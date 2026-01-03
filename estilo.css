@@ -1,0 +1,91 @@
+:root {
+  --primary-color: #007bff;
+  --sidebar-color: #2c3e50;
+  --bg-light: #f4f6f9;
+  --text-light: #ecf0f1;
+  --secondary-color: #28a745;
+  --danger-color: #dc3545;
+  --background-color: #f4f7f6;
+  --sidebar-color: #2c3e50;
+  --text-light: #ecf0f1;
+  --card-bg: #ffffff;
+  --warning-color: #ffc107;
+  --info-color: #17a2b8;
+}
+
+body { font-family: 'Segoe UI', system-ui; background-color: var(--bg-light); }
+
+.dashboard-container { display: flex; min-height: 100vh; }
+
+/* Sidebar Desktop */
+.sidebar {
+  width: 260px;
+  background-color: var(--sidebar-color);
+  color: var(--text-light);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  padding: 20px;
+}
+
+/* Sidebar Móvil (Oculta por defecto) */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    height: 100%;
+  }
+  .sidebar.active { left: 0; }
+  .main-content { padding: 15px !important; }
+}
+
+.sidebar-nav a {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  color: var(--text-light);
+  text-decoration: none;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: 0.2s;
+}
+
+.sidebar-nav a:hover, .sidebar-nav a.active {
+  background-color: rgba(255,255,255,0.1);
+  color: var(--primary-color);
+}
+
+.sidebar-nav a i { width: 25px; margin-right: 10px; }
+
+/* Main Content */
+.main-content { flex-grow: 1; padding: 30px; width: 100%; }
+
+.content-section { display: none; }
+.content-section.active { display: block; animation: fadeIn 0.4s; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+/* Stats Grid Responsivo  */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  border-left: 4px solid;
+}
+
+.hover-card { transition: 0.3s; cursor: pointer; }
+.hover-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1) !important; }
+
+/* Ajustes de Tabla para pantallas pequeñas */
+.table td, .table th { padding: 12px; font-size: 0.9rem; }
+
+@media (max-width: 576px) {
+    .stat-value { font-size: 1.4rem; }
+    .table td, .table th { font-size: 0.8rem; padding: 8px; }
+}
