@@ -1,18 +1,9 @@
 /**
- * SISTEMA CCH - DASHBOARD DE ASISTENCIAS (Versión GitHub)
- * Este script se conecta a la Web App de Google Apps Script.
+ * SISTEMA CCH - DASHBOARD CORE (JsRender Version)
  */
 
-// ================= 1. CONFIGURACIÓN Y ESTADO =================
 const CONFIG = {
-    // URL de tu Web App publicada (Debe ser la de "Nueva Implementación")
-    API_URL: 'https://script.google.com/macros/s/AKfycbzafrk_uQaDvhWzqgjUm7oh6RvjowPZQnyPEMOKauib-B0r4CnF-hCa1Rb3zfrQzQMiZA/exec',
-    COLORS: {
-        primary: '#007bff',
-        success: '#198754',
-        warning: '#ffc107',
-        danger: '#dc3545'
-    }
+    API_URL: 'https://script.google.com/macros/s/AKfycbzafrk_uQaDvhWzqgjUm7oh6RvjowPZQnyPEMOKauib-B0r4CnF-hCa1Rb3zfrQzQMiZA/exec'
 };
 
 const STATE = {
@@ -20,152 +11,104 @@ const STATE = {
     currentView: 'inicio'
 };
 
-// ================= 2. CAPA DE CONEXIÓN (API) =================
+// ================= 1. HELPERS JSRENDER =================
+$.views.helpers({
+    getStatusClass: function(faltas) {
+        const n = parseFloat(faltas || 0);
+        return n > 8 ? "text-danger" : (n > 4 ? "text-warning" : "text-success");
+    },
+    getStatusBadge: function(faltas) {
+        const n = parseFloat(faltas || 0);
+        return n > 8 ? "⚠️ NP" : (n > 4 ? "❗" : "");
+    }
+});
+
+// ================= 2. CAPA DE DATOS =================
 const API = {
-    /**
-     * Obtiene los datos desde la Web App de Google
-     */
-    async fetchAttendance(sheetName) {
-        const url = `${CONFIG.API_URL}?action=getData&sheetName=${sheetName}`;
-        
+    async getData(sheetName) {
         try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error("Error en la respuesta del servidor");
-            const result = await response.json();
-            return result;
-        } catch (error) {
-            console.error("API Error:", error);
-            return { status: "error", message: "No se pudo conectar con Google Sheets. Revisa la URL de la API." };
+            const response = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${sheetName}`);
+            return await response.json();
+        } catch (e) {
+            return { status: "error", message: "Error de conexión con Google." };
         }
     }
 };
 
-// ================= 3. GESTIÓN DE INTERFAZ (UI) =================
+// ================= 3. GESTIÓN DE UI =================
 const UI = {
-    /**
-     * Muestra el spinner de carga
-     */
     showLoading(show) {
         const body = document.getElementById('tableBody');
         if (show) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="10" class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <p class="mt-2 text-muted">Obteniendo datos de la hoja...</p>
-                    </td>
-                </tr>`;
+            body.innerHTML = `<tr><td colspan="10" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
         }
     },
 
-    /**
-     * Actualiza las tarjetas del Dashboard
-     */
     updateStats(data) {
         document.getElementById('stat-total').textContent = data.length;
-        
-        const sumPct = data.reduce((acc, curr) => acc + parseFloat(curr.porcentaje || 0), 0);
-        const avg = data.length > 0 ? (sumPct / data.length).toFixed(1) : 0;
-        document.getElementById('stat-avg').textContent = `${avg}%`;
-        
-        const riskCount = data.filter(s => parseFloat(s.porcentaje) < 80).length;
-        document.getElementById('stat-risk').textContent = riskCount;
+        const sum = data.reduce((acc, curr) => acc + parseFloat(curr.porcentaje || 0), 0);
+        document.getElementById('stat-avg').textContent = (data.length > 0 ? (sum / data.length).toFixed(1) : 0) + '%';
+        document.getElementById('stat-risk').textContent = data.filter(s => parseFloat(s.porcentaje) < 80).length;
     },
 
-    /**
-     * Renderiza la tabla según el tipo de reporte
-     */
-    renderTable(data, type) {
-        const header = document.getElementById('tableHeader');
-        const body = document.getElementById('tableBody');
-        
-        // Definición de columnas por materia
-        let cols = [];
-        if (type === 'maga') {
-            header.innerHTML = `<tr><th>Cuenta</th><th>Faltas</th><th>Sellos</th><th>Exámenes</th><th>Total</th></tr>`;
-            cols = ['cuenta', 'faltas', 'sellos', 'examenes', 'total'];
-        } else {
-            header.innerHTML = `<tr><th>Cuenta</th><th>Faltas</th><th>Tareas</th><th>Ejercicios</th><th>Part.</th><th>Examen</th><th>Total</th></tr>`;
-            cols = ['cuenta', 'faltas', 'tareas', 'ejercicios', 'participaciones', 'examenes', 'total'];
-        }
+    render(data, type) {
+        // Renderizar Encabezado
+        const headerHtml = $("#headerTmpl").render({ type: type });
+        document.getElementById('tableHeader').innerHTML = headerHtml;
 
-        body.innerHTML = '';
+        // Renderizar Cuerpo
+        const body = document.getElementById('tableBody');
         if (data.length === 0) {
-            body.innerHTML = '<tr><td colspan="10" class="text-center">No se encontraron resultados.</td></tr>';
+            body.innerHTML = '<tr><td colspan="10" class="text-center py-4">Sin datos.</td></tr>';
             return;
         }
 
-        data.forEach(student => {
-            const tr = document.createElement('tr');
-            const nFaltas = parseFloat(student.faltas || 0);
-            
-            // Lógica de Semáforo
-            let statusClass = nFaltas > 8 ? "text-danger fw-bold" : (nFaltas > 4 ? "text-warning fw-bold" : "text-success");
-            let badge = nFaltas > 8 ? " ⚠️ NP" : (nFaltas > 4 ? " ❗" : "");
-
-            tr.innerHTML = cols.map(c => {
-                if (c === 'faltas') return `<td class="${statusClass}">${student[c]}${badge}</td>`;
-                return `<td>${student[c] || 0}</td>`;
-            }).join('');
-            
-            body.appendChild(tr);
-        });
+        const templateId = type === 'maga' ? "#magaRowTmpl" : "#cycRowTmpl";
+        body.innerHTML = $(templateId).render(data);
     }
 };
 
-// ================= 4. CONTROLADOR DE LA APP =================
+// ================= 4. CONTROLADOR APP =================
 const App = {
     init() {
-        // Listeners para la navegación
+        // Cargar secciones según data-section
         document.querySelectorAll('.sidebar-nav a').forEach(link => {
             link.addEventListener('click', (e) => {
+                e.preventDefault();
                 const section = link.getAttribute('data-section');
-                this.handleNavigation(link, section);
+                this.loadSection(section);
+                
+                document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
             });
         });
     },
 
-    handleNavigation(link, section) {
-        // Actualizar estilos de la barra lateral
-        document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-
-        this.loadSection(section);
-
-        // Cerrar sidebar en móviles
-        if (window.innerWidth <= 768) {
-            document.getElementById('sidebar').classList.remove('active');
-        }
-    },
-
     async loadSection(section) {
-        const inicioSec = document.getElementById('inicio');
-        const reportSec = document.getElementById('reporte-view');
+        const inicio = document.getElementById('inicio');
+        const reporte = document.getElementById('reporte-view');
 
         if (section === 'inicio') {
-            inicioSec.classList.add('active');
-            reportSec.classList.remove('active');
-            STATE.currentView = 'inicio';
+            inicio.classList.add('active');
+            reporte.classList.remove('active');
             return;
         }
 
-        // Preparar vista de reporte
-        inicioSec.classList.remove('active');
-        reportSec.classList.add('active');
+        inicio.classList.remove('active');
+        reporte.classList.add('active');
         document.getElementById('view-title').textContent = section === 'maga' ? 'Reporte MAGA 2' : 'Reporte CYC';
         document.getElementById('tableSearch').value = '';
-        
+
         STATE.currentView = section;
         UI.showLoading(true);
 
-        // Pedir datos a la API (Google Sheets)
         const sheetName = section === 'maga' ? 'Reporte_MAGA2' : 'Reporte_CYC';
-        const result = await API.fetchAttendance(sheetName);
+        const result = await API.getData(sheetName);
 
         if (result.status === 'success') {
             STATE.currentData = result.data;
             UI.updateStats(result.data);
-            UI.renderTable(result.data, section);
+            UI.render(result.data, section);
         } else {
             document.getElementById('tableBody').innerHTML = `<tr><td colspan="10" class="alert alert-danger">${result.message}</td></tr>`;
         }
@@ -176,13 +119,17 @@ const App = {
         const filtered = STATE.currentData.filter(item => 
             String(item.cuenta).toLowerCase().includes(query)
         );
-        UI.renderTable(filtered, STATE.currentView);
+        UI.render(filtered, STATE.currentView);
     },
 
     toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('active');
+    },
+
+    handleNavClick(el, sec) {
+        this.loadSection(sec);
+        if (window.innerWidth <= 768) this.toggleSidebar();
     }
 };
 
-// Iniciar aplicación
 document.addEventListener('DOMContentLoaded', () => App.init());
