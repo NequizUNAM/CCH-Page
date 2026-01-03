@@ -13,15 +13,23 @@
     <div class="dashboard-container">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="logo"><i class="fas fa-school"></i> <span>Sistema CCH</span></div>
-                <button class="btn-close-sidebar d-md-none" onclick="App.toggleSidebar()"><i class="fas fa-times"></i></button>
+                <div class="logo">
+                    <i class="fas fa-school"></i> <span>Sistema CCH</span>
+                </div>
+                <button class="btn-close-sidebar d-md-none" onclick="App.toggleSidebar()">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
+            
             <nav class="sidebar-nav">
                 <a href="#inicio" class="active" data-section="inicio" onclick="App.handleNavClick(this, 'inicio')">
                     <i class="fas fa-home"></i> <span>Inicio</span>
                 </a>
                 <a href="#maga" data-section="maga" onclick="App.handleNavClick(this, 'maga')">
                     <i class="fas fa-square-root-variable"></i> <span>MAGA 2</span>
+                </a>
+                <a href="#maga3" data-section="maga3" onclick="App.handleNavClick(this, 'maga3')">
+                    <i class="fas fa-calculator"></i> <span>MAGA 3</span>
                 </a>
                 <a href="#cyc" data-section="cyc" onclick="App.handleNavClick(this, 'cyc')">
                     <i class="fas fa-laptop-code"></i> <span>CYC</span>
@@ -31,23 +39,34 @@
 
         <main class="main-content">
             <header class="mobile-header d-md-none mb-3">
-                <button class="btn btn-dark" onclick="App.toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <button class="btn btn-dark" onclick="App.toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <span class="fw-bold ms-2">Sistema CCH</span>
             </header>
 
             <section id="inicio" class="content-section active">
                 <h2 class="h4 mb-4"><i class="fas fa-chalkboard-teacher text-primary"></i> Panel de Control</h2>
                 <div class="row g-3">
-                    <div class="col-12 col-sm-6">
+                    <div class="col-12 col-sm-4">
                         <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga')">
                             <div class="display-5 mb-2">📐</div>
                             <h5 class="fw-bold">Reporte MAGA 2</h5>
+                            <p class="small text-muted mb-0">Geometría Analítica</p>
                         </div>
                     </div>
-                    <div class="col-12 col-sm-6">
+                    <div class="col-12 col-sm-4">
+                        <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga3')">
+                            <div class="display-5 mb-2">📊</div>
+                            <h5 class="fw-bold">Reporte MAGA 3</h5>
+                            <p class="small text-muted mb-0">Cálculo Diferencial</p>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-4">
                         <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('cyc')">
                             <div class="display-5 mb-2">💻</div>
                             <h5 class="fw-bold">Reporte CYC</h5>
+                            <p class="small text-muted mb-0">Cibernética</p>
                         </div>
                     </div>
                 </div>
@@ -58,30 +77,28 @@
                 
                 <div class="stats-grid mb-4">
                     <div class="stat-card border-primary">
-                        <div class="stat-label text-muted small">Total Alumnos</div>
+                        <div class="stat-label text-muted small text-uppercase fw-bold">Total Alumnos</div>
                         <div class="stat-value h2 mb-0" id="stat-total">0</div>
                     </div>
                     <div class="stat-card border-success">
-                        <div class="stat-label text-muted small">Promedio Asistencia</div>
+                        <div class="stat-label text-muted small text-uppercase fw-bold">Promedio Asistencia</div>
                         <div class="stat-value h2 mb-0" id="stat-avg">0%</div>
                     </div>
                     <div class="stat-card border-danger">
-                        <div class="stat-label text-muted small">Alumnos en Riesgo</div>
+                        <div class="stat-label text-muted small text-uppercase fw-bold">En Riesgo (<80%)</div>
                         <div class="stat-value h2 mb-0" id="stat-risk">0</div>
                     </div>
                 </div>
 
                 <div class="input-group mb-4 shadow-sm">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" id="tableSearch" class="form-control border-start-0" placeholder="Buscar por cuenta..." onkeyup="App.filterTable()">
+                    <input type="text" id="tableSearch" class="form-control border-start-0" placeholder="Escribe un número de cuenta..." onkeyup="App.filterTable()">
                 </div>
 
                 <div class="card border-0 shadow-sm">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light" id="tableHeader"></thead>
-                            <tbody id="tableBody"></tbody>
-                        </table>
+                        <table class="table table-hover align-middle mb-0" id="mainAttendanceTable">
+                            </table>
                     </div>
                 </div>
             </section>
@@ -90,44 +107,63 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrender/1.0.11/jsrender.min.js"></script>
-    
-    <script id="headerTmpl" type="text/x-jsrender">
-        <tr>
-            <th>Cuenta</th>
-            <th>Faltas</th>
-            {{if type === 'maga'}}
-                <th>Sellos</th>
-                <th>Exámenes</th>
-            {{else}}
-                <th>Tareas</th>
-                <th>Ejercicios</th>
-                <th>Part.</th>
-                <th>Examen</th>
-            {{/if}}
-            <th>Total</th>
-        </tr>
-    </script>
 
     <script id="magaRowTmpl" type="text/x-jsrender">
-        <tr>
-            <td>{{:cuenta}}</td>
-            <td class="{{:~getStatusClass(faltas)}} fw-bold">{{:faltas}} {{:~getStatusBadge(faltas)}}</td>
-            <td>{{:sellos}}</td>
-            <td>{{:examenes}}</td>
-            <td class="{{:total < 60 ? 'text-danger fw-bold' : ''}}">{{:total}}</td>
-        </tr>
+        <thead class="table-light">
+            <tr>
+                <th>Cuenta</th>
+                <th>Faltas</th>
+                <th>Sellos 60%</th>
+                <th>Exámenes 40%</th>
+                <th>Total 100%</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{for students}}
+            <tr>
+                <td>{{:cuenta}}</td>
+                <td class="{{:~getStatusClass(faltas)}} fw-bold">
+                    {{:faltas}} {{:~getStatusBadge(faltas)}}
+                </td>
+                <td>{{:sellos}}</td>
+                <td>{{:examenes}}</td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
+                    {{:total}}
+                </td>
+            </tr>
+            {{/for}}
+        </tbody>
     </script>
 
     <script id="cycRowTmpl" type="text/x-jsrender">
-        <tr>
-            <td>{{:cuenta}}</td>
-            <td class="{{:~getStatusClass(faltas)}} fw-bold">{{:faltas}} {{:~getStatusBadge(faltas)}}</td>
-            <td>{{:tareas}}</td>
-            <td>{{:ejercicios}}</td>
-            <td>{{:participaciones}}</td>
-            <td>{{:examenes}}</td>
-            <td class="{{:total < 60 ? 'text-danger fw-bold' : ''}}">{{:total}}</td>
-        </tr>
+        <thead class="table-light">
+            <tr>
+                <th>Cuenta</th>
+                <th>Faltas</th>
+                <th>Tareas</th>
+                <th>Ejercicios</th>
+                <th>Participaciones</th>
+                <th>Examen</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{for students}}
+            <tr>
+                <td>{{:cuenta}}</td>
+                <td class="{{:~getStatusClass(faltas)}} fw-bold">
+                    {{:faltas}} {{:~getStatusBadge(faltas)}}
+                </td>
+                <td>{{:tareas}}</td>
+                <td>{{:ejercicios}}</td>
+                <td>{{:participaciones}}</td>
+                <td>{{:examenes}}</td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
+                    {{:total}}
+                </td>
+            </tr>
+            {{/for}}
+        </tbody>
     </script>
 
     <script src="script.js"></script>

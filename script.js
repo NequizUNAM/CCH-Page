@@ -6,12 +6,13 @@ const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycbzafrk_uQaDvhWzqgjUm7oh6RvjowPZQnyPEMOKauib-B0r4CnF-hCa1Rb3zfrQzQMiZA/exec'
 };
 
+
 const STATE = {
     currentData: [],
     currentView: 'inicio'
 };
 
-// ================= 1. HELPERS JSRENDER =================
+// HELPERS JSRENDER
 $.views.helpers({
     getStatusClass: function(faltas) {
         const n = parseFloat(faltas || 0);
@@ -19,28 +20,26 @@ $.views.helpers({
     },
     getStatusBadge: function(faltas) {
         const n = parseFloat(faltas || 0);
-        return n > 8 ? "⚠️ NP" : (n > 4 ? "❗" : "");
+        return n > 8 ? "⚠️ NP" : (n > 4 ? "❗Revisar" : "");
     }
 });
 
-// ================= 2. CAPA DE DATOS =================
 const API = {
     async getData(sheetName) {
         try {
             const response = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${sheetName}`);
             return await response.json();
         } catch (e) {
-            return { status: "error", message: "Error de conexión con Google." };
+            return { status: "error", message: "Error de conexión." };
         }
     }
 };
 
-// ================= 3. GESTIÓN DE UI =================
 const UI = {
     showLoading(show) {
-        const body = document.getElementById('tableBody');
+        const table = document.getElementById('mainAttendanceTable');
         if (show) {
-            body.innerHTML = `<tr><td colspan="10" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
+            table.innerHTML = `<tbody><tr><td class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr></tbody>`;
         }
     },
 
@@ -52,32 +51,28 @@ const UI = {
     },
 
     render(data, type) {
-        // Renderizar Encabezado
-        const headerHtml = $("#headerTmpl").render({ type: type });
-        document.getElementById('tableHeader').innerHTML = headerHtml;
-
-        // Renderizar Cuerpo
-        const body = document.getElementById('tableBody');
+        const table = document.getElementById('mainAttendanceTable');
+        
         if (data.length === 0) {
-            body.innerHTML = '<tr><td colspan="10" class="text-center py-4">Sin datos.</td></tr>';
+            table.innerHTML = '<tbody><tr><td class="text-center py-4">Sin datos registrados.</td></tr></tbody>';
             return;
         }
 
-        const templateId = type === 'maga' ? "#magaRowTmpl" : "#cycRowTmpl";
-        body.innerHTML = $(templateId).render(data);
+        // Seleccionamos el template consolidado
+        const templateId = (type === 'maga' || type === 'maga3') ? "#magaRowTmpl" : "#cycRowTmpl";
+        
+        // Renderizamos pasando el objeto envuelto en una propiedad 'students' para el {{for}}
+        const html = $(templateId).render({ students: data });
+        table.innerHTML = html;
     }
 };
 
-// ================= 4. CONTROLADOR APP =================
 const App = {
     init() {
-        // Cargar secciones según data-section
         document.querySelectorAll('.sidebar-nav a').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const section = link.getAttribute('data-section');
-                this.loadSection(section);
-                
+                this.loadSection(link.getAttribute('data-section'));
                 document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
                 link.classList.add('active');
             });
@@ -96,21 +91,23 @@ const App = {
 
         inicio.classList.remove('active');
         reporte.classList.add('active');
-        document.getElementById('view-title').textContent = section === 'maga' ? 'Reporte MAGA 2' : 'Reporte CYC';
+        
+        const titulos = { 'maga': 'MAGA 2', 'maga3': 'MAGA 3', 'cyc': 'CYC' };
+        document.getElementById('view-title').textContent = `Reporte ${titulos[section] || ''}`;
         document.getElementById('tableSearch').value = '';
 
         STATE.currentView = section;
         UI.showLoading(true);
 
-        const sheetName = section === 'maga' ? 'Reporte_MAGA2' : 'Reporte_CYC';
-        const result = await API.getData(sheetName);
+        const sheetNames = { 'maga': 'Reporte_MAGA2', 'maga3': 'Reporte_MAGA3', 'cyc': 'Reporte_CYC' };
+        const result = await API.getData(sheetNames[section]);
 
         if (result.status === 'success') {
             STATE.currentData = result.data;
             UI.updateStats(result.data);
             UI.render(result.data, section);
         } else {
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="10" class="alert alert-danger">${result.message}</td></tr>`;
+            document.getElementById('mainAttendanceTable').innerHTML = `<tr><td class="alert alert-danger">${result.message}</td></tr>`;
         }
     },
 
@@ -122,14 +119,8 @@ const App = {
         UI.render(filtered, STATE.currentView);
     },
 
-    toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('active');
-    },
-
-    handleNavClick(el, sec) {
-        this.loadSection(sec);
-        if (window.innerWidth <= 768) this.toggleSidebar();
-    }
+    toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
+    handleNavClick(el, sec) { this.loadSection(sec); if (window.innerWidth <= 768) this.toggleSidebar(); }
 };
 
 document.addEventListener('DOMContentLoaded', () => App.init());
