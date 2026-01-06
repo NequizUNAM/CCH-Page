@@ -137,6 +137,7 @@ const App = {
             inicioSec.classList.add('active');
             reporteSec.classList.remove('active');
             STATE.currentView = 'inicio';
+            this.closeSidebar(); // Siempre cerrar al navegar
             return;
         }
 
