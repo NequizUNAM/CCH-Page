@@ -25,14 +25,20 @@
                 <a href="#inicio" class="active" data-section="inicio" onclick="App.handleNavClick(this, 'inicio')">
                     <i class="fas fa-home"></i> <span>Inicio</span>
                 </a>
-                <a href="#maga" data-section="maga" onclick="App.handleNavClick(this, 'maga')">
+                <a href="#maga1" data-section="maga1" onclick="App.handleNavClick(this, 'maga1')">
+                    <i class="fas fa-arrow-up-1-9"></i> <span>MAGA 1</span>
+                </a>
+                <a href="#maga" data-section="maga2" onclick="App.handleNavClick(this, 'maga2')">
                     <i class="fas fa-square-root-variable"></i> <span>MAGA 2</span>
                 </a>
                 <a href="#maga3" data-section="maga3" onclick="App.handleNavClick(this, 'maga3')">
                     <i class="fas fa-calculator"></i> <span>MAGA 3</span>
                 </a>
                 <a href="#cyc" data-section="cyc" onclick="App.handleNavClick(this, 'cyc')">
-                    <i class="fas fa-laptop-code"></i> <span>CYC</span>
+                    <i class="fas fa-laptop-code"></i> <span>CYC 1</span>
+                </a>
+                <a href="#estadistica" data-section="estadistica" onclick="App.handleNavClick(this, 'estadistica')">
+                    <i class="fas fa-chart-pie"></i> <span>Estadística</span>
                 </a>
             </nav>
         </aside>
@@ -48,27 +54,41 @@
             <section id="inicio" class="content-section active">
                 <h2 class="h4 mb-4"><i class="fas fa-chalkboard-teacher text-primary"></i> Panel de Control</h2>
                 <div class="row g-3">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga1')">
+                            <div class="display-5 mb-2">📒</div>
+                            <h5 class="fw-bold">Reporte MAGA 1</h5>
+                            <p class="small text-muted mb-0">MATEMÁTICAS I</p>
+                        </div>
+                    </div>
                     <div class="col-12 col-sm-4">
-                        <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga')">
+                        <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga2')">
                             <div class="display-5 mb-2">📐</div>
                             <h5 class="fw-bold">Reporte MAGA 2</h5>
                             <p class="small text-muted mb-0">Geometría Analítica</p>
                         </div>
                     </div>
-                    <div class="col-12 col-sm-4">
+                    <!-- <div class="col-12 col-sm-4">
                         <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('maga3')">
                             <div class="display-5 mb-2">📊</div>
                             <h5 class="fw-bold">Reporte MAGA 3</h5>
                             <p class="small text-muted mb-0">Cálculo Diferencial</p>
                         </div>
-                    </div>
+                    </div> -->
                     <div class="col-12 col-sm-4">
                         <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('cyc')">
                             <div class="display-5 mb-2">💻</div>
-                            <h5 class="fw-bold">Reporte CYC</h5>
-                            <p class="small text-muted mb-0">Cibernética</p>
+                            <h5 class="fw-bold">Reporte CYC 1</h5>
+                            <p class="small text-muted mb-0">Cibernética 1</p>
                         </div>
                     </div>
+
+                    <!-- <div class="col-12 col-sm-6 col-md-3">
+                        <div class="card p-4 shadow-sm text-center border-0 bg-white hover-card" onclick="App.loadSection('estadistica')">
+                            <div class="display-5 mb-2">📊</div>
+                            <h5 class="fw-bold">Reporte Estadística</h5>
+                        </div>
+                    </div> -->
                 </div>
             </section>
 
@@ -90,6 +110,25 @@
                     </div>
                 </div>
 
+                <div class="row g-2 mb-4">
+                    <div class="col-md-6">
+                        <div class="alert alert-warning d-flex align-items-center mb-0 py-2 border-0 shadow-sm">
+                            <h5 class="mb-0 fs-6">
+                                <span class="badge text-dark me-2">‼️</span> 
+                                <strong>Trabajo adicional</strong>
+                            </h5>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-danger d-flex align-items-center mb-0 py-2 border-0 shadow-sm">
+                            <h5 class="mb-0 fs-6">
+                                <span class="badge bg-danger me-2">⚠️ NP</span> 
+                                <strong>No presentó</strong>
+                            </h5>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="input-group mb-4 shadow-sm">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
                     <input type="text" id="tableSearch" class="form-control border-start-0" placeholder="Escribe un número de cuenta..." onkeyup="App.filterTable()">
@@ -97,8 +136,8 @@
 
                 <div class="card border-0 shadow-sm">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" id="mainAttendanceTable">
-                            </table>
+                        <table class="table table-hover align-middle mb-0 text-center" id="mainAttendanceTable">
+                        </table>
                     </div>
                 </div>
             </section>
@@ -140,11 +179,11 @@
             <tr>
                 <th>Cuenta</th>
                 <th>Faltas</th>
-                <th>Tareas</th>
-                <th>Ejercicios</th>
-                <th>Participaciones</th>
-                <th>Examen</th>
-                <th>Total</th>
+                <th>Tareas 40%</th>
+                <th>Ejercicios 20%</th>
+                <th>Participaciones 20%</th>
+                <th>Examen 20%</th>
+                <th>Total 100%</th>
             </tr>
         </thead>
         <tbody>
@@ -157,6 +196,36 @@
                 <td>{{:tareas}}</td>
                 <td>{{:ejercicios}}</td>
                 <td>{{:participaciones}}</td>
+                <td>{{:examenes}}</td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
+                    {{:total}}
+                </td>
+            </tr>
+            {{/for}}
+        </tbody>
+    </script>
+
+    <!-- ESTADISTICA -->
+    <script id="estadRowTmpl" type="text/x-jsrender">
+        <thead class="table-light">
+            <tr>
+                <th>Cuenta</th>
+                <th>Faltas</th>
+                <th>Actividades 30%</th>
+                <th>Prácticas 30%</th>
+                <th>Examen 40%</th>
+                <th>Total 100%</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{for students}}
+            <tr>
+                <td>{{:cuenta}}</td>
+                <td class="{{:~getStatusClass(faltas)}} fw-bold">
+                    {{:faltas}} {{:~getStatusBadge(faltas)}}
+                </td>
+                <td>{{:actividades}}</td>
+                <td>{{:practicas}}</td>
                 <td>{{:examenes}}</td>
                 <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
                     {{:total}}
