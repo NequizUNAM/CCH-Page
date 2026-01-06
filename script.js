@@ -17,12 +17,12 @@ const STATE = {
 // ================= 2. HELPERS DE JSRENDER =================
 // Estos helpers permiten procesar lógica visual directamente en el HTML
 $.views.helpers({
-    getStatusClass: function(faltas) {
+    getStatusClass: function (faltas) {
         const n = parseFloat(faltas || 0);
         // Semáforo: Rojo (>8), Amarillo (>4), Verde (<=4)
         return n > 8 ? "text-danger" : (n > 4 ? "text-warning" : "text-success");
     },
-    getStatusBadge: function(faltas) {
+    getStatusBadge: function (faltas) {
         const n = parseFloat(faltas || 0);
         // Badges: NP (No Presentó), ! (Revisión)
         return n > 8 ? "⚠️" : (n > 4 ? "‼️" : "");
@@ -71,11 +71,11 @@ const UI = {
      */
     updateStats(data) {
         document.getElementById('stat-total').textContent = data.length;
-        
+
         const sumPct = data.reduce((acc, curr) => acc + parseFloat(curr.porcentaje || 0), 0);
         const avg = data.length > 0 ? (sumPct / data.length).toFixed(1) : 0;
         document.getElementById('stat-avg').textContent = `${avg}%`;
-        
+
         const riskCount = data.filter(s => parseFloat(s.porcentaje) < 80).length;
         document.getElementById('stat-risk').textContent = riskCount;
     },
@@ -85,7 +85,7 @@ const UI = {
      */
     render(data, type) {
         const table = document.getElementById('mainAttendanceTable');
-        
+
         if (data.length === 0) {
             table.innerHTML = '<tbody><tr><td class="text-center py-4">No se encontraron registros en esta hoja.</td></tr></tbody>';
             return;
@@ -101,7 +101,7 @@ const UI = {
         };
 
         const templateId = templateMap[type] || "#cycRowTmpl";
-        
+
         // Ejecución de JsRender
         const html = $(templateId).render({ students: data });
         table.innerHTML = html;
@@ -117,7 +117,7 @@ const App = {
                 e.preventDefault();
                 const section = link.getAttribute('data-section');
                 this.loadSection(section);
-                
+
                 // Actualizar estado activo en el menú
                 document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
                 link.classList.add('active');
@@ -148,7 +148,7 @@ const App = {
             'maga1': { title: 'MAGA 1', sheet: 'Reporte_MAGA1' },
             'maga2': { title: 'MAGA 2', sheet: 'Reporte_MAGA2' },
             'maga3': { title: 'MAGA 3', sheet: 'Reporte_MAGA3' },
-            'cyc':   { title: 'CYC 1',  sheet: 'Reporte_CYC' },
+            'cyc': { title: 'CYC 1', sheet: 'Reporte_CYC' },
             'estadistica': { title: 'Estadística', sheet: 'Reporte_Estadistica' }
         };
 
@@ -174,9 +174,12 @@ const App = {
         }
 
         // Cerrar sidebar en móviles tras seleccionar
-        if (window.innerWidth <= 768) {
-            this.toggleSidebar();
-        }
+        // if (window.innerWidth <= 768) {
+        //     this.toggleSidebar();
+        // }
+
+        // Ejecutar cierre de sidebar independientemente del tamaño de pantalla
+        this.closeSidebar();
     },
 
     /**
@@ -184,14 +187,20 @@ const App = {
      */
     filterTable() {
         const query = document.getElementById('tableSearch').value.toLowerCase().trim();
-        const filtered = STATE.currentData.filter(item => 
+        const filtered = STATE.currentData.filter(item =>
             String(item.cuenta).toLowerCase().includes(query)
         );
         UI.render(filtered, STATE.currentView);
     },
 
-    toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('active');
+    /**
+     * Fuerza el cierre del sidebar eliminando la clase active
+     */
+    closeSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
     },
 
     handleNavClick(el, sec) {
