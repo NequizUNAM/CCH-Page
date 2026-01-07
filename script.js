@@ -1,213 +1,153 @@
 /**
- * SISTEMA CCH - DASHBOARD CENTRALIZADO (Versión JsRender)
- * Gestión de MAGA 1, 2, 3, CYC y Estadística
+ * SISTEMA CCH - DASHBOARD MOTOR FRONTEND CON SEGURIDAD
  */
 
-// ================= 1. CONFIGURACIÓN Y ESTADO =================
 const CONFIG = {
-    // URL de tu Web App de Google Apps Script
-    API_URL: 'https://script.google.com/macros/s/AKfycbzafrk_uQaDvhWzqgjUm7oh6RvjowPZQnyPEMOKauib-B0r4CnF-hCa1Rb3zfrQzQMiZA/exec'
+    API_URL: 'https://script.google.com/macros/s/AKfycbzafrk_uQaDvhWzqgjUm7oh6RvjowPZQnyPEMOKauib-B0r4CnF-hCa1Rb3zfrQzQMiZA/exec',
+    ADMIN_PASS: '307153443'
 };
 
-const STATE = {
-    currentData: [],
-    currentView: 'inicio'
-};
+const STATE = { currentData: [], currentView: 'inicio', currentSheet: '', isEditable: false };
 
-// ================= 2. HELPERS DE JSRENDER =================
-// Estos helpers permiten procesar lógica visual directamente en el HTML
 $.views.helpers({
-    getStatusClass: function (faltas) {
-        const n = parseFloat(faltas || 0);
-        // Semáforo: Rojo (>8), Amarillo (>4), Verde (<=4)
-        return n > 8 ? "text-danger" : (n > 4 ? "text-warning" : "text-success");
-    },
-    getStatusBadge: function (faltas) {
-        const n = parseFloat(faltas || 0);
-        // Badges: NP (No Presentó), ! (Revisión)
-        return n > 8 ? "⚠️" : (n > 4 ? "‼️" : "");
-    }
+    isEditable: () => STATE.isEditable,
+    getStatusClass: (f) => parseFloat(f) > 8 ? "text-danger" : (parseFloat(f) > 4 ? "text-warning" : "text-success"),
+    getStatusBadge: (f) => parseFloat(f) > 8 ? "NP" : (parseFloat(f) > 4 ? "!" : "")
 });
 
-// ================= 3. CAPA DE CONEXIÓN (API) =================
-const API = {
-    /**
-     * Obtiene los datos de una hoja específica desde Google Sheets
-     */
-    async getData(sheetName) {
-        try {
-            const response = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${sheetName}`);
-            if (!response.ok) throw new Error("Error en la respuesta del servidor");
-            return await response.json();
-        } catch (e) {
-            console.error("API Error:", e);
-            return { status: "error", message: "No se pudo conectar con el servidor." };
-        }
-    }
-};
-
-// ================= 4. GESTIÓN DE INTERFAZ (UI) =================
 const UI = {
-    /**
-     * Muestra el spinner de carga en la tabla principal
-     */
     showLoading(show) {
-        const table = document.getElementById('mainAttendanceTable');
-        if (show) {
-            table.innerHTML = `
-                <tbody>
-                    <tr>
-                        <td class="text-center py-5">
-                            <div class="spinner-border text-primary" role="status"></div>
-                            <p class="mt-2 text-muted">Consultando Google Sheets...</p>
-                        </td>
-                    </tr>
-                </tbody>`;
-        }
+        const t = document.getElementById('mainAttendanceTable');
+        if (show) t.innerHTML = `<tbody><tr><td class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr></tbody>`;
     },
-
-    /**
-     * Actualiza las tarjetas de métricas superiores
-     */
     updateStats(data) {
         document.getElementById('stat-total').textContent = data.length;
-
-        const sumPct = data.reduce((acc, curr) => acc + parseFloat(curr.porcentaje || 0), 0);
-        const avg = data.length > 0 ? (sumPct / data.length).toFixed(1) : 0;
-        document.getElementById('stat-avg').textContent = `${avg}%`;
-
-        const riskCount = data.filter(s => parseFloat(s.porcentaje) < 80).length;
-        document.getElementById('stat-risk').textContent = riskCount;
+        const avg = data.length > 0 ? (data.reduce((a, b) => a + parseFloat(b.porcentaje || 0), 0) / data.length).toFixed(1) : 0;
+        document.getElementById('stat-avg').textContent = avg + '%';
+        document.getElementById('stat-risk').textContent = data.filter(s => parseFloat(s.porcentaje) < 80).length;
     },
-
-    /**
-     * Renderiza la tabla utilizando el template correcto según la materia
-     */
     render(data, type) {
-        const table = document.getElementById('mainAttendanceTable');
-
-        if (data.length === 0) {
-            table.innerHTML = '<tbody><tr><td class="text-center py-4">No se encontraron registros en esta hoja.</td></tr></tbody>';
-            return;
-        }
-
-        // MAPEO DE TEMPLATES: Cada materia se vincula a su propio diseño HTML
-        const templateMap = {
-            'maga1': '#magaRowTmpl',
-            'maga2': '#magaRowTmpl',
-            'maga3': '#magaRowTmpl',
-            'cyc': '#cycRowTmpl',
-            'estadistica': '#estadRowTmpl' // Template único para Estadística
-        };
-
-        const templateId = templateMap[type] || "#cycRowTmpl";
-
-        // Ejecución de JsRender
-        const html = $(templateId).render({ students: data });
-        table.innerHTML = html;
+        const t = document.getElementById('mainAttendanceTable');
+        const map = { 'maga1': '#magaRowTmpl', 'maga2': '#magaRowTmpl', 'maga3': '#magaRowTmpl', 'estadistica': '#estadRowTmpl', 'cyc': '#cycRowTmpl' };
+        t.innerHTML = $(map[type] || "#cycRowTmpl").render({ students: data }, { isEditable: STATE.isEditable });
     }
 };
 
-// ================= 5. CONTROLADOR DE LA APLICACIÓN =================
 const App = {
     init() {
-        // Listeners para los enlaces de navegación del sidebar
-        document.querySelectorAll('.sidebar-nav a').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const section = link.getAttribute('data-section');
-                this.loadSection(section);
+        document.querySelectorAll('.sidebar-nav a').forEach(l => l.addEventListener('click', e => {
+            e.preventDefault();
+            this.loadSection(l.getAttribute('data-section'));
+        }));
+    },
 
-                // Actualizar estado activo en el menú
-                document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-            });
+    processRawData(raw) {
+        const headers = raw[0].map(h => String(h || "").trim());
+        const rows = raw.slice(1);
+        const findCol = (name) => headers.indexOf(name);
+
+        const idx = {
+            cuenta: findCol("Cuenta"),
+            nombre: findCol("First Name"), // Verifica que en tu Excel la columna se llame así o cámbialo a "Nombre"
+            calif: findCol("Calificación"),
+            ex: findCol("Total Exámenes"),
+            sel: findCol("Total Sellos"),
+            selH: findCol("Sellos"),
+            tar: findCol("Total Tareas"),
+            eje: findCol("Total Ejercicios"),
+            part: findCol("Total Participaciones"),
+            act: findCol("Actividades 30%"),
+            prac: findCol("Prácticas 30%")
+        };
+
+        const start = idx.nombre + 1;
+        const end = (idx.selH !== -1 ? idx.selH : findCol("Puntos")) - 1;
+
+        return rows.map(row => {
+            let asistencias = 0, faltas = 0, totalClases = 0;
+            for (let i = start; i <= end; i++) {
+                let cell = row[i] ? row[i].toString().toLowerCase() : "";
+                if (cell.includes("asis")) { asistencias++; totalClases++; }
+                else if (cell.includes("falt")) { faltas++; totalClases++; }
+            }
+            const pct = totalClases > 0 ? ((asistencias / totalClases) * 100).toFixed(1) : 0;
+            return {
+                cuenta: row[idx.cuenta],
+                nombre: row[idx.nombre] || "Sin Nombre", // Extraemos el nombre para la columna dinámica
+                faltas,
+                porcentaje: pct,
+                examenes: row[idx.ex] || 0,
+                total: row[idx.calif] || 0,
+                sellos: row[idx.sel] || 0,
+                tareas: row[idx.tar] || 0,
+                ejercicios: row[idx.eje] || 0,
+                participaciones: row[idx.part] || 0,
+                actividades: row[idx.act] || 0,
+                practicas: row[idx.prac] || 0
+            };
         });
     },
 
-    /**
-     * Gestiona el cambio de vista y la carga de datos
-     */
     async loadSection(section) {
-        const inicioSec = document.getElementById('inicio');
-        const reporteSec = document.getElementById('reporte-view');
-
-        // Mostrar/Ocultar secciones
         if (section === 'inicio') {
-            inicioSec.classList.add('active');
-            reporteSec.classList.remove('active');
-            STATE.currentView = 'inicio';
-            this.closeSidebar(); // Siempre cerrar al navegar
-            return;
+            document.getElementById('inicio').classList.add('active');
+            document.getElementById('reporte-view').classList.remove('active');
+            this.closeSidebar(); return;
         }
+        document.getElementById('inicio').classList.remove('active');
+        document.getElementById('reporte-view').classList.add('active');
 
-        inicioSec.classList.remove('active');
-        reporteSec.classList.add('active');
-
-        // CONFIGURACIÓN POR MATERIA: Títulos y Hojas de Google
-        const materias = {
-            'maga1': { title: 'MAGA 1', sheet: 'Reporte_MAGA1' },
-            'maga2': { title: 'MAGA 2', sheet: 'Reporte_MAGA2' },
-            'maga3': { title: 'MAGA 3', sheet: 'Reporte_MAGA3' },
-            'cyc': { title: 'CYC 1', sheet: 'Reporte_CYC' },
-            'estadistica': { title: 'Estadística', sheet: 'Reporte_Estadistica' }
-        };
-
-        const config = materias[section] || {};
-        document.getElementById('view-title').textContent = `Reporte ${config.title || ''}`;
-        document.getElementById('tableSearch').value = '';
-
+        const sheets = { 'maga1': 'Reporte_MAGA1', 'maga2': 'Reporte_MAGA2', 'maga3': 'Reporte_MAGA3', 'cyc': 'Reporte_CYC', 'estadistica': 'Reporte_Estadistica' };
         STATE.currentView = section;
+        STATE.currentSheet = sheets[section];
         UI.showLoading(true);
 
-        // Petición a la API
-        const result = await API.getData(config.sheet);
-
-        if (result.status === 'success') {
-            STATE.currentData = result.data;
-            UI.updateStats(result.data);
-            UI.render(result.data, section);
-        } else {
-            document.getElementById('mainAttendanceTable').innerHTML = `
-                <tbody>
-                    <tr><td class="alert alert-danger">${result.message}</td></tr>
-                </tbody>`;
-        }
-
-        // Cerrar sidebar en móviles tras seleccionar
-        // if (window.innerWidth <= 768) {
-        //     this.toggleSidebar();
-        // }
-
-        // Ejecutar cierre de sidebar independientemente del tamaño de pantalla
+        try {
+            const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${STATE.currentSheet}`).then(r => r.json());
+            if (res.status === 'success') {
+                STATE.currentData = this.processRawData(res.data);
+                UI.updateStats(STATE.currentData);
+                UI.render(STATE.currentData, section);
+            }
+        } catch (e) { alert("Error al cargar datos"); }
         this.closeSidebar();
     },
 
-    /**
-     * Filtra la tabla actual basándose en el número de cuenta
-     */
-    filterTable() {
-        const query = document.getElementById('tableSearch').value.toLowerCase().trim();
-        const filtered = STATE.currentData.filter(item =>
-            String(item.cuenta).toLowerCase().includes(query)
-        );
-        UI.render(filtered, STATE.currentView);
+    openAuthModal() { new bootstrap.Modal(document.getElementById('authModal')).show(); },
+
+    verifyPassword() {
+        if (document.getElementById('adminPass').value === CONFIG.ADMIN_PASS) {
+            STATE.isEditable = true;
+            bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
+            document.getElementById('btn-unlock').classList.add('d-none');
+            document.getElementById('btn-lock').classList.remove('d-none');
+            UI.render(STATE.currentData, STATE.currentView); // Redibuja con la nueva columna y los inputs
+        } else alert("Contraseña incorrecta");
+        document.getElementById('adminPass').value = '';
     },
 
-    /**
-     * Fuerza el cierre del sidebar eliminando la clase active
-     */
-    closeSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar.classList.contains('active')) {
-            sidebar.classList.remove('active');
+    lockEdition() {
+        STATE.isEditable = false;
+        document.getElementById('btn-unlock').classList.remove('d-none');
+        document.getElementById('btn-lock').classList.add('d-none');
+        UI.render(STATE.currentData, STATE.currentView); // Redibuja ocultando la columna nombre e inputs
+    },
+
+    async saveRow(cuenta) {
+        const newValue = document.getElementById(`input-${cuenta}`).value;
+        const btn = event.currentTarget; btn.disabled = true;
+        const url = `${CONFIG.API_URL}?action=updateData&sheetName=${STATE.currentSheet}&cuenta=${cuenta}&newValue=${newValue}`;
+        const res = await fetch(url).then(r => r.json());
+        if (res.status === 'success') {
+            STATE.currentData.find(s => s.cuenta == cuenta).total = newValue;
+            //  alert("✅ Guardado correctamente");
         }
+        btn.disabled = false;
     },
 
-    handleNavClick(el, sec) {
-        this.loadSection(sec);
-    }
+    filterTable() { const q = document.getElementById('tableSearch').value.toLowerCase(); UI.render(STATE.currentData.filter(i => String(i.cuenta).includes(q)), STATE.currentView); },
+    toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
+    closeSidebar() { document.getElementById('sidebar').classList.remove('active'); },
+    handleNavClick(el, sec) { this.loadSection(sec); }
 };
-
-// Inicialización al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => App.init());
