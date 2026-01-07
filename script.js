@@ -12,7 +12,7 @@ const STATE = { currentData: [], currentView: 'inicio', currentSheet: '', isEdit
 $.views.helpers({
     isEditable: () => STATE.isEditable,
     getStatusClass: (f) => parseFloat(f) > 8 ? "text-danger" : (parseFloat(f) > 4 ? "text-warning" : "text-success"),
-    getStatusBadge: (f) => parseFloat(f) > 8 ? "NP" : (parseFloat(f) > 4 ? "!" : "")
+    getStatusBadge: (f) => parseFloat(f) > 8 ? "⚠️NP" : (parseFloat(f) > 4 ? "‼️" : "")
 });
 
 const UI = {
@@ -46,35 +46,48 @@ const App = {
         const rows = raw.slice(1);
         const findCol = (name) => headers.indexOf(name);
 
+        // Seguimos necesitando los índices de las columnas de RESULTADOS
         const idx = {
-            cuenta: findCol("Cuenta"),
             nombre: findCol("First Name"),
-            calif: findCol("Calificación"),
-            ex: findCol("Total Exámenes"),
-            sel: findCol("Total Sellos"),
-            selH: findCol("Sellos"),
-            tar: findCol("Total Tareas"),
-            eje: findCol("Total Ejercicios"),
+            cuenta: findCol("Cuenta"),
             part: findCol("Total Participaciones"),
-            act: findCol("Actividades 30%"),
-            prac: findCol("Prácticas 30%")
+            ex: findCol("Total Exámenes"),
+            eje: findCol("Total Ejercicios"),
+            sel: findCol("Total Sellos"),
+            tar: findCol("Total Tareas"),
+            act: findCol("Actividades"),
+            prac: findCol("Prácticas"),
+            calif: findCol("Calificación")
         };
-
-        const start = idx.nombre + 1;
-        const end = (idx.selH !== -1 ? idx.selH : findCol("Puntos")) - 1;
 
         return rows.map(row => {
             let asistencias = 0, faltas = 0, totalClases = 0;
-            for (let i = start; i <= end; i++) {
-                let cell = row[i] ? row[i].toString().toLowerCase() : "";
-                if (cell.includes("asis")) { asistencias++; totalClases++; }
-                else if (cell.includes("falt")) { faltas++; totalClases++; }
+
+            // --- CONFIGURACIÓN DE RANGO FIJO ---
+            // Según tu JSON, del índice 2 al 18 están las asistencias.
+            const START_COL = 2;
+            const END_COL = 30;
+
+            for (let i = START_COL; i <= END_COL; i++) {
+                let cell = String(row[i] || "").toLowerCase().trim();
+
+                // Solo contabiliza si coincide EXACTAMENTE con el criterio
+                if (cell.includes("asisten")) {
+                    asistencias++;
+                    totalClases++;
+                }
+                else if (cell.includes("falta")) {
+                    faltas++;
+                    totalClases++;
+                }
             }
+
             const pct = totalClases > 0 ? ((asistencias / totalClases) * 100).toFixed(1) : 0;
+
             return {
                 cuenta: row[idx.cuenta],
                 nombre: row[idx.nombre] || "Sin Nombre",
-                faltas,
+                faltas: faltas,
                 porcentaje: pct,
                 examenes: row[idx.ex] || 0,
                 total: row[idx.calif] || 0,
@@ -109,19 +122,21 @@ const App = {
         try {
             const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${STATE.currentSheet}`).then(r => r.json());
 
+            console.log(res);
+
             if (res.status === 'success') {
                 STATE.currentData = this.processRawData(res.data);
                 UI.updateStats(STATE.currentData);
                 UI.render(STATE.currentData, section);
             } else {
-                // VALIDACIÓN DE HOJA NO ENCONTRADA O ERROR DE GAS
+                // VALIDACIÓN DE HOJA NO ENCONTRADA O ERROR
                 document.getElementById('mainAttendanceTable').innerHTML = `
-                    <tbody><tr><td class="p-5">
-                        <div class="alert alert-danger mb-0 text-center">
-                            <i class="fas fa-exclamation-circle me-2"></i> 
-                            <strong>Atención:</strong> ${res.message}
-                        </div>
-                    </td></tr></tbody>`;
+                                                                            <tbody><tr><td class="p-5">
+                                                                                <div class="alert alert-danger mb-0 text-center">
+                                                                                    <i class="fas fa-exclamation-circle me-2"></i> 
+                                                                                    <strong>Atención:</strong> ${res.message}
+                                                                                </div>
+                                                                            </td></tr></tbody>`;
                 document.getElementById('stat-total').textContent = '0';
                 document.getElementById('stat-avg').textContent = '0%';
                 document.getElementById('stat-risk').textContent = '0';
@@ -161,7 +176,7 @@ const App = {
             const res = await fetch(url).then(r => r.json());
             if (res.status === 'success') {
                 STATE.currentData.find(s => s.cuenta == cuenta).total = newValue;
-                alert("✅ Guardado correctamente");
+                // alert("✅ Guardado correctamente");
             } else {
                 alert("❌ Error al guardar: " + res.message);
             }
