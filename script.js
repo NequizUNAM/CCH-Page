@@ -1,5 +1,5 @@
 /**
- * SISTEMA CCH - DASHBOARD MOTOR FRONTEND CON SEGURIDAD
+ * SISTEMA CCH - DASHBOARD MOTOR FRONTEND CON VALIDACIÓN DE ERRORES
  */
 
 const CONFIG = {
@@ -48,7 +48,7 @@ const App = {
 
         const idx = {
             cuenta: findCol("Cuenta"),
-            nombre: findCol("First Name"), // Verifica que en tu Excel la columna se llame así o cámbialo a "Nombre"
+            nombre: findCol("First Name"),
             calif: findCol("Calificación"),
             ex: findCol("Total Exámenes"),
             sel: findCol("Total Sellos"),
@@ -73,7 +73,7 @@ const App = {
             const pct = totalClases > 0 ? ((asistencias / totalClases) * 100).toFixed(1) : 0;
             return {
                 cuenta: row[idx.cuenta],
-                nombre: row[idx.nombre] || "Sin Nombre", // Extraemos el nombre para la columna dinámica
+                nombre: row[idx.nombre] || "Sin Nombre",
                 faltas,
                 porcentaje: pct,
                 examenes: row[idx.ex] || 0,
@@ -98,18 +98,37 @@ const App = {
         document.getElementById('reporte-view').classList.add('active');
 
         const sheets = { 'maga1': 'Reporte_MAGA1', 'maga2': 'Reporte_MAGA2', 'maga3': 'Reporte_MAGA3', 'cyc': 'Reporte_CYC', 'estadistica': 'Reporte_Estadistica' };
+        const titulos = { 'maga1': 'MAGA 1', 'maga2': 'MAGA 2', 'maga3': 'MAGA 3', 'cyc': 'CYC 1', 'estadistica': 'Estadística' };
+
         STATE.currentView = section;
         STATE.currentSheet = sheets[section];
+        document.getElementById('view-title').textContent = `Reporte ${titulos[section] || ''}`;
+
         UI.showLoading(true);
 
         try {
             const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${STATE.currentSheet}`).then(r => r.json());
+
             if (res.status === 'success') {
                 STATE.currentData = this.processRawData(res.data);
                 UI.updateStats(STATE.currentData);
                 UI.render(STATE.currentData, section);
+            } else {
+                // VALIDACIÓN DE HOJA NO ENCONTRADA O ERROR DE GAS
+                document.getElementById('mainAttendanceTable').innerHTML = `
+                    <tbody><tr><td class="p-5">
+                        <div class="alert alert-danger mb-0 text-center">
+                            <i class="fas fa-exclamation-circle me-2"></i> 
+                            <strong>Atención:</strong> ${res.message}
+                        </div>
+                    </td></tr></tbody>`;
+                document.getElementById('stat-total').textContent = '0';
+                document.getElementById('stat-avg').textContent = '0%';
+                document.getElementById('stat-risk').textContent = '0';
             }
-        } catch (e) { alert("Error al cargar datos"); }
+        } catch (e) {
+            alert("Error crítico de conexión: Comprueba tu URL o conexión a internet.");
+        }
         this.closeSidebar();
     },
 
@@ -121,7 +140,7 @@ const App = {
             bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
             document.getElementById('btn-unlock').classList.add('d-none');
             document.getElementById('btn-lock').classList.remove('d-none');
-            UI.render(STATE.currentData, STATE.currentView); // Redibuja con la nueva columna y los inputs
+            UI.render(STATE.currentData, STATE.currentView);
         } else alert("Contraseña incorrecta");
         document.getElementById('adminPass').value = '';
     },
@@ -130,22 +149,31 @@ const App = {
         STATE.isEditable = false;
         document.getElementById('btn-unlock').classList.remove('d-none');
         document.getElementById('btn-lock').classList.add('d-none');
-        UI.render(STATE.currentData, STATE.currentView); // Redibuja ocultando la columna nombre e inputs
+        UI.render(STATE.currentData, STATE.currentView);
     },
 
     async saveRow(cuenta) {
         const newValue = document.getElementById(`input-${cuenta}`).value;
         const btn = event.currentTarget; btn.disabled = true;
-        const url = `${CONFIG.API_URL}?action=updateData&sheetName=${STATE.currentSheet}&cuenta=${cuenta}&newValue=${newValue}`;
-        const res = await fetch(url).then(r => r.json());
-        if (res.status === 'success') {
-            STATE.currentData.find(s => s.cuenta == cuenta).total = newValue;
-            //  alert("✅ Guardado correctamente");
-        }
+
+        try {
+            const url = `${CONFIG.API_URL}?action=updateData&sheetName=${STATE.currentSheet}&cuenta=${cuenta}&newValue=${newValue}`;
+            const res = await fetch(url).then(r => r.json());
+            if (res.status === 'success') {
+                STATE.currentData.find(s => s.cuenta == cuenta).total = newValue;
+                alert("✅ Guardado correctamente");
+            } else {
+                alert("❌ Error al guardar: " + res.message);
+            }
+        } catch (e) { alert("Error de conexión al guardar."); }
+
         btn.disabled = false;
     },
 
-    filterTable() { const q = document.getElementById('tableSearch').value.toLowerCase(); UI.render(STATE.currentData.filter(i => String(i.cuenta).includes(q)), STATE.currentView); },
+    filterTable() {
+        const q = document.getElementById('tableSearch').value.toLowerCase();
+        UI.render(STATE.currentData.filter(i => String(i.cuenta).includes(q)), STATE.currentView);
+    },
     toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
     closeSidebar() { document.getElementById('sidebar').classList.remove('active'); },
     handleNavClick(el, sec) { this.loadSection(sec); }
