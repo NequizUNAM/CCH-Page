@@ -152,8 +152,8 @@
     <script id="magaRowTmpl" type="text/x-jsrender">
         <thead class="table-light">
             <tr>
-                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Cuenta</th>
+                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Faltas</th>
                 <th>Sellos 60%</th>
                 <th>Exámenes 40%</th>
@@ -164,16 +164,16 @@
         <tbody>
             {{for students}}
             <tr class="{{if ~isEditable}}is-editing{{/if}}">
-                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td>{{:cuenta}}</td>
+                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td class="{{:~getStatusClass(faltas)}} fw-bold">{{:faltas}} {{:~getStatusBadge(faltas)}}</td>
                 <td>{{:sellos}} %</td>
                 <td>{{:examenes}} %</td>
-                <td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
                     {{if ~isEditable}}
                         <input type="number" step="0.1" class="input-edit" id="input-{{:cuenta}}" value="{{:total}}">
                     {{else}}
-                        <span class="fw-bold">{{:total}} %</span>
+                        {{:total}} %
                     {{/if}}
                 </td>
                 {{if ~isEditable}}
@@ -191,8 +191,8 @@
     <script id="cycRowTmpl" type="text/x-jsrender">
         <thead class="table-light">
             <tr>
-                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Cuenta</th>
+                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Faltas</th>
                 <th>Tareas</th>
                 <th>Ejercicios</th>
@@ -205,18 +205,16 @@
         <tbody>
             {{for students}}
             <tr class="{{if ~isEditable}}is-editing{{/if}}">
-                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td>{{:cuenta}}</td>
+                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td class="{{:~getStatusClass(faltas)}} fw-bold">{{:faltas}} {{:~getStatusBadge(faltas)}}</td>
-                <td>{{:tareas}} %</td>
-                <td>{{:ejercicios}} %</td>
-                <td>{{:participaciones}} %</td>
-                <td>{{:examenes}} %</td>
-                <td>
+                <td>{{:tareas}} %</td><td>{{:ejercicios}} %</td>
+                <td>{{:participaciones}} %</td><td>{{:examenes}} %</td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
                     {{if ~isEditable}}
                         <input type="number" step="0.1" class="input-edit" id="input-{{:cuenta}}" value="{{:total}}">
                     {{else}}
-                        <span class="fw-bold">{{:total}} %</span>
+                        {{:total}} %
                     {{/if}}
                 </td>
                 {{if ~isEditable}}
@@ -234,8 +232,8 @@
     <script id="estadRowTmpl" type="text/x-jsrender">
         <thead class="table-light">
             <tr>
-                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Cuenta</th>
+                {{if ~isEditable}}<th>Nombre</th>{{/if}}
                 <th>Faltas</th>
                 <th>Activ.</th>
                 <th>Práct.</th>
@@ -247,16 +245,16 @@
         <tbody>
             {{for students}}
             <tr class="{{if ~isEditable}}is-editing{{/if}}">
-                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td>{{:cuenta}}</td>
+                {{if ~isEditable}}<td class="text-start small">{{:nombre}}</td>{{/if}}
                 <td class="{{:~getStatusClass(faltas)}} fw-bold">{{:faltas}} {{:~getStatusBadge(faltas)}}</td>
                 <td>{{:actividades}}</td><td>{{:practicas}}</td>
                 <td>{{:examenes}}</td>
-                <td>
+                <td class="{{:total < 60 ? 'text-danger fw-bold' : 'text-success fw-bold'}}">
                     {{if ~isEditable}}
                         <input type="number" step="0.1" class="input-edit" id="input-{{:cuenta}}" value="{{:total}}">
                     {{else}}
-                        <span class="fw-bold">{{:total}}</span>
+                        {{:total}}
                     {{/if}}
                 </td>
                 {{if ~isEditable}}
