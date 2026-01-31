@@ -1,7 +1,8 @@
 /**
  * SISTEMA CCH - DASHBOARD
  * ✅ Tabla dinámica por Show
- * ✅ Nuevo flujo Admin: contraseña -> nombre -> crear hoja plantilla
+ * ✅ Colores para "Calificación"
+ * ✅ Warning para "Total Asistencias" = 0
  */
 
 const CONFIG = {
@@ -12,6 +13,7 @@ const CONFIG = {
 const STATE = {
     currentView: 'inicio',
     currentSheet: '',
+    isEditable: false,
 
     raw: {
         showRow: [],
@@ -57,29 +59,66 @@ const UI = {
         head.innerHTML = "";
         body.innerHTML = "";
 
+        // ✅ índices especiales
+        const califIdx = App.getColumnIndexByHeader("Calificación");
+        const totalFaltasIdx = App.getColumnIndexByHeader("Faltas");
+
+        // HEADERS
         const trHead = document.createElement("tr");
 
         STATE.visibleCols.forEach(colIdx => {
             const th = document.createElement("th");
             th.textContent = STATE.raw.headers[colIdx] || "";
+            th.classList.add("text-center");
             trHead.appendChild(th);
         });
 
         head.appendChild(trHead);
 
+        // BODY
         STATE.filteredRows.forEach(row => {
             const tr = document.createElement("tr");
 
             STATE.visibleCols.forEach(colIdx => {
                 const td = document.createElement("td");
+                td.classList.add("text-center");
 
                 const value = row[colIdx] ?? "";
-                const v = String(value).toLowerCase().trim();
+                const text = String(value ?? "");
+                const v = text.toLowerCase().trim();
 
+                // ✅ Colorear asistencia / falta (visual extra)
                 if (v.includes("asisten")) td.classList.add("table-success");
                 if (v.includes("falta")) td.classList.add("table-danger");
 
-                td.textContent = value;
+                // ✅ VALIDACIÓN: Calificación (colores)
+                if (colIdx === califIdx) {
+                    const n = Number(String(value).replace(",", "."));
+                    if (!isNaN(n)) {
+                        td.classList.add("fw-bold");
+
+                        if (n >= 0 && n <= 59) {
+                            td.classList.add("text-danger");
+                        } else if (n >= 60 && n <= 70) {
+                            td.classList.add("text-warning");
+                        } else if (n >= 71 && n <= 100) {
+                            td.classList.add("text-success");
+                        }
+                    }
+                }
+
+                // ✅ VALIDACIÓN: Total Asistencias = 0
+                if (colIdx === totalFaltasIdx) {
+                    const n = Number(String(value).replace(",", "."));
+                    if (!isNaN(n) && n === 0) {
+                        td.classList.add("fw-bold", "text-danger");
+                        td.innerHTML = `<i class="fas fa-triangle-exclamation me-1"></i>${text}`;
+                        tr.appendChild(td);
+                        return; // evita sobrescribir con textContent abajo
+                    }
+                }
+
+                td.textContent = text;
                 tr.appendChild(td);
             });
 
@@ -113,6 +152,13 @@ const App = {
         );
     },
 
+    // 🔎 buscar índice por nombre exacto del header
+    getColumnIndexByHeader: (headerName) => {
+        const h = String(headerName || "").trim().toLowerCase();
+        return STATE.raw.headers.findIndex(x => String(x || "").trim().toLowerCase() === h);
+    },
+
+    // ✅ calcula % usando SOLO columnas Show (donde haya Asistencia/Falta)
     calcAttendancePct: (row) => {
         let asist = 0;
         let total = 0;
@@ -137,6 +183,38 @@ const App = {
         if (el) el.classList.add("active");
     },
 
+    // ✅ sincroniza asistencia desde Apps Script
+    syncAttendance: async () => {
+        const btn = document.getElementById("btn-sync");
+        if (!btn) return alert("No existe el botón btn-sync en el HTML");
+
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i> Sincronizando...`;
+
+        try {
+            const url = `${CONFIG.API_URL}?action=syncAttendance`;
+            const res = await fetch(url).then(r => r.json());
+
+            if (res.status === "success") {
+                alert(res.message);
+
+                // ✅ recargar la hoja actual si ya hay una cargada
+                if (STATE.currentSheet) {
+                    await App.loadBySheetName(STATE.currentSheet);
+                }
+            } else {
+                alert("❌ Error: " + res.message);
+            }
+
+        } catch (e) {
+            alert("❌ Error de conexión al sincronizar.");
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-rotate me-1"></i> Sincronizar`;
+    },
+
+    // ✅ flujo admin para crear hoja
     openAdminFlow: async () => {
         const pass = prompt("Ingrese contraseña de administrador:");
         if (pass !== CONFIG.ADMIN_PASS) {
@@ -150,10 +228,8 @@ const App = {
             return;
         }
 
-        const reportName = name.trim();
-
         try {
-            const url = `${CONFIG.API_URL}?action=createReportSheet&reportName=${encodeURIComponent(reportName)}`;
+            const url = `${CONFIG.API_URL}?action=createReportSheet&reportName=${encodeURIComponent(name.trim())}`;
             const res = await fetch(url).then(r => r.json());
 
             if (res.status !== "success") {
@@ -161,17 +237,18 @@ const App = {
                 return;
             }
 
-            alert(`✅ ${res.message}\nHoja creada: ${res.sheetName}`);
+            alert(`✅ ${res.message}\nHoja: ${res.sheetName}`);
 
-            // ✅ Cargar automáticamente esa hoja
+            // ✅ cargar la hoja creada
             STATE.currentSheet = res.sheetName;
             await App.loadBySheetName(res.sheetName);
 
         } catch (e) {
-            alert("Error de conexión al crear la hoja.");
+            alert("❌ Error de conexión al crear reporte.");
         }
     },
 
+    // ✅ carga directa por nombre de hoja
     loadBySheetName: async (sheetName) => {
         document.getElementById('inicio').classList.remove('active');
         document.getElementById('reporte-view').classList.remove('d-none');
@@ -197,7 +274,7 @@ const App = {
             UI.updateStats();
 
         } catch (e) {
-            alert("❌ Error al cargar hoja creada: " + e.message);
+            alert("❌ Error: " + e.message);
         }
     },
 
@@ -260,6 +337,7 @@ const App = {
 
             UI.renderTable();
             UI.updateStats();
+
         } catch (e) {
             alert("❌ Error: " + e.message);
         }
@@ -268,7 +346,7 @@ const App = {
     filterTable: () => {
         const q = document.getElementById('tableSearch').value.toLowerCase().trim();
 
-        const cuentaIdx = STATE.raw.headers.findIndex(h => String(h).trim().toLowerCase() === "cuenta");
+        const cuentaIdx = App.getColumnIndexByHeader("Cuenta");
 
         if (!q) {
             STATE.filteredRows = STATE.raw.rows;
