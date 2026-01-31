@@ -1,5 +1,7 @@
 /**
- * SISTEMA CCH - DASHBOARD MOTOR FRONTEND CON VALIDACIÓN DE ERRORES
+ * SISTEMA CCH - DASHBOARD
+ * ✅ Tabla dinámica por Show
+ * ✅ Nuevo flujo Admin: contraseña -> nombre -> crear hoja plantilla
  */
 
 const CONFIG = {
@@ -7,190 +9,279 @@ const CONFIG = {
     ADMIN_PASS: '307153443'
 };
 
-const STATE = { currentData: [], currentView: 'inicio', currentSheet: '', isEditable: false };
+const STATE = {
+    currentView: 'inicio',
+    currentSheet: '',
 
-$.views.helpers({
-    isEditable: () => STATE.isEditable,
-    getStatusClass: (f) => parseFloat(f) > 8 ? "text-danger" : (parseFloat(f) > 4 ? "text-warning" : "text-success"),
-    getStatusBadge: (f) => parseFloat(f) > 8 ? "⚠️NP" : (parseFloat(f) > 4 ? "‼️" : "")
-});
+    raw: {
+        showRow: [],
+        headers: [],
+        rows: []
+    },
+
+    visibleCols: [],
+    filteredRows: []
+};
 
 const UI = {
-    showLoading(show) {
-        const t = document.getElementById('mainAttendanceTable');
-        if (show) t.innerHTML = `<tbody><tr><td class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr></tbody>`;
+    showLoading: (show) => {
+        const head = document.getElementById('mainAttendanceHead');
+        const body = document.getElementById('mainAttendanceBody');
+
+        if (show) {
+            head.innerHTML = "";
+            body.innerHTML = `
+        <tr>
+          <td colspan="99" class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+          </td>
+        </tr>`;
+        }
     },
-    updateStats(data) {
-        document.getElementById('stat-total').textContent = data.length;
-        const avg = data.length > 0 ? (data.reduce((a, b) => a + parseFloat(b.porcentaje || 0), 0) / data.length).toFixed(1) : 0;
-        document.getElementById('stat-avg').textContent = avg + '%';
-        document.getElementById('stat-risk').textContent = data.filter(s => parseFloat(s.porcentaje) < 80).length;
+
+    updateStats: () => {
+        const dataRows = STATE.filteredRows.length;
+
+        const pcts = STATE.filteredRows.map(row => App.calcAttendancePct(row));
+        const avg = pcts.length ? (pcts.reduce((a, b) => a + b, 0) / pcts.length).toFixed(1) : 0;
+
+        document.getElementById('stat-total').textContent = dataRows;
+        document.getElementById('stat-avg').textContent = avg + "%";
+        document.getElementById('stat-risk').textContent = pcts.filter(p => p < 80).length;
     },
-    render(data, type) {
-        const t = document.getElementById('mainAttendanceTable');
-        const map = { 'maga1': '#magaRowTmpl', 'maga2': '#magaRowTmpl', 'maga3': '#magaRowTmpl', 'estadistica': '#estadRowTmpl', 'cyc': '#cycRowTmpl' };
-        t.innerHTML = $(map[type] || "#cycRowTmpl").render({ students: data }, { isEditable: STATE.isEditable });
+
+    renderTable: () => {
+        const head = document.getElementById('mainAttendanceHead');
+        const body = document.getElementById('mainAttendanceBody');
+
+        head.innerHTML = "";
+        body.innerHTML = "";
+
+        const trHead = document.createElement("tr");
+
+        STATE.visibleCols.forEach(colIdx => {
+            const th = document.createElement("th");
+            th.textContent = STATE.raw.headers[colIdx] || "";
+            trHead.appendChild(th);
+        });
+
+        head.appendChild(trHead);
+
+        STATE.filteredRows.forEach(row => {
+            const tr = document.createElement("tr");
+
+            STATE.visibleCols.forEach(colIdx => {
+                const td = document.createElement("td");
+
+                const value = row[colIdx] ?? "";
+                const v = String(value).toLowerCase().trim();
+
+                if (v.includes("asisten")) td.classList.add("table-success");
+                if (v.includes("falta")) td.classList.add("table-danger");
+
+                td.textContent = value;
+                tr.appendChild(td);
+            });
+
+            body.appendChild(tr);
+        });
+
+        if (STATE.visibleCols.length === 0) {
+            head.innerHTML = `<tr><th>No hay columnas con "Show" en la fila 1</th></tr>`;
+        }
+    }
+};
+
+const DataUtils = {
+    normalize: (v) => String(v ?? "").trim(),
+
+    getVisibleColumns: (showRow) => {
+        return showRow
+            .map((v, i) => ({ v: DataUtils.normalize(v).toLowerCase(), i }))
+            .filter(x => x.v === "show")
+            .map(x => x.i);
     }
 };
 
 const App = {
-    init() {
-        document.querySelectorAll('.sidebar-nav a').forEach(l => l.addEventListener('click', e => {
-            e.preventDefault();
-            this.loadSection(l.getAttribute('data-section'));
-        }));
+    init: () => {
+        document.querySelectorAll('.sidebar-nav a').forEach(l =>
+            l.addEventListener('click', e => {
+                e.preventDefault();
+                App.loadSection(l.getAttribute('data-section'));
+            })
+        );
     },
 
-    processRawData(raw) {
-        const headers = raw[0].map(h => String(h || "").trim());
-        const rows = raw.slice(1);
-        const findCol = (name) => headers.indexOf(name);
+    calcAttendancePct: (row) => {
+        let asist = 0;
+        let total = 0;
 
-        // Seguimos necesitando los índices de las columnas de RESULTADOS
-        const idx = {
-            nombre: findCol("First Name"),
-            cuenta: findCol("Cuenta"),
-            part: findCol("Total Participaciones"),
-            ex: findCol("Total Exámenes"),
-            eje: findCol("Total Ejercicios"),
-            sel: findCol("Total Sellos"),
-            tar: findCol("Total Tareas"),
-            act: findCol("Actividades"),
-            prac: findCol("Prácticas"),
-            calif: findCol("Calificación")
-        };
+        STATE.visibleCols.forEach(idx => {
+            const cell = String(row[idx] ?? "").toLowerCase().trim();
+            if (cell.includes("asisten")) {
+                asist++;
+                total++;
+            } else if (cell.includes("falta")) {
+                total++;
+            }
+        });
 
-        return rows.map(row => {
-            let asistencias = 0, faltas = 0, totalClases = 0;
+        if (!total) return 0;
+        return (asist / total) * 100;
+    },
 
-            // --- CONFIGURACIÓN DE RANGO FIJO ---
-            // Según tu JSON, del índice 2 al 18 están las asistencias.
-            const START_COL = 2;
-            const END_COL = 30;
+    setActiveNav: (section) => {
+        document.querySelectorAll(".navbar-nav .nav-link").forEach(a => a.classList.remove("active"));
+        const el = document.querySelector(`.navbar-nav .nav-link[data-section="${section}"]`);
+        if (el) el.classList.add("active");
+    },
 
-            for (let i = START_COL; i <= END_COL; i++) {
-                let cell = String(row[i] || "").toLowerCase().trim();
+    openAdminFlow: async () => {
+        const pass = prompt("Ingrese contraseña de administrador:");
+        if (pass !== CONFIG.ADMIN_PASS) {
+            alert("❌ Contraseña incorrecta");
+            return;
+        }
 
-                // Solo contabiliza si coincide EXACTAMENTE con el criterio
-                if (cell.includes("asisten")) {
-                    asistencias++;
-                    totalClases++;
-                }
-                else if (cell.includes("falta")) {
-                    faltas++;
-                    totalClases++;
-                }
+        const name = prompt("Nombre del nuevo reporte (ej: CYC3, MAGA4, GrupoA):");
+        if (!name || !name.trim()) {
+            alert("❌ Nombre inválido");
+            return;
+        }
+
+        const reportName = name.trim();
+
+        try {
+            const url = `${CONFIG.API_URL}?action=createReportSheet&reportName=${encodeURIComponent(reportName)}`;
+            const res = await fetch(url).then(r => r.json());
+
+            if (res.status !== "success") {
+                alert("❌ Error: " + res.message);
+                return;
             }
 
-            const pct = totalClases > 0 ? ((asistencias / totalClases) * 100).toFixed(1) : 0;
+            alert(`✅ ${res.message}\nHoja creada: ${res.sheetName}`);
 
-            return {
-                cuenta: row[idx.cuenta],
-                nombre: row[idx.nombre] || "Sin Nombre",
-                faltas: faltas,
-                porcentaje: pct,
-                examenes: row[idx.ex] || 0,
-                total: row[idx.calif] || 0,
-                sellos: row[idx.sel] || 0,
-                tareas: row[idx.tar] || 0,
-                ejercicios: row[idx.eje] || 0,
-                participaciones: row[idx.part] || 0,
-                actividades: row[idx.act] || 0,
-                practicas: row[idx.prac] || 0
-            };
-        });
+            // ✅ Cargar automáticamente esa hoja
+            STATE.currentSheet = res.sheetName;
+            await App.loadBySheetName(res.sheetName);
+
+        } catch (e) {
+            alert("Error de conexión al crear la hoja.");
+        }
+    },
+
+    loadBySheetName: async (sheetName) => {
+        document.getElementById('inicio').classList.remove('active');
+        document.getElementById('reporte-view').classList.remove('d-none');
+
+        document.getElementById('view-title').textContent = `Reporte ${sheetName}`;
+        document.getElementById('view-subtitle').textContent = `Hoja: ${sheetName}`;
+
+        UI.showLoading(true);
+
+        try {
+            const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${sheetName}`).then(r => r.json());
+            if (res.status !== "success") throw new Error(res.message || "Error al cargar");
+
+            const showRow = res.showRow || res.data?.[0] || [];
+            const headers = res.headers || res.data?.[1] || [];
+            const rows = (res.data || []).slice(2);
+
+            STATE.raw = { showRow, headers, rows };
+            STATE.visibleCols = DataUtils.getVisibleColumns(showRow);
+            STATE.filteredRows = rows;
+
+            UI.renderTable();
+            UI.updateStats();
+
+        } catch (e) {
+            alert("❌ Error al cargar hoja creada: " + e.message);
+        }
     },
 
     async loadSection(section) {
         if (section === 'inicio') {
-            document.getElementById('inicio').classList.add('active');
-            document.getElementById('reporte-view').classList.remove('active');
-            this.closeSidebar(); return;
-        }
-        document.getElementById('inicio').classList.remove('active');
-        document.getElementById('reporte-view').classList.add('active');
+            STATE.currentView = 'inicio';
 
-        const sheets = { 'maga1': 'Reporte_MAGA1', 'maga2': 'Reporte_MAGA2', 'maga3': 'Reporte_MAGA3', 'cyc': 'Reporte_CYC', 'estadistica': 'Reporte_Estadistica' };
-        const titulos = { 'maga1': 'MAGA 1', 'maga2': 'MAGA 2', 'maga3': 'MAGA 3', 'cyc': 'CYC 1', 'estadistica': 'Estadística' };
+            document.getElementById('inicio').classList.add('active');
+            document.getElementById('reporte-view').classList.add('d-none');
+
+            document.getElementById('view-title').textContent = "Inicio";
+            document.getElementById('view-subtitle').textContent = "Selecciona una sección del menú";
+
+            App.setActiveNav("inicio");
+            return;
+        }
+
+        document.getElementById('inicio').classList.remove('active');
+        document.getElementById('reporte-view').classList.remove('d-none');
+
+        const sheets = {
+            maga1: 'Reporte_MAGA1',
+            maga2: 'Reporte_MAGA2',
+            maga3: 'Reporte_MAGA3',
+            cyc: 'Reporte_CYC',
+            cyc2: 'Reporte_CYC2',
+            estadistica: 'Reporte_Estadistica'
+        };
+
+        const titulos = {
+            maga1: 'MAGA 1',
+            maga2: 'MAGA 2',
+            maga3: 'MAGA 3',
+            cyc: 'CYC 1',
+            cyc2: 'CYC 2',
+            estadistica: 'Estadística'
+        };
 
         STATE.currentView = section;
-        STATE.currentSheet = sheets[section];
+        STATE.currentSheet = sheets[section] || '';
+
         document.getElementById('view-title').textContent = `Reporte ${titulos[section] || ''}`;
+        document.getElementById('view-subtitle').textContent = `Hoja: ${STATE.currentSheet}`;
+
+        App.setActiveNav(section);
 
         UI.showLoading(true);
 
         try {
             const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${STATE.currentSheet}`).then(r => r.json());
+            if (res.status !== "success") throw new Error(res.message || "Error al cargar datos");
 
-            console.log(res);
+            const showRow = res.showRow || res.data?.[0] || [];
+            const headers = res.headers || res.data?.[1] || [];
+            const rows = (res.data || []).slice(2);
 
-            if (res.status === 'success') {
-                STATE.currentData = this.processRawData(res.data);
-                UI.updateStats(STATE.currentData);
-                UI.render(STATE.currentData, section);
-            } else {
-                // VALIDACIÓN DE HOJA NO ENCONTRADA O ERROR
-                document.getElementById('mainAttendanceTable').innerHTML = `
-                                                                            <tbody><tr><td class="p-5">
-                                                                                <div class="alert alert-danger mb-0 text-center">
-                                                                                    <i class="fas fa-exclamation-circle me-2"></i> 
-                                                                                    <strong>Atención:</strong> ${res.message}
-                                                                                </div>
-                                                                            </td></tr></tbody>`;
-                document.getElementById('stat-total').textContent = '0';
-                document.getElementById('stat-avg').textContent = '0%';
-                document.getElementById('stat-risk').textContent = '0';
-            }
+            STATE.raw = { showRow, headers, rows };
+            STATE.visibleCols = DataUtils.getVisibleColumns(showRow);
+            STATE.filteredRows = rows;
+
+            UI.renderTable();
+            UI.updateStats();
         } catch (e) {
-            alert("Error crítico de conexión: Comprueba tu URL o conexión a internet.");
+            alert("❌ Error: " + e.message);
         }
-        this.closeSidebar();
     },
 
-    openAuthModal() { new bootstrap.Modal(document.getElementById('authModal')).show(); },
+    filterTable: () => {
+        const q = document.getElementById('tableSearch').value.toLowerCase().trim();
 
-    verifyPassword() {
-        if (document.getElementById('adminPass').value === CONFIG.ADMIN_PASS) {
-            STATE.isEditable = true;
-            bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
-            document.getElementById('btn-unlock').classList.add('d-none');
-            document.getElementById('btn-lock').classList.remove('d-none');
-            UI.render(STATE.currentData, STATE.currentView);
-        } else alert("Contraseña incorrecta");
-        document.getElementById('adminPass').value = '';
-    },
+        const cuentaIdx = STATE.raw.headers.findIndex(h => String(h).trim().toLowerCase() === "cuenta");
 
-    lockEdition() {
-        STATE.isEditable = false;
-        document.getElementById('btn-unlock').classList.remove('d-none');
-        document.getElementById('btn-lock').classList.add('d-none');
-        UI.render(STATE.currentData, STATE.currentView);
-    },
+        if (!q) {
+            STATE.filteredRows = STATE.raw.rows;
+        } else {
+            STATE.filteredRows = STATE.raw.rows.filter(row => {
+                const cuenta = String(row[cuentaIdx] ?? "").toLowerCase();
+                return cuenta.includes(q);
+            });
+        }
 
-    async saveRow(cuenta) {
-        const newValue = document.getElementById(`input-${cuenta}`).value;
-        const btn = event.currentTarget; btn.disabled = true;
-
-        try {
-            const url = `${CONFIG.API_URL}?action=updateData&sheetName=${STATE.currentSheet}&cuenta=${cuenta}&newValue=${newValue}`;
-            const res = await fetch(url).then(r => r.json());
-            if (res.status === 'success') {
-                STATE.currentData.find(s => s.cuenta == cuenta).total = newValue;
-                // alert("✅ Guardado correctamente");
-            } else {
-                alert("❌ Error al guardar: " + res.message);
-            }
-        } catch (e) { alert("Error de conexión al guardar."); }
-
-        btn.disabled = false;
-    },
-
-    filterTable() {
-        const q = document.getElementById('tableSearch').value.toLowerCase();
-        UI.render(STATE.currentData.filter(i => String(i.cuenta).includes(q)), STATE.currentView);
-    },
-    toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
-    closeSidebar() { document.getElementById('sidebar').classList.remove('active'); },
-    handleNavClick(el, sec) { this.loadSection(sec); }
+        UI.renderTable();
+        UI.updateStats();
+    }
 };
+
 document.addEventListener('DOMContentLoaded', () => App.init());
