@@ -21,6 +21,8 @@ const App = {
     },
 
     loadSection: async (section) => {
+        document.querySelectorAll('.sidebar-nav .nav-link').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.sidebar-nav .nav-link[data-section="${section}"]`)?.classList.add('active');
         const sheets = {
             maga1: 'Reporte_MAGA1', maga2: 'Reporte_MAGA2', maga3: 'Reporte_MAGA3',
             cyc: 'Reporte_CYC', cyc2: 'Reporte_CYC2', 

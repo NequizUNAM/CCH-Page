@@ -55,3 +55,22 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8; 
 }
+
+/* Menú deslizable horizontal para celulares */
+.menu-deslizable {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch; /* Movimiento suave en celulares */
+}
+
+/* Ocultar barra de scroll estéticamente pero mantener funcionalidad */
+.menu-deslizable::-webkit-scrollbar {
+    height: 3px;
+}
+.menu-deslizable::-webkit-scrollbar-track {
+    background: transparent;
+}
+.menu-deslizable::-webkit-scrollbar-thumb {
+    background: #6c757d; 
+    border-radius: 4px;
+}
