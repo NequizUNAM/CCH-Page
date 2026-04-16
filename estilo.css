@@ -1,9 +1,12 @@
 body {
-  background: #f8f9fa;
+  background: #f4f6f9;
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .table-responsive {
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  border-radius: 6px;
 }
 
 .table thead th {
@@ -15,11 +18,40 @@ body {
   white-space: nowrap;
   font-weight: 600;
   text-align: center;
+  border-bottom: 2px solid #dee2e6;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
 }
 
 .table td {
   white-space: nowrap;
   vertical-align: middle;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   text-align: center;
+}
+
+/* Colores más suaves para asistencias */
+.table-success {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+.table-danger {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+}
+
+/* Scrollbar Custom */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8; 
 }
