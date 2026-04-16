@@ -1,5 +1,5 @@
 /**
- * SERVIDOR - SISTEMA CCH (PROCESAMIENTO CONTINUO)
+ * SERVIDOR - SISTEMA CCH (FORMATO REGIONAL MÉXICO DD/MM/AAAA)
  * Autor: @Pedro Nequiz
  */
 
@@ -46,9 +46,6 @@ function doGet(e) {
   }
 }
 
-/**
- * LÓGICA DE SINCRONIZACIÓN FORZADA (ASISTENCIAS + CALIFICACIONES)
- */
 function syncAllData(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const reportSheet = ss.getSheetByName(sheetName);
@@ -57,13 +54,12 @@ function syncAllData(sheetName) {
   const reportData = reportSheet.getDataRange().getDisplayValues();
   const headers = reportData[1];
   const cuentaIdxRep = headers.indexOf("Cuenta");
-  
   if (cuentaIdxRep === -1) throw new Error("El reporte no tiene columna 'Cuenta'.");
 
   let updAtt = 0;
   let updCal = 0;
 
-  // 1. PROCESAR ASISTENCIAS DESDE EL LOG
+  // 1. ASISTENCIAS (Formato DD/MM/AAAA)
   const logSheet = ss.getSheetByName("Attendance Log");
   if (logSheet) {
     const logData = logSheet.getDataRange().getDisplayValues();
@@ -74,15 +70,16 @@ function syncAllData(sheetName) {
     const attendanceMap = {};
     for (let i = 1; i < logData.length; i++) {
       const cuenta = String(logData[i][logCuentaIdx]).trim();
-      const dateStr = String(logData[i][logDateIdx]).trim();
+      const dateStr = String(logData[i][logDateIdx]).trim(); // DD/MM/AAAA
       if (cuenta && dateStr) {
         if (!attendanceMap[cuenta]) attendanceMap[cuenta] = {};
         attendanceMap[cuenta][dateStr] = true;
       }
     }
 
+    // Regex ajustado para DD/MM/AAAA
+    const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
     const dateCols = [];
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     headers.forEach((h, j) => {
       if (dateRegex.test(String(h).trim())) dateCols.push({ index: j, dateStr: String(h).trim() });
     });
@@ -90,12 +87,9 @@ function syncAllData(sheetName) {
     for (let i = 2; i < reportData.length; i++) {
       const cuenta = String(reportData[i][cuentaIdxRep]).trim();
       if (!cuenta) continue;
-      
       dateCols.forEach(col => {
         const currentVal = String(reportData[i][col.index]).trim();
         const newVal = (attendanceMap[cuenta] && attendanceMap[cuenta][col.dateStr]) ? "Asistencia" : "Falta";
-        
-        // REGLA: Sobrescribir si está vacía o si es una Falta que ahora es Asistencia
         if (currentVal === "" || currentVal === "Falta") {
           if (currentVal !== newVal) {
             reportData[i][col.index] = newVal;
@@ -106,21 +100,14 @@ function syncAllData(sheetName) {
     }
   }
 
-  // 2. PROCESAR CALIFICACIONES (Soporte para "Calificacion" o "Calificación")
-  let califSheet = ss.getSheetByName("Calificacion") || ss.getSheetByName("Calificación");
+  // 2. CALIFICACIONES (Búsqueda Estricta)
+  let califSheet = ss.getSheetByName("Calificaciones");
   if (califSheet) {
     const califData = califSheet.getDataRange().getDisplayValues();
     const califHeaders = califData[0].map(h => h.trim());
     const cCuentaIdx = califHeaders.indexOf("Cuenta");
-    
     const colsToSync = ["Parcial_1", "Parcial_2", "Parcial_3", "Sellos", "Proyecto_Final", "Puntos Adicionales"];
     
-    const califIndices = {};
-    colsToSync.forEach(col => {
-      const idx = califHeaders.indexOf(col);
-      if (idx !== -1) califIndices[col] = idx;
-    });
-
     const califMap = {};
     if (cCuentaIdx !== -1) {
       for (let i = 1; i < califData.length; i++) {
@@ -128,75 +115,51 @@ function syncAllData(sheetName) {
         if (cuenta) {
           califMap[cuenta] = {};
           colsToSync.forEach(col => {
-            if (califIndices[col] !== undefined) califMap[cuenta][col] = califData[i][califIndices[col]];
+            const idx = califHeaders.indexOf(col);
+            if (idx !== -1) califMap[cuenta][col] = califData[i][idx];
           });
         }
       }
     }
 
-    const reportIndices = {};
     colsToSync.forEach(col => {
-      const idx = headers.indexOf(col);
-      if (idx !== -1) reportIndices[col] = idx;
-    });
-
-    for (let i = 2; i < reportData.length; i++) {
-      const cuenta = String(reportData[i][cuentaIdxRep]).trim();
-      if (!cuenta || !califMap[cuenta]) continue;
-      
-      colsToSync.forEach(col => {
-        if (reportIndices[col] !== undefined && califMap[cuenta][col] !== undefined && califMap[cuenta][col] !== "") {
-          const currentVal = String(reportData[i][reportIndices[col]]).trim();
-          
-          // REGLA: Solo llenar si la celda en el reporte está vacía
-          if (currentVal === "") {
-            reportData[i][reportIndices[col]] = califMap[cuenta][col];
-            updCal++;
+      const rIdx = headers.indexOf(col);
+      if (rIdx !== -1) {
+        for (let i = 2; i < reportData.length; i++) {
+          const cuenta = String(reportData[i][cuentaIdxRep]).trim();
+          if (cuenta && califMap[cuenta] && califMap[cuenta][col] !== undefined && califMap[cuenta][col] !== "") {
+            if (String(reportData[i][rIdx]).trim() === "") {
+              reportData[i][rIdx] = califMap[cuenta][col];
+              updCal++;
+            }
           }
         }
-      });
-    }
+      }
+    });
   }
 
-  // Actualizar la hoja siempre para garantizar sincronía total
   reportSheet.getRange(1, 1, reportData.length, reportData[0].length).setValues(reportData);
-  
-  return { 
-    status: "success", 
-    message: `Sincronización finalizada con éxito. Registros actualizados: ${updAtt} asistencias y ${updCal} calificaciones.` 
-  };
+  return { status: "success", message: `Sincronización terminada. Actualizados: ${updAtt} asistencias y ${updCal} calificaciones.` };
 }
 
-/**
- * CREACIÓN DE PLANTILLA HOMOLOGADA
- */
 function createReportSheet(reportName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const safe = String(reportName || "").trim().replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
   const sheetName = `Reporte_${safe}`;
-
   let sheet = ss.getSheetByName(sheetName);
   if (sheet) return { sheetName, message: `La hoja ya existe: ${sheetName}` };
-
   sheet = ss.insertSheet(sheetName);
 
-  // Columnas homologadas según requerimiento
-  const headers = [
-    "Cuenta", "First Name", "2026-03-24", "2026-03-26", 
-    "Parcial_1", "Parcial_2", "Parcial_3", "Sellos", 
-    "Proyecto_Final", "Puntos Adicionales", "Calificación", "SIAE"
-  ];
+  // Ejemplo con formato DD/MM/AAAA
+  const headers = ["Cuenta", "First Name", "24/03/2026", "26/03/2026", "Parcial_1", "Parcial_2", "Parcial_3", "Sellos", "Proyecto_Final", "Puntos Adicionales", "Calificación", "SIAE"];
   const showRow = headers.map(() => "Show");
-
   sheet.getRange(1, 1, 1, headers.length).setValues([showRow]);
   sheet.getRange(2, 1, 1, headers.length).setValues([headers]);
   sheet.setFrozenRows(2);
-
   applyHeaderBaseFormat_(sheet, headers.length);
   formatTotalsHeaderOnly_(sheet, headers);
   applySheetConditionalFormats_(sheet, headers.length);
   sheet.autoResizeColumns(1, headers.length);
-
   return { sheetName, message: `Plantilla creada correctamente ✅` };
 }
 
@@ -217,19 +180,11 @@ function formatTotalsHeaderOnly_(sheet, headers) {
 
 function applySheetConditionalFormats_(sheet, numCols) {
   const showRange = sheet.getRange(1, 1, 1, numCols);
-  const dataRange = sheet.getRange(3, 1, 400, numCols); // Rango extendido para datos
-  
+  const dataRange = sheet.getRange(3, 1, 500, numCols);
   sheet.setConditionalFormatRules([]);
   const rules = [];
-
-  // Formato para Fila 1 (Show)
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Show").setBackground("#DBEAFE").setFontColor("#1D4ED8").setBold(true).setRanges([showRange]).build());
-  
-  // Formato Asistencia (Verde Minimalista)
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Asistencia").setBackground("#D1E7DD").setFontColor("#0F5132").setRanges([dataRange]).build());
-
-  // Formato Falta (Rojo Minimalista)
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Falta").setBackground("#F8D7DA").setFontColor("#842029").setRanges([dataRange]).build());
-
   sheet.setConditionalFormatRules(rules);
 }

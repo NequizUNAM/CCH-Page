@@ -26,67 +26,51 @@ const App = {
             cyc: 'Reporte_CYC', cyc2: 'Reporte_CYC2', 
             est1: 'Reporte_Estadistica1', est2: 'Reporte_Estadistica2'
         };
-        const titles = {
-            maga1: 'MAGA 1', maga2: 'MAGA 2', maga3: 'MAGA 3',
-            cyc: 'CYC 1', cyc2: 'CYC 2', est1: 'Estadística 1', est2: 'Estadística 2'
-        };
-
         if (section === 'inicio') {
             document.getElementById('inicio').classList.remove('d-none');
             document.getElementById('reporte-view').classList.add('d-none');
             STATE.currentSheet = '';
             return;
         }
-
         STATE.currentSheet = sheets[section];
-        document.getElementById('view-title').textContent = titles[section];
-        document.getElementById('view-subtitle').textContent = `Hoja: ${STATE.currentSheet}`;
+        document.getElementById('view-title').textContent = section.toUpperCase();
         document.getElementById('inicio').classList.add('d-none');
         document.getElementById('reporte-view').classList.remove('d-none');
-
         await App.fetchData();
     },
 
     fetchData: async () => {
         if (!STATE.currentSheet) return;
-        const body = document.getElementById('mainAttendanceBody');
-        body.innerHTML = '<tr><td colspan="99">Cargando...</td></tr>';
-
         try {
             const res = await fetch(`${CONFIG.API_URL}?action=getData&sheetName=${STATE.currentSheet}`).then(r => r.json());
             if (res.status !== "success") throw new Error(res.message);
-
             const showRow = res.showRow || [];
             STATE.raw.headers = res.headers || [];
             STATE.raw.rows = (res.data || []).slice(2);
-            
             STATE.visibleCols = showRow.map((v, i) => v.toLowerCase() === "show" ? i : null).filter(v => v !== null);
             STATE.filteredRows = STATE.raw.rows;
-
             App.renderTable();
         } catch (e) { alert("Error: " + e.message); }
     },
 
     syncAttendance: async () => {
-        if (!STATE.currentSheet) return alert("Por favor, selecciona un grupo primero.");
+        if (!STATE.currentSheet) return alert("Selecciona un grupo.");
         const btn = document.getElementById('btn-sync');
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
         try {
             const res = await fetch(`${CONFIG.API_URL}?action=syncAttendance&sheetName=${STATE.currentSheet}`).then(r => r.json());
             alert(res.message);
             await App.fetchData();
-        } catch (e) { alert("Error de conexión"); }
+        } catch (e) { alert("Error de red"); }
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-rotate me-1"></i> Sincronizar';
+        btn.innerHTML = '<i class="fas fa-rotate"></i> Sincronizar';
     },
 
     renderTable: () => {
         const head = document.getElementById('mainAttendanceHead');
         const body = document.getElementById('mainAttendanceBody');
         head.innerHTML = ""; body.innerHTML = "";
-
         const trH = document.createElement("tr");
         STATE.visibleCols.forEach(i => {
             const th = document.createElement("th");
@@ -94,7 +78,6 @@ const App = {
             trH.appendChild(th);
         });
         head.appendChild(trH);
-
         STATE.filteredRows.forEach(row => {
             const tr = document.createElement("tr");
             STATE.visibleCols.forEach(i => {
@@ -116,9 +99,9 @@ const App = {
     },
 
     openAdminFlow: async () => {
-        const p = prompt("Contraseña:");
-        if (p !== CONFIG.ADMIN_PASS) return alert("Incorrecta");
-        const n = prompt("Nombre (ej. Est3):");
+        const p = prompt("Password:");
+        if (p !== CONFIG.ADMIN_PASS) return alert("Cerrado");
+        const n = prompt("Nombre Reporte:");
         if (n) {
             const res = await fetch(`${CONFIG.API_URL}?action=createReportSheet&reportName=${n}`).then(r => r.json());
             alert(res.message);
