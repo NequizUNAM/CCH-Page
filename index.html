@@ -13,12 +13,26 @@
 <body class="bg-light">
   <nav class="navbar navbar-dark bg-dark border-bottom shadow-sm pb-0">
     <div class="container-fluid d-flex flex-column align-items-start">
-      <div class="d-flex justify-content-between align-items-center w-100 mb-2 mt-1">
+      <div class="d-flex justify-content-between align-items-center w-100 mb-2 mt-1 gap-2">
         <a class="navbar-brand fw-bold m-0" href="#" id="home-link">
           <i class="fas fa-school me-2"></i>Dashboard CCH
         </a>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+          <!-- Botón Forms Eventos: abre el formulario en una pestaña nueva -->
+          <a
+            id="btn-forms-eventos"
+            class="btn btn-warning btn-sm"
+            href="https://docs.google.com/forms/d/e/1FAIpQLSdRT8_TkBACvMPxC90dPRVGrFpq_CH90EDQWzXcEBh5ddOcug/viewform?usp=dialog"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir Forms Eventos"
+          >
+            <i class="fas fa-calendar-check"></i>
+            <span class="d-none d-sm-inline">Forms Eventos</span>
+            <i class="fas fa-arrow-up-right-from-square fa-xs ms-1"></i>
+          </a>
+
           <button id="btn-unlock" class="btn btn-outline-info btn-sm" type="button" title="Crear reporte">
             <i class="fas fa-plus"></i>
             <span class="d-none d-sm-inline">Reporte</span>
@@ -56,15 +70,17 @@
 
         <input
           id="tableSearch"
+          type="search"
           class="form-control form-control-sm"
           placeholder="Filtrar información..."
-          style="width: 250px"
+          aria-label="Filtrar información"
+          style="width: 100%; max-width: 250px"
           disabled
         >
       </div>
     </div>
 
-    <div id="alert-container"></div>
+    <div id="alert-container" aria-live="polite"></div>
 
     <section id="inicio" class="text-center py-5">
       <h4 class="text-muted">Gestión Escolar CCH</h4>
@@ -89,6 +105,40 @@
     </section>
   </main>
 
+  <!-- Modal para crear reporte (reemplaza los prompt() del navegador) -->
+  <div class="modal fade" id="adminModal" tabindex="-1" aria-labelledby="adminModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" id="adminForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adminModalLabel">
+            <i class="fas fa-lock me-2"></i>Crear nuevo reporte
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="adminPass" class="form-label">Contraseña de administrador</label>
+            <input type="password" class="form-control" id="adminPass" required autocomplete="current-password">
+          </div>
+          <div class="mb-0">
+            <label for="reportName" class="form-label">Nombre del nuevo reporte</label>
+            <input type="text" class="form-control" id="reportName" required maxlength="80" placeholder="Ej. Grupo 501">
+          </div>
+          <div id="adminError" class="text-danger small mt-2 d-none"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="adminSubmit">
+            <i class="fas fa-plus"></i> Crear
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>
