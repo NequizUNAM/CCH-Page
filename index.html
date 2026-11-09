@@ -20,9 +20,6 @@
       </a>
 
       <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-sm btn-outline-light" href="https://nequizunam.github.io/CCH-Docs/" target="_blank" rel="noopener noreferrer" title="Aula Digital">
-          <i class="bi bi-journal-bookmark"></i><span class="d-none d-sm-inline ms-1">Aula Digital</span>
-        </a>
         <button class="btn btn-sm btn-outline-light" id="btn-prefs" type="button" title="Preferencias" aria-label="Preferencias">
           <i class="bi bi-sliders"></i>
         </button>
@@ -41,31 +38,23 @@
     <!-- ============ BIENVENIDA / LOGIN ALUMNO ============ -->
     <section id="view-login" class="view">
 
-      <header class="welcome-hero mb-4">
-        <div class="d-flex align-items-center gap-3">
-          <div class="hero-icon" aria-hidden="true"><i class="bi bi-mortarboard-fill"></i></div>
-          <div>
-            <h1 class="h3 mb-1">Bienvenida, bienvenido</h1>
-            <p class="mb-0 opacity-75">Consulta tu asistencia, tus calificaciones, tus equipos y tus evidencias de los grupos del CCH.</p>
-          </div>
-        </div>
+      <header class="welcome-hero mb-3">
+        <h1 class="h4 mb-1"><i class="bi bi-mortarboard-fill me-2"></i>Dashboard CCH</h1>
+        <p class="mb-0 small opacity-75">Asistencia · Calificaciones · Equipos · Evidencias</p>
       </header>
 
       <div class="row g-3 justify-content-center">
-        <div class="col-12 col-md-7 col-lg-5">
+        <div class="col-12 col-md-7 col-lg-6">
           <div class="card card-soft h-100">
             <div class="card-body p-4">
-              <h2 class="h5 mb-1">Consulta tu avance</h2>
-              <p class="text-body-secondary small mb-4">El acceso es <b>solo con tu número de cuenta</b>; no se usa otro medio.</p>
-
               <form id="student-login" autocomplete="on" novalidate>
-                <div class="form-floating mb-3">
+                <div class="form-floating mb-2">
                   <input type="text" class="form-control mono" id="login-cuenta" inputmode="numeric" pattern="\d{6,10}" maxlength="10" placeholder="Número de cuenta" required autocomplete="username">
                   <label for="login-cuenta">Número de cuenta</label>
                 </div>
                 <div class="form-check mb-3">
                   <input class="form-check-input" type="checkbox" id="login-remember">
-                  <label class="form-check-label small" for="login-remember">Recordar mi número de cuenta en este dispositivo</label>
+                  <label class="form-check-label small" for="login-remember">Recordar en este dispositivo</label>
                 </div>
                 <div id="login-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
                 <button class="btn btn-primary w-100" type="submit" id="login-submit">
@@ -78,93 +67,40 @@
 
         <div class="col-12 col-md-5 col-lg-3">
           <div class="card card-soft h-100 text-center">
-            <div class="card-body p-4 d-flex flex-column align-items-center justify-content-center">
-              <h2 class="h6 text-uppercase text-body-secondary mb-3">Ábrela en tu celular</h2>
+            <div class="card-body p-3 d-flex flex-column align-items-center justify-content-center">
               <div id="page-qr" class="qr-box" role="img" aria-label="Código QR con la dirección de esta página"></div>
-              <p class="small text-body-secondary mt-3 mb-1">Escanea el código con la cámara.</p>
-              <p class="small mb-0"><i class="bi bi-person-badge me-1"></i>Acceso solo con número de cuenta.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-4">
-          <div class="card card-soft h-100">
-            <div class="card-body p-4">
-              <h2 class="h6 text-uppercase text-body-secondary mb-3">Aquí puedes</h2>
-              <ul class="list-unstyled feature-list mb-0">
-                <li><i class="bi bi-calendar-check text-success"></i>Ver tus asistencias, retardos y faltas.</li>
-                <li><i class="bi bi-bar-chart text-primary"></i>Ver tus calificaciones y ponderaciones.</li>
-                <li><i class="bi bi-people text-warning"></i>Registrar tu equipo para cada proyecto.</li>
-                <li><i class="bi bi-cloud-arrow-up text-info"></i>Subir evidencias para puntos adicionales.</li>
-              </ul>
+              <p class="small text-body-secondary mt-2 mb-0">Escanéalo con tu celular</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Preguntas frecuentes -->
-      <section class="mt-4" aria-labelledby="faq-title">
-        <h2 class="h5 mb-3" id="faq-title"><i class="bi bi-question-circle me-2"></i>Preguntas frecuentes</h2>
-        <div class="accordion faq" id="faq">
-
+      <section class="mt-4 faq-wrap" aria-labelledby="faq-title">
+        <h2 class="h6 text-uppercase text-body-secondary mb-2" id="faq-title">Preguntas frecuentes</h2>
+        <div class="accordion accordion-flush faq card-soft overflow-hidden" id="faq">
           <div class="accordion-item">
             <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" aria-expanded="false" aria-controls="faq1">¿Cómo entro?</button></h3>
-            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              Escribe tu <b>número de cuenta</b> (solo dígitos) y presiona <b>Entrar</b>. Es el único acceso; no se pide correo ni contraseña.
-              Si dice que no encuentra tu cuenta, revisa que esté bien escrita o avisa a tu profesor para que te registre. La sesión se cierra sola después de 2 horas o al presionar <b>Salir</b>.
-            </div></div>
+            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">Solo con tu número de cuenta. No compartas el tuyo.</div></div>
           </div>
-
           <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" aria-expanded="false" aria-controls="faq2">Asistencia: ¿qué significa cada color?</button></h3>
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" aria-expanded="false" aria-controls="faq2">Asistencia</button></h3>
             <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              <div class="legend mb-2">
-                <span class="st-asistencia">Asistencia</span><span class="st-retardo">Retardo</span><span class="st-falta">Falta</span><span class="st-nd">N/D</span><span class="st-otro">Justificada</span>
-              </div>
-              <b>Asistencia</b>: registraste a tiempo. <b>Retardo</b>: llegaste después de la tolerancia (15 min). <b>Falta</b>: ese día hubo lista y no apareces.
-              <b>N/D</b>: ese día no se pasó lista. <b>Justificada</b>: tu profesor la justificó.
-              Con <b>más de 4 faltas</b>, tu número de cuenta se pinta de rojo, cada vez más intenso.
+              <div class="legend"><span class="st-asistencia">✓ Asistencia</span><span class="st-falta">✗ Falta</span><span class="st-justificante">J Justificante</span><span class="st-nd">· Sin lista</span></div>
+              <div class="mt-2">Con más de 4 faltas tu cuenta se marca en rojo.</div>
             </div></div>
           </div>
-
           <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3" aria-expanded="false" aria-controls="faq3">Calificaciones: ¿cómo se calcula mi promedio?</button></h3>
-            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              Cada grupo tiene su propia forma de evaluar: parciales, sellos, proyectos, asistencia, etc., cada uno con un <b>peso</b> en porcentaje.
-              Todas las calificaciones se muestran en escala de 10.
-              <ul class="mb-0 mt-2">
-                <li><b>Promedio actual</b>: solo cuenta lo que ya fue calificado.</li>
-                <li><b>Si hoy cerrara el curso</b>: lo que aún no tiene calificación cuenta como 0.</li>
-                <li><b>Aporte</b>: cuántos puntos suma cada rubro a tu calificación final.</li>
-              </ul>
-            </div></div>
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3" aria-expanded="false" aria-controls="faq3">Calificaciones</button></h3>
+            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small"><b>Promedio actual</b>: solo lo ya calificado. <b>Si hoy cerrara</b>: lo pendiente cuenta 0.</div></div>
           </div>
-
           <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4" aria-expanded="false" aria-controls="faq4">Equipos: ¿cómo registro el mío?</button></h3>
-            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              En <b>Equipos</b> aparecen los proyectos que tu profesor habilitó. Escribe el nombre del equipo y los números de cuenta de tus compañeros (tú ya estás incluido).
-              Nadie puede estar en dos equipos del mismo proyecto y no se repiten nombres de equipo. Solo un integrante registra al equipo; si hay un error, solo el profesor puede corregirlo.
-              Cuando el profesor califica al equipo (de 1 a 5 ★ por rubro), la calificación les llega a <b>todos los integrantes</b>.
-              Si cierra el registro y no tienes equipo, ese proyecto cuenta 0.
-            </div></div>
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4" aria-expanded="false" aria-controls="faq4">Equipos</button></h3>
+            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">Un integrante registra al equipo con las cuentas de todos. La calificación llega a cada integrante.</div></div>
           </div>
-
           <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5" aria-expanded="false" aria-controls="faq5">Evidencias y puntos adicionales</button></h3>
-            <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              Si asistes a un evento o haces una actividad extra, sube una foto o PDF en <b>Evidencias</b>. Queda como <b>Pendiente</b> hasta que tu profesor la revise.
-              Él decide cuántos puntos te da y a qué examen se suman. Cuando quedan <b>aplicados</b>, aparece la etiqueta
-              <span class="bonus-tag"><i class="bi bi-stars"></i>+0.5</span> junto a esa calificación; pasa el dedo o el cursor encima para ver de qué evidencia vienen.
-            </div></div>
-          </div>
-
-          <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6" aria-expanded="false" aria-controls="faq6">¿Quién ve mi información?</button></h3>
-            <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
-              Solo ves tus propios datos, nunca los de tus compañeros. Las notas internas del profesor no se muestran aquí.
-              Como el acceso es con número de cuenta, <b>no compartas el tuyo</b>.
-            </div></div>
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5" aria-expanded="false" aria-controls="faq5">Evidencias</button></h3>
+            <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">Sube foto o PDF. Si se aplican puntos verás <span class="bonus-tag"><i class="bi bi-stars"></i>+0.5</span> en esa calificación.</div></div>
           </div>
         </div>
       </section>
@@ -177,9 +113,14 @@
           <h1 class="h5 mb-0" id="stu-name">—</h1>
           <span class="text-body-secondary small">Cuenta <span class="mono" id="stu-cuenta">—</span></span>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" id="stu-refresh" type="button">
-          <i class="bi bi-arrow-clockwise"></i> Actualizar
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-primary" id="stu-links" type="button">
+            <i class="bi bi-link-45deg"></i> Enlaces <span class="badge text-bg-light" id="stu-links-count"></span>
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" id="stu-refresh" type="button" title="Actualizar" aria-label="Actualizar">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
       </div>
 
       <div id="stu-courses" class="nav nav-pills pill-scroll mb-3" role="tablist" aria-label="Tus grupos"></div>

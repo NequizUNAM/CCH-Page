@@ -14,6 +14,7 @@
   --st-miss-bg: #f8d7da; --st-miss-fg: #842029;
   --st-nd-bg: #eceff3;   --st-nd-fg: #64748b;
   --st-other-bg: #e7f1fb; --st-other-fg: #1c5d99;
+  --st-just-bg: #cff4fc;  --st-just-fg: #055160;
 }
 
 [data-bs-theme="dark"] {
@@ -23,6 +24,7 @@
   --st-miss-bg: #47222a; --st-miss-fg: #f5b8be;
   --st-nd-bg: #2b3036;   --st-nd-fg: #9aa4b2;
   --st-other-bg: #1c2f44; --st-other-fg: #9ec5fe;
+  --st-just-bg: #032830;  --st-just-fg: #6edff6;
 }
 
 body {
@@ -47,6 +49,7 @@ body {
   padding: 1.5rem;
   box-shadow: var(--cch-shadow);
 }
+.welcome-hero { max-width: 1000px; margin-left: auto; margin-right: auto; padding: 1.1rem 1.4rem; }
 .hero-icon {
   width: 56px; height: 56px; flex-shrink: 0;
   display: grid; place-items: center;
@@ -122,7 +125,16 @@ body {
 .st-retardo    { background: var(--st-late-bg) !important; color: var(--st-late-fg) !important; }
 .st-falta      { background: var(--st-miss-bg) !important; color: var(--st-miss-fg) !important; }
 .st-nd         { background: var(--st-nd-bg) !important; color: var(--st-nd-fg) !important; font-style: italic; }
+.st-justificante { background: var(--st-just-bg) !important; color: var(--st-just-fg) !important; font-weight: 700; }
 .st-otro       { background: var(--st-other-bg) !important; color: var(--st-other-fg) !important; }
+
+/* Asistencia minimalista: celdas angostas con símbolo */
+.att-table td.st, .att-table th:not(.sticky-col):not(.text-start) { min-width: 2.6rem; padding-left: .25rem; padding-right: .25rem; }
+.att-table td.st { font-weight: 700; cursor: default; }
+.att-table thead th { font-size: .72rem; }
+.st-dot { display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; border-radius: 6px; font-weight: 700; font-size: .8rem; }
+.profile-tabs .nav-link { white-space: nowrap; }
+.faq-wrap { max-width: 760px; margin-left: auto; margin-right: auto; }
 
 /* Cuenta con más de 4 faltas: el color lo pone JS (hsl rojo pastel) */
 .cuenta-cell { font-family: ui-monospace, 'Courier New', monospace; font-weight: 600; }
