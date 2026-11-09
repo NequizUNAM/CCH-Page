@@ -38,6 +38,29 @@ body {
   border-bottom: 3px solid var(--cch-accent);
 }
 
+/* ---------- Bienvenida ---------- */
+.welcome-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b 60%, #334155);
+  color: #fff;
+  border-radius: var(--cch-radius);
+  border-bottom: 5px solid var(--cch-accent);
+  padding: 1.5rem;
+  box-shadow: var(--cch-shadow);
+}
+.hero-icon {
+  width: 56px; height: 56px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 16px; font-size: 1.6rem;
+  background: linear-gradient(135deg, #e8590c, #f08c00);
+}
+.qr-box { background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--bs-border-color); line-height: 0; }
+.qr-box img, .qr-box canvas { width: 160px; height: 160px; }
+.faq .accordion-button:not(.collapsed) { color: var(--cch-accent); background: rgba(232, 89, 12, .06); box-shadow: none; }
+.faq .accordion-item { border-color: var(--bs-border-color-translucent); }
+.welcome-hero h1 { color: #fff; }
+.app-footer { border-top: 1px solid var(--bs-border-color-translucent); }
+.app-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
 /* ---------- Tarjetas ---------- */
 .card-soft {
   border: 1px solid var(--bs-border-color-translucent);

@@ -2,7 +2,7 @@
 // SESIONES
 //
 // - Admin: contraseña en la propiedad CCH_ADMIN_PASSWORD → token (6 h)
-// - Alumno: número de cuenta + correo registrado en Students → token (2 h)
+// - Alumno: SOLO número de cuenta registrado en Students → token (2 h)
 // Los tokens viven en CacheService; nunca se guarda la contraseña.
 // Tras LOGIN_MAX_ATTEMPTS intentos fallidos se bloquea LOGIN_LOCK_S segundos.
 // ============================================================
@@ -49,18 +49,6 @@ function studentLogin_(params) {
   if (!records.length) {
     registerFailure_(cache, rateKey);
     throw new Error("No encontramos ese número de cuenta. Revisa que esté bien escrito.");
-  }
-
-  const emails = records.map(r => r.email.toLowerCase()).filter(Boolean);
-  const typed = String(params.correo || "").trim().toLowerCase();
-
-  if (emails.length) {
-    if (!typed || !emails.includes(typed)) {
-      registerFailure_(cache, rateKey);
-      throw new Error("El correo no coincide con el registrado para esa cuenta.");
-    }
-  } else if (!SETTINGS.ALLOW_LOGIN_WITHOUT_EMAIL) {
-    throw new Error("Tu cuenta no tiene correo registrado. Pídele a tu profesor que lo agregue.");
   }
 
   cache.remove(rateKey);

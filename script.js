@@ -29,9 +29,8 @@ const Prefs = {
     theme: "auto",          // auto | light | dark
     compact: false,         // tablas compactas
     showHidden: true,       // admin: mostrar columnas "Oculto" del reporte
-    remember: false,        // recordar cuenta/correo del alumno
+    remember: false,        // recordar el número de cuenta del alumno
     cuenta: "",
-    correo: "",
     stuTab: "asistencia",
     admTab: "asistencia",
     admGroup: "",
@@ -367,15 +366,30 @@ const App = {
 
     if (Prefs.get("remember")) {
       $("login-cuenta").value = Prefs.get("cuenta") || "";
-      $("login-correo").value = Prefs.get("correo") || "";
       $("login-remember").checked = true;
     }
+
+    App.renderQr();
 
     window.addEventListener("beforeunload", e => {
       if (Admin.dirty && Admin.dirty.size) { e.preventDefault(); e.returnValue = ""; }
     });
 
     App.route();
+  },
+
+  /** QR con la dirección de esta página (sin #, sin parámetros). */
+  renderQr() {
+    const box = $("page-qr");
+    if (!box) return;
+    const url = location.origin + location.pathname;
+    box.title = url;
+    if (typeof QRCode === "undefined") {
+      box.replaceChildren(h("a", { href: url, class: "small", text: url }));
+      return;
+    }
+    box.replaceChildren();
+    new QRCode(box, { text: url, width: 320, height: 320, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
   },
 
   show(view) {
@@ -448,7 +462,7 @@ const App = {
         class: "form-check-input", type: "checkbox", id: `pref-${key}`, checked: !!Prefs.get(key),
         onchange: e => {
           Prefs.set(key, e.target.checked);
-          if (key === "remember" && !e.target.checked) { Prefs.set("cuenta", ""); Prefs.set("correo", ""); }
+          if (key === "remember" && !e.target.checked) Prefs.set("cuenta", "");
           document.body.classList.toggle("compact", !!Prefs.get("compact"));
           if (key === "showHidden" && Session.get("admin")) Admin.renderTab();
         }
@@ -463,7 +477,7 @@ const App = {
     $("prefs-body").replaceChildren(
       h("div", { class: "mb-3" }, h("label", { class: "form-label", for: "pref-theme", text: "Tema" }), theme),
       sw("compact", "Tablas compactas"),
-      sw("remember", "Recordar mi cuenta y correo", "Útil en tu celular; no lo actives en computadoras compartidas."),
+      sw("remember", "Recordar mi número de cuenta", "Útil en tu celular; no lo actives en computadoras compartidas."),
       sw("showHidden", "Admin: mostrar columnas «Oculto» del reporte", "Se ven en gris; los alumnos nunca las ven."),
       h("button", {
         class: "btn btn-sm btn-outline-danger", type: "button",
@@ -484,7 +498,6 @@ const Student = {
   async login(event) {
     event.preventDefault();
     const cuenta = $("login-cuenta").value.replace(/\D/g, "");
-    const correo = $("login-correo").value.trim();
     const errorBox = $("login-error");
     errorBox.classList.add("d-none");
 
@@ -496,13 +509,12 @@ const Student = {
 
     try {
       await UI.busy($("login-submit"), async () => {
-        const result = await Api.call("studentLogin", { cuenta, correo });
+        const result = await Api.call("studentLogin", { cuenta });
         Session.set("student", { token: result.token, cuenta: result.cuenta });
       });
       const remember = $("login-remember").checked;
       Prefs.set("remember", remember);
       Prefs.set("cuenta", remember ? cuenta : "");
-      Prefs.set("correo", remember ? correo : "");
       Student.open();
     } catch (error) {
       errorBox.textContent = error.message;

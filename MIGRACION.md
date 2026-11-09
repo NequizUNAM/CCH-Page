@@ -110,7 +110,7 @@ La celda también lleva una franja de color a la izquierda.
 ## Seguridad y privacidad
 
 - Antes, `getData` enviaba la hoja completa a cualquiera, incluidas las columnas «Oculto». Ahora el alumno **solo recibe su propia fila** y solo las columnas visibles. Los comentarios nunca salen del panel de admin.
-- El alumno entra con **cuenta + correo registrado** en `Students`. Si un alumno no tiene correo, entra solo con su cuenta; puedes cambiarlo con `SETTINGS.ALLOW_LOGIN_WITHOUT_EMAIL`.
+- El alumno entra **solo con su número de cuenta**, que debe existir en `Students`. Cualquiera que conozca una cuenta puede ver la asistencia y las calificaciones de ese alumno; por eso la página de inicio pide no compartirla. Los comentarios y los datos de otros alumnos nunca se envían.
 - La contraseña de admin viaja por POST, nunca en la URL. La sesión dura 6 h, y tras 5 intentos fallidos el acceso se bloquea 10 minutos.
 - En el navegador se guardan las preferencias (tema, tablas compactas, recordar cuenta) en `localStorage`, y la sesión en `sessionStorage`, que se borra al cerrar la pestaña.
 

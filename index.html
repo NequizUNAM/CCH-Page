@@ -38,27 +38,34 @@
 
   <main class="container-xl py-3 py-md-4">
 
-    <!-- ============ LOGIN ALUMNO ============ -->
+    <!-- ============ BIENVENIDA / LOGIN ALUMNO ============ -->
     <section id="view-login" class="view">
+
+      <header class="welcome-hero mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <div class="hero-icon" aria-hidden="true"><i class="bi bi-mortarboard-fill"></i></div>
+          <div>
+            <h1 class="h3 mb-1">Bienvenida, bienvenido</h1>
+            <p class="mb-0 opacity-75">Consulta tu asistencia, tus calificaciones, tus equipos y tus evidencias de los grupos del CCH.</p>
+          </div>
+        </div>
+      </header>
+
       <div class="row g-3 justify-content-center">
-        <div class="col-12 col-md-6 col-lg-5">
-          <div class="card card-soft">
+        <div class="col-12 col-md-7 col-lg-5">
+          <div class="card card-soft h-100">
             <div class="card-body p-4">
-              <h1 class="h4 mb-1">Consulta tu avance</h1>
-              <p class="text-body-secondary small mb-4">Entra con tu número de cuenta y tu correo institucional.</p>
+              <h2 class="h5 mb-1">Consulta tu avance</h2>
+              <p class="text-body-secondary small mb-4">El acceso es <b>solo con tu número de cuenta</b>; no se usa otro medio.</p>
 
               <form id="student-login" autocomplete="on" novalidate>
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="login-cuenta" inputmode="numeric" pattern="\d{6,10}" placeholder="Número de cuenta" required autocomplete="username">
+                  <input type="text" class="form-control mono" id="login-cuenta" inputmode="numeric" pattern="\d{6,10}" maxlength="10" placeholder="Número de cuenta" required autocomplete="username">
                   <label for="login-cuenta">Número de cuenta</label>
-                </div>
-                <div class="form-floating mb-3">
-                  <input type="email" class="form-control" id="login-correo" placeholder="correo@alumno.cch.unam.mx" autocomplete="email">
-                  <label for="login-correo">Correo registrado</label>
                 </div>
                 <div class="form-check mb-3">
                   <input class="form-check-input" type="checkbox" id="login-remember">
-                  <label class="form-check-label small" for="login-remember">Recordar mis datos en este dispositivo</label>
+                  <label class="form-check-label small" for="login-remember">Recordar mi número de cuenta en este dispositivo</label>
                 </div>
                 <div id="login-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
                 <button class="btn btn-primary w-100" type="submit" id="login-submit">
@@ -69,7 +76,18 @@
           </div>
         </div>
 
-        <div class="col-12 col-md-6 col-lg-4">
+        <div class="col-12 col-md-5 col-lg-3">
+          <div class="card card-soft h-100 text-center">
+            <div class="card-body p-4 d-flex flex-column align-items-center justify-content-center">
+              <h2 class="h6 text-uppercase text-body-secondary mb-3">Ábrela en tu celular</h2>
+              <div id="page-qr" class="qr-box" role="img" aria-label="Código QR con la dirección de esta página"></div>
+              <p class="small text-body-secondary mt-3 mb-1">Escanea el código con la cámara.</p>
+              <p class="small mb-0"><i class="bi bi-person-badge me-1"></i>Acceso solo con número de cuenta.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
           <div class="card card-soft h-100">
             <div class="card-body p-4">
               <h2 class="h6 text-uppercase text-body-secondary mb-3">Aquí puedes</h2>
@@ -83,6 +101,73 @@
           </div>
         </div>
       </div>
+
+      <!-- Preguntas frecuentes -->
+      <section class="mt-4" aria-labelledby="faq-title">
+        <h2 class="h5 mb-3" id="faq-title"><i class="bi bi-question-circle me-2"></i>Preguntas frecuentes</h2>
+        <div class="accordion faq" id="faq">
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" aria-expanded="false" aria-controls="faq1">¿Cómo entro?</button></h3>
+            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              Escribe tu <b>número de cuenta</b> (solo dígitos) y presiona <b>Entrar</b>. Es el único acceso; no se pide correo ni contraseña.
+              Si dice que no encuentra tu cuenta, revisa que esté bien escrita o avisa a tu profesor para que te registre. La sesión se cierra sola después de 2 horas o al presionar <b>Salir</b>.
+            </div></div>
+          </div>
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" aria-expanded="false" aria-controls="faq2">Asistencia: ¿qué significa cada color?</button></h3>
+            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              <div class="legend mb-2">
+                <span class="st-asistencia">Asistencia</span><span class="st-retardo">Retardo</span><span class="st-falta">Falta</span><span class="st-nd">N/D</span><span class="st-otro">Justificada</span>
+              </div>
+              <b>Asistencia</b>: registraste a tiempo. <b>Retardo</b>: llegaste después de la tolerancia (15 min). <b>Falta</b>: ese día hubo lista y no apareces.
+              <b>N/D</b>: ese día no se pasó lista. <b>Justificada</b>: tu profesor la justificó.
+              Con <b>más de 4 faltas</b>, tu número de cuenta se pinta de rojo, cada vez más intenso.
+            </div></div>
+          </div>
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3" aria-expanded="false" aria-controls="faq3">Calificaciones: ¿cómo se calcula mi promedio?</button></h3>
+            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              Cada grupo tiene su propia forma de evaluar: parciales, sellos, proyectos, asistencia, etc., cada uno con un <b>peso</b> en porcentaje.
+              Todas las calificaciones se muestran en escala de 10.
+              <ul class="mb-0 mt-2">
+                <li><b>Promedio actual</b>: solo cuenta lo que ya fue calificado.</li>
+                <li><b>Si hoy cerrara el curso</b>: lo que aún no tiene calificación cuenta como 0.</li>
+                <li><b>Aporte</b>: cuántos puntos suma cada rubro a tu calificación final.</li>
+              </ul>
+            </div></div>
+          </div>
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4" aria-expanded="false" aria-controls="faq4">Equipos: ¿cómo registro el mío?</button></h3>
+            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              En <b>Equipos</b> aparecen los proyectos que tu profesor habilitó. Escribe el nombre del equipo y los números de cuenta de tus compañeros (tú ya estás incluido).
+              Nadie puede estar en dos equipos del mismo proyecto y no se repiten nombres de equipo. Solo un integrante registra al equipo; si hay un error, solo el profesor puede corregirlo.
+              Cuando el profesor califica al equipo (de 1 a 5 ★ por rubro), la calificación les llega a <b>todos los integrantes</b>.
+              Si cierra el registro y no tienes equipo, ese proyecto cuenta 0.
+            </div></div>
+          </div>
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5" aria-expanded="false" aria-controls="faq5">Evidencias y puntos adicionales</button></h3>
+            <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              Si asistes a un evento o haces una actividad extra, sube una foto o PDF en <b>Evidencias</b>. Queda como <b>Pendiente</b> hasta que tu profesor la revise.
+              Él decide cuántos puntos te da y a qué examen se suman. Cuando quedan <b>aplicados</b>, aparece la etiqueta
+              <span class="bonus-tag"><i class="bi bi-stars"></i>+0.5</span> junto a esa calificación; pasa el dedo o el cursor encima para ver de qué evidencia vienen.
+            </div></div>
+          </div>
+
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6" aria-expanded="false" aria-controls="faq6">¿Quién ve mi información?</button></h3>
+            <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faq"><div class="accordion-body small">
+              Solo ves tus propios datos, nunca los de tus compañeros. Las notas internas del profesor no se muestran aquí.
+              Como el acceso es con número de cuenta, <b>no compartas el tuyo</b>.
+            </div></div>
+          </div>
+        </div>
+      </section>
     </section>
 
     <!-- ============ VISTA ALUMNO ============ -->
@@ -142,6 +227,11 @@
     </section>
   </main>
 
+  <footer class="app-footer text-center small text-body-secondary py-3">
+    Dashboard CCH · Prof. Nequiz ·
+    <a class="link-secondary" href="mailto:ing.nequiz@gmail.com">ing.nequiz@gmail.com</a>
+  </footer>
+
   <!-- Avisos -->
   <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts" aria-live="polite"></div>
 
@@ -195,6 +285,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>

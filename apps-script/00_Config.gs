@@ -34,7 +34,7 @@
  * ============================================================
  */
 
-const API_VERSION = "5.1.0";
+const API_VERSION = "5.2.0";
 const REPORT_PREFIX = "Reporte_";
 
 const SHEETS = {
@@ -130,8 +130,7 @@ const SETTINGS = {
   STUDENT_TOKEN_TTL_S: 2 * 60 * 60,  // 2 h
   LOGIN_MAX_ATTEMPTS: 5,             // intentos fallidos antes de bloquear
   LOGIN_LOCK_S: 10 * 60,             // bloqueo de 10 min
-  // Si el alumno no tiene correo registrado en Students, ¿puede entrar solo con su cuenta?
-  ALLOW_LOGIN_WITHOUT_EMAIL: true,
+  // El alumno entra SOLO con su número de cuenta (no se pide correo ni contraseña)
 
   // ---- Equipos y evidencias ----
   MAX_TEAM_SIZE: 8,
