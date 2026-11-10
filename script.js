@@ -13,7 +13,7 @@ const CONFIG = {
   // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
   // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
-  VERSION: "6.8",
+  VERSION: "6.9",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -2357,7 +2357,11 @@ const Admin = {
       const fresh = draft.filter(c => !c.id && c.nombre.trim()).map(c => c.nombre.trim());
       pairNote.replaceChildren(...kids(
         gone.length ? h("div", { class: "alert alert-warning py-1 px-2 mb-1 small" }, icon("exclamation-triangle", "me-1"), `Al guardar se borrarán del reporte las columnas: ${gone.join(", ")} (con sus datos).`) : null,
-        fresh.length ? h("div", { class: "alert alert-info py-1 px-2 mb-1 small" }, icon("plus-lg", "me-1"), `Al guardar se crea su columna en el reporte: ${fresh.join(", ")}.`) : null));
+        fresh.length ? h("div", { class: "alert alert-info py-1 px-2 mb-1 small" }, icon("plus-lg", "me-1"), `Al guardar se crea su columna en el reporte: ${fresh.join(", ")}.`) : null,
+        // Columnas que muestran un proyecto pero no cuentan en la calificación
+        ...(g.columns || []).filter(l => l.tipo === "proyecto" && !draft.some(c => c.tipo === "proyectos" && Fmt.normalize(c.nombre) === Fmt.normalize(l.columna)))
+          .map(l => h("div", { class: "alert alert-warning py-1 px-2 mb-1 small" }, icon("exclamation-triangle", "me-1"),
+            `«${l.columna}» muestra un proyecto en el reporte, pero no cuenta en la calificación. Agrega un componente llamado «${l.columna}» de tipo «Proyectos en equipo» con su %: tomará esa misma columna y ese proyecto.`))));
       sumBar.className = `progress-bar ${exact ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
       sumHint.textContent = exact ? "" : `Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`;
       saveBtn.disabled = !exact;

@@ -4390,13 +4390,30 @@ function pairComponentColumns_(idCurso, before) {
       }
       return;
     }
-    const free = info.out.filter(i => !linkedCols.has(colKey_(h[i])));
+    // Libres = sin enlace, o enlazadas directo a UN proyecto (el componente las reemplaza; ej. «Ejercicio Clase»)
+    const projectLinked = k => all.some(x => mine(x) && cleanText_(x.Tipo) === "proyecto" && colKey_(x.Columna) === colKey_(h[k]));
+    const free = info.out.filter(k => !linkedCols.has(colKey_(h[k])) || projectLinked(k));
     let i = free.find(k => colKey_(h[k]) === colKey_(c.nombre));
     if (i === undefined && c.tipo === "proyectos") i = free.find(k => /proyecto|ejercicio/.test(colKey_(h[k])));
+    if (i !== undefined && projectLinked(i)) {
+      const refs = all.filter(x => mine(x) && cleanText_(x.Tipo) === "proyecto" && colKey_(x.Columna) === colKey_(h[i])).map(x => cleanText_(x.Ref));
+      for (let x = all.length - 1; x >= 0; x--) if (mine(all[x]) && colKey_(all[x].Columna) === colKey_(h[i])) all.splice(x, 1);
+      // Componente de tipo Proyectos: el proyecto que llenaba la columna pasa a contar en él (si no contaba en otro)
+      if (c.tipo === "proyectos" && refs.length) {
+        const validIds = new Set(after.map(x => x.id));
+        const rows = Db.read(WEB.PROJECTS).rows;
+        let changed = 0;
+        rows.forEach(r => {
+          if (refs.includes(cleanText_(r.ID)) && !validIds.has(cleanText_(r.ID_Componente))) { r.ID_Componente = c.id; changed++; }
+        });
+        if (changed) { Db.writeAll(WEB.PROJECTS, rows); notes.push(`El proyecto de «${h[i]}» ahora cuenta en «${c.nombre}».`); }
+      }
+    }
     if (i === undefined) {
       i = sheet.getLastColumn();
       sheet.getRange(1, i + 1).setValue("Visible");
       sheet.getRange(2, i + 1).setValue(c.nombre);
+      formatNewReportColumn_(sheet, i + 1);
       h[i] = c.nombre;
       created.push(c.nombre);
     }
@@ -4431,6 +4448,17 @@ function pairAllComponentColumns_() {
   props.setProperty("CCH_PAIRED_V641", new Date().toISOString());
 }
 
+/** Columna nueva con el mismo formato de encabezado (filas 1–2) que la columna «Nombre». */
+function formatNewReportColumn_(sheet, col) {
+  try {
+    const headers = sheet.getRange(2, 1, 1, Math.max(col - 1, 1)).getValues()[0].map(cleanText_);
+    let from = findNameColumn_(headers);
+    if (from === -1) from = Math.max(col - 2, 0);
+    sheet.getRange(1, from + 1, 2, 1).copyTo(sheet.getRange(1, col, 2, 1), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    sheet.setColumnWidth(col, Math.max(sheet.getColumnWidth(from + 1), 110));
+  } catch (e) { /* solo es formato */ }
+}
+
 /** Agrega una columna (no fecha) al final del reporte y, por defecto, su componente (0 %). */
 function addReportColumn_(params) {
   const { group, sheet } = reportSheetFor_(params.idCurso);
@@ -4442,6 +4470,7 @@ function addReportColumn_(params) {
   const col = sheet.getLastColumn() + 1;
   sheet.getRange(1, col).setValue("Visible");
   sheet.getRange(2, col).setValue(name);
+  formatNewReportColumn_(sheet, col);
   delete Db._cache["__rep_" + group.sheet];
   if (params.component === false) return { message: `Columna «${name}» agregada a ${group.sheet}.` };
 
