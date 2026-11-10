@@ -93,8 +93,11 @@ body {
 [data-bs-theme="dark"] .nav-pills .nav-link.active { background: #334155; }
 
 /* ---------- Tablas ---------- */
+/* Alto = N filas (Preferencias → Alumnos visibles por tabla; 60 por defecto) */
+:root { --row-h: 2.35rem; --rows: 60; }
+.compact { --row-h: 1.9rem; }
 .table-wrap {
-  max-height: calc(100vh - 260px);
+  max-height: calc(var(--rows) * var(--row-h) + 2.75rem);
   min-height: 160px;
   overflow: auto;
   border-radius: var(--cch-radius);
@@ -102,6 +105,7 @@ body {
   background: var(--bs-body-bg);
 }
 .table-wrap.auto-h { max-height: none; min-height: 0; }
+.rows-all .table-wrap { max-height: none; }
 
 .table-cch { margin: 0; font-size: .85rem; }
 .table-cch th, .table-cch td { white-space: nowrap; vertical-align: middle; text-align: center; }
@@ -282,6 +286,9 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #74a7e0, inset 6px 0 0 #9b87e8;
 }
 .weight-bar { height: .5rem; }
 .comp-row .form-control, .comp-row .form-select { font-size: .85rem; }
+.comp-focus { border: 2px solid #e8590c !important; background: #fff4e0; }
+[data-bs-theme="dark"] .comp-focus { background: rgba(240, 140, 0, .14); }
+.att-table th.col-linked .th-link { display: inline-flex; align-items: center; }
 .empty-state { text-align: center; color: var(--bs-secondary-color); padding: 2.5rem 1rem; }
 .empty-state i { font-size: 2rem; display: block; margin-bottom: .5rem; }
 .loading { text-align: center; padding: 2rem; color: var(--bs-secondary-color); }
@@ -296,7 +303,6 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #74a7e0, inset 6px 0 0 #9b87e8;
 ::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 576px) {
-  .table-wrap { max-height: calc(100vh - 220px); }
   .table-cch .name-cell { max-width: 190px; }
   .roll-table .name-cell { max-width: 96px; }
   .roll-table td, .roll-table th { padding: .25rem .3rem; }

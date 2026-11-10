@@ -26,14 +26,13 @@
  * ============================================================
  */
 
-const API_VERSION = "6.3.0";
+const API_VERSION = "6.4.0";
 const REPORT_PREFIX = "Reporte_";
 
 const SHEETS = {
   ATTENDANCE: "Attendance Log",
   STUDENTS: "Students",
-  COURSE: "Course",
-  LEGACY_GRADES: "Calificaciones"
+  COURSE: "Course"
 };
 
 /** Hojas nuevas de la web: nombre + encabezados (fila 1). */
@@ -124,16 +123,6 @@ const DEFAULT_RUBRICS = [
   "Funcionamiento - Creatividad",
   "Presentación y explicación"
 ];
-
-/** Columnas de la hoja Calificaciones (AppSheet) → nombre de componente al importar. */
-const LEGACY_GRADE_COLUMNS = {
-  "Parcial_1": "Parcial 1",
-  "Parcial_2": "Parcial 2",
-  "Parcial_3": "Parcial 3",
-  "Sellos": "Sellos",
-  "Proyecto_Final": "Proyecto Final",
-  "Puntos Adicionales": "Puntos Adicionales"
-};
 
 const SETTINGS = {
   ADMIN_PASSWORD_KEY: "CCH_ADMIN_PASSWORD",
@@ -266,7 +255,6 @@ function routes_() {
   saveGroup:          { auth: "admin", fn: saveGroup_, lock: true },
   groupData:          { auth: "admin", fn: groupData_ },
   saveComponents:     { auth: "admin", fn: synced(saveComponents_, byParam), lock: true },
-  importLegacyGrades: { auth: "admin", fn: synced(importLegacyGrades_, byParam), lock: true },
   saveGrades:         { auth: "admin", fn: synced(saveGrades_, byParam), lock: true },
   saveProject:        { auth: "admin", fn: synced(saveProject_, byParam), lock: true },
   deleteProject:      { auth: "admin", fn: synced(deleteProject_, byResult), lock: true },
@@ -305,7 +293,9 @@ function routes_() {
 
   // ---- Columnas del reporte ----
   columnsInfo:        { auth: "admin", fn: p => columnsInfo_(p.idCurso) },
-  saveColumns:        { auth: "admin", fn: saveColumns_, lock: true }
+  saveColumns:        { auth: "admin", fn: saveColumns_, lock: true },
+  addReportColumn:    { auth: "admin", fn: addReportColumn_, lock: true },
+  deleteReportColumn: { auth: "admin", fn: deleteReportColumn_, lock: true }
   };
 }
 
@@ -435,6 +425,7 @@ function setupWeb_(options) {
   const linked = [];
 
   ensureCourseWebColumns_();
+  upgradeIntegerLinks_();
 
   // Hojas Reporte_ que ningún curso tiene ligadas → se ligan al curso detectado (si no tiene hoja)
   const courses = courseMap_();
@@ -1272,8 +1263,8 @@ function insertDateColumns_(sheet, report, lastDateIndex, dateKeys, tz) {
   const dateFormat = /[dy]/i.test(sourceFormat) ? sourceFormat : SETTINGS.DEFAULT_DATE_FORMAT;
 
   // Fila 1: visibilidad
-  const anchorVisibility = cleanText_((report.data[0] || [])[lastDateIndex]);
-  const visibility = anchorVisibility ? normalizeVisibilityValue_(anchorVisibility) : "Visible";
+  // Las fechas nuevas siempre se crean visibles
+  const visibility = "Visible";
 
   sheet.getRange(1, firstNewColumn, 1, count)
     .setValues([dateKeys.map(() => visibility)])
@@ -2385,74 +2376,6 @@ function saveGrades_(params) {
     saved, removed, errors,
     message: `Guardado: ${saved} calificación(es)${removed ? `, ${removed} borrada(s)` : ""}.` +
       (errors.length ? ` ${errors.length} con error.` : "")
-  };
-}
-
-/**
- * Copia Parcial_1, Parcial_2, Parcial_3, Sellos y Proyecto_Final de la hoja
- * Calificaciones (AppSheet) a W_Calificaciones para el grupo. Si el grupo
- * no tiene componentes, primero crea la plantilla por defecto.
- * Nunca sobrescribe una calificación ya capturada en la web.
- */
-function importLegacyGrades_(params) {
-  const idCurso = cleanText_(params.idCurso);
-  requireGroup_(idCurso);
-
-  let components = componentsFor_(idCurso);
-  if (!components.length) {
-    saveComponents_({ idCurso, components: DEFAULT_COMPONENTS.map(c => ({ nombre: c.Nombre, tipo: c.Tipo, ponderacion: c.Ponderacion, maximo: c.Maximo })) });
-    components = componentsFor_(idCurso);
-  }
-
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.LEGACY_GRADES);
-  if (!sheet) throw new Error(`No existe la hoja "${SHEETS.LEGACY_GRADES}".`);
-
-  const data = sheet.getDataRange().getValues();
-  const headers = (data[0] || []).map(cleanText_);
-  const iCurso = findColumn_(headers, "ID_Curso");
-  const iCuenta = findColumn_(headers, "Cuenta");
-
-  // "Puntos Adicionales" con datos → componente manual con 0% (no altera el promedio)
-  const iPuntos = findColumn_(headers, "Puntos Adicionales");
-  const hasPuntos = iPuntos !== -1 && data.slice(1).some(r => cleanText_(r[iCurso]) === idCurso && toNumberOrNull_(r[iPuntos]) !== null);
-  if (hasPuntos && !components.some(c => normalizeKey_(c.nombre) === normalizeKey_("Puntos Adicionales"))) {
-    saveComponents_({ idCurso, components: components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo }))
-      .concat([{ nombre: "Puntos Adicionales", tipo: "manual", ponderacion: 0, maximo: 10 }]) });
-    components = componentsFor_(idCurso);
-  }
-
-  const mapping = [];
-  Object.keys(LEGACY_GRADE_COLUMNS).forEach(column => {
-    const colIndex = findColumn_(headers, column);
-    const comp = components.find(c => c.tipo === "manual" && normalizeKey_(c.nombre) === normalizeKey_(LEGACY_GRADE_COLUMNS[column]));
-    if (colIndex !== -1 && comp) mapping.push({ colIndex, comp });
-  });
-
-  if (!mapping.length) {
-    return { imported: 0, message: "No hay componentes manuales con nombres equivalentes (Parcial 1, Parcial 2, Parcial 3, Sellos, Proyecto Final)." };
-  }
-
-  const existing = gradesFor_(idCurso);
-  const entries = [];
-  let raised = 0;
-
-  data.slice(1).forEach(row => {
-    if (cleanText_(row[iCurso]) !== idCurso) return;
-    const cuenta = limpiarCuenta_(row[iCuenta]);
-    if (!cuenta) return;
-    mapping.forEach(({ colIndex, comp }) => {
-      const value = toNumberOrNull_(row[colIndex]);
-      if (value === null || (existing[cuenta] && existing[cuenta][comp.id] !== undefined)) return;
-      if (value > comp.maximo) { raised++; return; }
-      entries.push({ cuenta, componentId: comp.id, valor: value });
-    });
-  });
-
-  const result = saveGrades_({ idCurso, entries });
-  return {
-    imported: result.saved,
-    message: `Importadas ${result.saved} calificación(es) desde "${SHEETS.LEGACY_GRADES}".` +
-      (raised ? ` ${raised} valor(es) superan el máximo del componente y se omitieron (ajusta "Máximo").` : "")
   };
 }
 
@@ -4125,6 +4048,8 @@ function saveLinks_(params) {
 //   proyecto   → la calificación del equipo del alumno en ese proyecto
 //   final      → promedio actual (sobre lo evaluado)
 //   estricta   → final con lo pendiente en 0
+//   entero     → suma de porcentajes ganados ÷ 10, SIN redondear (8.9 → 8)
+//                (para Calificación y SIAE)
 // El enlace vive en W_Columnas. Cada vez que cambias algo en la web
 // (captura, estrellas, evidencias, pase de lista…) se reescribe la
 // columna en la hoja Reporte_ (reemplaza fórmulas viejas como VLOOKUP).
@@ -4133,7 +4058,12 @@ function saveLinks_(params) {
 // desde la web (botón «Columnas») o directo en la hoja.
 // ============================================================
 
-const COLUMN_LINK_TYPES = ["componente", "proyecto", "final", "estricta"];
+const COLUMN_LINK_TYPES = ["componente", "proyecto", "final", "estricta", "entero"];
+
+/** Entero sin redondear (con tolerancia para 7.9999999 → 8). */
+function truncGrade_(v) {
+  return v === null || v === undefined || !isFinite(v) ? null : Math.floor(v + 1e-9);
+}
 
 function savedColumnLinks_(idCurso) {
   return Db.read(WEB.COLUMNS).rows
@@ -4150,7 +4080,8 @@ function columnLinksFor_(idCurso) {
   return savedColumnLinks_(idCurso).map(l => Object.assign(l, {
     label: l.tipo === "componente" ? comps[l.ref] || "(componente borrado)"
       : l.tipo === "proyecto" ? projects[l.ref] || "(proyecto borrado)"
-      : l.tipo === "final" ? "Promedio actual" : "Final estricta"
+      : l.tipo === "final" ? "Promedio actual"
+      : l.tipo === "entero" ? "Calificación entera" : "Final estricta"
   }));
 }
 
@@ -4159,7 +4090,8 @@ function suggestColumnLink_(name, comps, projects) {
   const key = normalizeKey_(name).replace(/[\s_\-.]+/g, "");
   const comp = comps.find(c => normalizeKey_(c.nombre).replace(/[\s_\-.]+/g, "") === key);
   if (comp) return { tipo: "componente", ref: comp.id };
-  if (/^(calificacion|calificacionfinal|promedio|final)$/.test(key)) return { tipo: "final", ref: "" };
+  if (/^(calificacion|calificacionfinal|siae|final)$/.test(key)) return { tipo: "entero", ref: "" };
+  if (/^promedio$/.test(key)) return { tipo: "final", ref: "" };
   if (/ejercicio|proyecto/.test(key) && projects.length === 1) return { tipo: "proyecto", ref: projects[0].id };
   if (/proyecto/.test(key)) {
     const pc = comps.find(c => c.tipo === "proyectos");
@@ -4188,7 +4120,11 @@ function columnsInfo_(idCurso) {
     dates: att.dates.map(d => ({ key: d.key, label: d.label, visible: d.visible })),
     options: comps.map(c => ({ tipo: "componente", ref: c.id, label: `Componente · ${c.nombre}` }))
       .concat(projects.map(p => ({ tipo: "proyecto", ref: p.id, label: `Proyecto · ${p.nombre}` })))
-      .concat([{ tipo: "final", ref: "", label: "Promedio actual" }, { tipo: "estricta", ref: "", label: "Final estricta" }])
+      .concat([
+        { tipo: "entero", ref: "", label: "Calificación entera (suma de % sin redondear)" },
+        { tipo: "final", ref: "", label: "Promedio actual (con decimales)" },
+        { tipo: "estricta", ref: "", label: "Final estricta (con decimales)" }
+      ])
   };
 }
 
@@ -4225,6 +4161,9 @@ function saveColumns_(params) {
     .map(c => ({ ID_Curso: idCurso, Columna: cleanText_(c.name), Tipo: cleanText_(c.link.tipo), Ref: cleanText_(c.link.ref) }));
   Db.writeAll(WEB.COLUMNS, others.concat(links));
 
+  // 3. Orden (solo columnas que no son fecha)
+  if (Array.isArray(params.order) && params.order.length) reorderReportColumns_(sheet, params.order);
+
   delete Db._cache["__rep_" + group.sheet];
   const written = syncReportColumns_(idCurso);
   return { message: `Columnas guardadas. ${written} columna(s) del reporte actualizadas con datos de la web ✅` };
@@ -4255,6 +4194,7 @@ function syncReportColumns_(idCurso) {
     if (link.tipo === "componente") return round(s.items[link.ref] ? s.items[link.ref].raw : null);
     if (link.tipo === "final") return round(s.final);
     if (link.tipo === "estricta") return round(s.finalStrict);
+    if (link.tipo === "entero") { const v = truncGrade_(s.finalStrict); return v === null ? "" : v; }
     // proyecto
     const project = projects[link.ref];
     if (!project) return "";
@@ -4289,6 +4229,108 @@ function afterGradesChange_(idCurso) {
   } catch (error) {
     return ` (No se pudo actualizar el reporte: ${error.message})`;
   }
+}
+
+// ---------- Agregar, borrar y reordenar columnas del Reporte_ ----------
+
+/** Índices (0-based) de columnas que no son Cuenta, Nombre ni fecha. */
+function otherColumnIndexes_(sheet) {
+  const width = sheet.getLastColumn();
+  const headers = sheet.getRange(2, 1, 1, width).getValues()[0];
+  const clean = headers.map(cleanText_);
+  const iCuenta = findColumn_(clean, "Cuenta"), iName = findNameColumn_(clean);
+  const dates = new Set(detectDateColumns_(headers, iCuenta, getSpreadsheetTz_()).map(d => d.index));
+  const out = [];
+  clean.forEach((h, i) => { if (h && i !== iCuenta && i !== iName && !dates.has(i)) out.push(i); });
+  return { out, clean };
+}
+
+function reportSheetFor_(idCurso) {
+  const group = requireGroup_(cleanText_(idCurso));
+  const sheet = group.sheet && SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+  if (!sheet) throw new Error("Este grupo no tiene hoja Reporte_ ligada.");
+  return { group, sheet };
+}
+
+/**
+ * Mueve las columnas (no fecha) al orden de `order` (nombres), ocupando
+ * los mismos lugares que ya tenían. Usa moveColumns: conserva valores,
+ * fórmulas y formato.
+ */
+function reorderReportColumns_(sheet, order) {
+  const first = otherColumnIndexes_(sheet);
+  const slots = first.out.slice();
+  const wanted = order.map(cleanText_).filter(n => first.clean.some(h => normalizeKey_(h) === normalizeKey_(n)));
+  wanted.forEach((name, k) => {
+    if (k >= slots.length) return;
+    const now = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0].map(cleanText_);
+    const from = findColumn_(now, name);
+    const to = slots[k];
+    if (from === -1 || from === to) return;
+    const letter = columnLetter_(from + 1);
+    sheet.moveColumns(sheet.getRange(`${letter}:${letter}`), from > to ? to + 1 : to + 2);
+  });
+}
+
+function columnLetter_(n) {
+  let s = "";
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+/** Agrega una columna (no fecha) al final del reporte. */
+function addReportColumn_(params) {
+  const { group, sheet } = reportSheetFor_(params.idCurso);
+  const name = cleanText_(params.name).slice(0, 40);
+  if (!name) throw new Error("Escribe el nombre de la columna.");
+  if (normalizeDateKey_(name, getSpreadsheetTz_())) throw new Error("Las fechas se agregan solas; usa otro nombre.");
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0].map(cleanText_);
+  if (findColumn_(headers, name) !== -1) throw new Error(`Ya existe la columna «${name}».`);
+  const col = sheet.getLastColumn() + 1;
+  sheet.getRange(1, col).setValue("Visible");
+  sheet.getRange(2, col).setValue(name);
+  delete Db._cache["__rep_" + group.sheet];
+  return { message: `Columna «${name}» agregada a ${group.sheet}.` };
+}
+
+/**
+ * Borra una columna (no fecha) del reporte.
+ * Si tiene datos y no viene force=true, NO borra y devuelve needsConfirm.
+ */
+function deleteReportColumn_(params) {
+  const { group, sheet } = reportSheetFor_(params.idCurso);
+  const name = cleanText_(params.name);
+  const info = otherColumnIndexes_(sheet);
+  const col = info.out.find(i => normalizeKey_(info.clean[i]) === normalizeKey_(name));
+  if (col === undefined) throw new Error("Solo se pueden borrar columnas que no sean Cuenta, Nombre ni fechas.");
+
+  let filled = 0;
+  if (sheet.getLastRow() >= 3) {
+    const range = sheet.getRange(3, col + 1, sheet.getLastRow() - 2, 1);
+    const values = range.getValues(), formulas = range.getFormulas();
+    values.forEach((r, i) => { if (cleanText_(r[0]) !== "" || formulas[i][0]) filled++; });
+  }
+  if (filled && !params.force) return { needsConfirm: true, filled, message: `«${name}» tiene ${filled} dato(s).` };
+
+  sheet.deleteColumn(col + 1);
+  const idCurso = cleanText_(params.idCurso);
+  Db.writeAll(WEB.COLUMNS, Db.read(WEB.COLUMNS).rows.filter(r => !(cleanText_(r.ID_Curso) === idCurso && normalizeKey_(r.Columna) === normalizeKey_(name))));
+  delete Db._cache["__rep_" + group.sheet];
+  return { message: `Columna «${name}» borrada de ${group.sheet}${filled ? ` (tenía ${filled} dato(s))` : ""}.` };
+}
+
+/** Calificación y SIAE enlazadas como "final" (decimales) pasan a "entero". Una sola vez, sin costo. */
+function upgradeIntegerLinks_() {
+  const rows = Db.read(WEB.COLUMNS).rows;
+  let changed = 0;
+  const out = rows.map(r => {
+    const copy = Object.assign({}, r);
+    const key = normalizeKey_(r.Columna).replace(/[\s_]+/g, "");
+    if (cleanText_(r.Tipo) === "final" && (key === "calificacion" || key === "siae")) { copy.Tipo = "entero"; changed++; }
+    return copy;
+  });
+  if (changed) Db.writeAll(WEB.COLUMNS, out);
+  return changed;
 }
 
 

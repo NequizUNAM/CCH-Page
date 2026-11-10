@@ -28,6 +28,7 @@ const Prefs = {
   defaults: {
     theme: "auto",          // auto | light | dark
     compact: false,         // tablas compactas
+    rows: 60,               // alumnos visibles por tabla antes del scroll (0 = todos)
     showHidden: true,       // admin: mostrar columnas "Oculto" del reporte
     remember: false,        // recordar el número de cuenta del alumno
     cuenta: "",
@@ -102,6 +103,8 @@ const icon = (name, cls = "") => h("i", { class: `bi bi-${name} ${cls}`.trim(), 
 
 const Fmt = {
   grade(n) { return n === null || n === undefined ? "—" : Number(n).toFixed(1); },
+  /** Entero sin redondear (trunca): 7.96 → 7. */
+  int(n) { return n === null || n === undefined || !isFinite(n) ? "" : String(Math.floor(Number(n) + 1e-9)); },
   num(n) { return n === null || n === undefined ? "—" : String(Math.round(n * 100) / 100); },
   date(iso) {
     if (!iso) return "";
@@ -596,7 +599,7 @@ const Psi = {
     else if (total) asis = "Asiste siempre";
 
     const avance = asis === "Nunca se presentó" ? "NP"
-      : final === null || final === undefined ? "" : String(Math.min(10, Math.max(5, Math.round(final))));
+      : final === null || final === undefined ? "" : String(Math.min(10, Math.max(5, Math.floor(final + 1e-9))));
 
     let tareas = "-1";
     if (opts.tareas === "none") tareas = "5";
@@ -739,6 +742,7 @@ const App = {
     Prefs.load();
     Session.load();
     App.applyTheme();
+    App.applyRows();
 
     $("home-link").addEventListener("click", e => { e.preventDefault(); App.route(); });
     $("btn-admin").addEventListener("click", App.openAdmin);
@@ -834,6 +838,13 @@ const App = {
     App.route();
   },
 
+  /** Alto de las tablas: N filas visibles antes del scroll (0 = sin límite). */
+  applyRows() {
+    const n = Number(Prefs.get("rows"));
+    document.documentElement.style.setProperty("--rows", String(n > 0 ? n : 60));
+    document.documentElement.classList.toggle("rows-all", !(n > 0));
+  },
+
   applyTheme() {
     const pref = Prefs.get("theme");
     const dark = pref === "dark" || (pref === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -859,15 +870,19 @@ const App = {
     const theme = h("select", { class: "form-select", id: "pref-theme", onchange: e => { Prefs.set("theme", e.target.value); App.applyTheme(); } },
       [["auto", "Automático (sistema)"], ["light", "Claro"], ["dark", "Oscuro"]].map(([v, t]) => h("option", { value: v, selected: Prefs.get("theme") === v, text: t })));
 
+    const rowsSel = h("select", { class: "form-select", id: "pref-rows", onchange: e => { Prefs.set("rows", Number(e.target.value)); App.applyRows(); } },
+      [[15, "15"], [30, "30"], [60, "60 (recomendado)"], [100, "100"], [0, "Todos (sin scroll interno)"]].map(([v, t]) => h("option", { value: v, selected: Number(Prefs.get("rows")) === v, text: t })));
+
     $("prefs-body").replaceChildren(
       h("div", { class: "mb-3" }, h("label", { class: "form-label", for: "pref-theme", text: "Tema" }), theme),
+      h("div", { class: "mb-3" }, h("label", { class: "form-label", for: "pref-rows", text: "Alumnos visibles por tabla" }), rowsSel),
       sw("compact", "Tablas compactas"),
       sw("remember", "Recordar mi número de cuenta", "Útil en tu celular; no lo actives en computadoras compartidas."),
       sw("showHidden", "Admin: mostrar columnas «Oculto» del reporte", "Se ven en gris; los alumnos nunca las ven."),
       sw("cache", "Admin: carga instantánea (guardar datos en este equipo)", "Abre el panel con lo último que viste y actualiza en segundo plano. Se borra al presionar Salir. Desactívalo en computadoras compartidas."),
       h("button", {
         class: "btn btn-sm btn-outline-danger", type: "button",
-        onclick: () => { Prefs.reset(); App.applyTheme(); App.openPrefs(); UI.toast("info", "Preferencias restablecidas."); }
+        onclick: () => { Prefs.reset(); App.applyTheme(); App.applyRows(); App.openPrefs(); UI.toast("info", "Preferencias restablecidas."); }
       }, icon("arrow-counterclockwise"), " Restablecer")
     );
     bootstrap.Modal.getOrCreateInstance($("modal-prefs")).show();
@@ -1446,12 +1461,13 @@ const Admin = {
     draw();
 
     const th = (text, visible, cls = "") => h("th", { class: `${cls} ${visible === false ? "col-hidden" : ""}`, title: visible === false ? "Oculto para alumnos" : null, text });
-    // Columna enlazada → encabezado clicable que lleva a su componente o proyecto
+    // Encabezado de columna (no fecha) → clic abre la ponderación en un modal, resaltando su componente
     const linkTh = (text, visible) => {
       const link = (g.columns || []).find(l => Fmt.normalize(l.columna) === Fmt.normalize(text));
-      if (!link) return th(text, visible);
-      return h("th", { class: `col-linked ${visible === false ? "col-hidden" : ""}`, title: `Enlazada a ${link.label} · clic para abrir` },
-        h("button", { type: "button", class: "th-link", onclick: () => Admin.goToLink(link) }, icon("link-45deg", "me-1"), text));
+      const project = link && link.tipo === "proyecto" ? (g.projects || []).find(p => p.id === link.ref) : null;
+      const focus = !link ? null : link.tipo === "componente" ? link.ref : project ? project.componentId : null;
+      return h("th", { class: `col-linked ${visible === false ? "col-hidden" : ""}`, title: `${link ? `Enlazada a ${link.label} · ` : ""}clic para editar la ponderación` },
+        h("button", { type: "button", class: "th-link", onclick: () => Admin.weightsModal(focus) }, link ? icon("link-45deg", "me-1") : null, text));
     };
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
@@ -1474,12 +1490,12 @@ const Admin = {
     const dates = g.attendance ? g.attendance.dates : [];
     const comps = g.components;
     const header = ["Cuenta", "Nombre"].concat(dates.map(d => d.key), ["Asistencias", "Faltas", "Justificantes", "% asistencia"],
-      comps.map(c => `${c.nombre} (${c.ponderacion}%)`), ["Final (evaluado)", "Final (estricta)"]);
+      comps.map(c => `${c.nombre} (${c.ponderacion}%)`), ["Final (evaluado)", "Final (estricta)", "Calificación (entera)"]);
     const rows = g.students.map(s => {
       const c = s.counts || { asistencia: 0, falta: 0, justificante: 0 };
       const pct = Parts.pct(c);
       return [s.cuenta, s.nombre].concat(dates.map((d, i) => s.statuses[i] || ""), [c.asistencia, c.falta, c.justificante, pct === null ? "" : pct],
-        comps.map(cp => { const it = s.items[cp.id]; return it && it.score10 !== null ? it.score10 : ""; }), [s.final ?? "", s.finalStrict ?? ""]);
+        comps.map(cp => { const it = s.items[cp.id]; return it && it.score10 !== null ? it.score10 : ""; }), [s.final ?? "", s.finalStrict ?? "", Fmt.int(s.finalStrict)]);
     });
     const esc = v => { const t = String(v ?? ""); return /[",;\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
     const csv = "\ufeff" + [header].concat(rows).map(r => r.map(esc).join(",")).join("\r\n");
@@ -1598,27 +1614,16 @@ const Admin = {
     });
   },
 
-  /** Lleva al componente (Captura) o al proyecto enlazado y lo resalta. */
-  goToLink(link) {
-    if (link.tipo === "proyecto") {
-      Admin.focus = { project: link.ref };
-      Prefs.set("admTab", "proyectos");
-    } else {
-      Admin.focus = { comp: link.tipo === "componente" ? link.ref : "final" };
-      Prefs.set("admTab", "captura");
-    }
-    Admin.renderTab();
-    setTimeout(() => {
-      const target = Admin.focus && (Admin.focus.project
-        ? document.querySelector(`[data-project="${Admin.focus.project}"]`)
-        : document.querySelector(`th[data-comp="${Admin.focus.comp}"]`));
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-        target.classList.add("flash");
-        setTimeout(() => target.classList.remove("flash"), 2200);
-      }
-      Admin.focus = null;
-    }, 120);
+  /** Ponderación en un modal (desde el encabezado de Asistencia). focusId = componente a resaltar. */
+  weightsModal(focusId) {
+    const body = h("div");
+    let m;
+    Admin.tabWeights(body, { modal: true, focusId, onSaved: () => m && m.close() });
+    m = UI.modal({ title: [icon("sliders", "me-2"), `Ponderación · ${Admin.group.group.label}`], body, size: "modal-xl" });
+    if (focusId) setTimeout(() => {
+      const row = body.querySelector(`[data-comp-row="${focusId}"]`);
+      if (row) { row.scrollIntoView({ block: "center" }); row.classList.add("flash"); }
+    }, 350);
   },
 
   async columnsModal() {
@@ -1632,7 +1637,12 @@ const Admin = {
     catch (error) { if (error.code !== "AUTH") body.replaceChildren(UI.empty("exclamation-octagon", error.message)); return; }
 
     const key = l => l ? `${l.tipo}|${l.ref || ""}` : "";
-    const rows = info.columns.map(c => {
+    const originalOrder = info.columns.map(c => c.name).join("|");
+    let changedSheet = false;           // se borró o agregó una columna (ya está en la hoja)
+    const notice = h("div");            // aviso en línea (los confirm abrirían otro modal)
+    const tbody = h("tbody");
+
+    const makeRow = c => {
       const state = { name: c.name, visible: c.visible, link: c.link || c.suggested || null };
       const sw = h("input", { class: "form-check-input", type: "checkbox", role: "switch", checked: c.visible, "aria-label": `Visible ${c.name}`, onchange: e => { state.visible = e.target.checked; } });
       const sel = h("select", { class: "form-select form-select-sm", "aria-label": `Enlace de ${c.name}`, onchange: e => {
@@ -1641,12 +1651,67 @@ const Admin = {
       } },
         h("option", { value: "", text: "— Sin enlace (se queda como está en la hoja) —" }),
         info.options.map(o => h("option", { value: key(o), selected: key(o) === key(state.link), text: o.label })));
-      return { state, node: h("tr", {},
+      const actions = h("td", { class: "text-nowrap" });
+      const tr = h("tr", {},
         h("td", { class: "text-start fw-semibold", text: c.name }),
         h("td", {}, h("div", { class: "form-check form-switch d-flex justify-content-center mb-0" }, sw)),
         h("td", { class: "text-start", style: { minWidth: "240px" } }, sel,
-          !c.link && c.suggested ? h("div", { class: "small text-success mt-1" }, icon("magic", "me-1"), "Sugerido; se aplica al guardar") : null)) };
+          !c.link && c.suggested ? h("div", { class: "small text-success mt-1" }, icon("magic", "me-1"), "Sugerido; se aplica al guardar") : null),
+        actions);
+      return { state, tr, actions };
+    };
+    const rows = info.columns.map(makeRow);
+
+    const removeColumn = async (row, btn, force = false) => {
+      notice.replaceChildren();
+      try {
+        const r = await UI.busy(btn, () => Api.call("deleteReportColumn", { idCurso: g.group.id, name: row.state.name, force }, "admin"));
+        if (r.needsConfirm) {
+          const yes = h("button", { class: "btn btn-sm btn-danger", type: "button" }, icon("trash", "me-1"), "Sí, borrar");
+          yes.addEventListener("click", () => removeColumn(row, yes, true));
+          notice.replaceChildren(h("div", { class: "alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2", role: "alert" },
+            icon("exclamation-triangle"), h("span", {}, h("b", { text: r.message }), " Se borrará también de la hoja Reporte_ y no se puede deshacer."),
+            h("div", { class: "ms-auto d-flex gap-1" }, h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", text: "Cancelar", onclick: () => notice.replaceChildren() }), yes)));
+          notice.scrollIntoView({ block: "nearest" });
+          return;
+        }
+        rows.splice(rows.indexOf(row), 1);
+        changedSheet = true;
+        drawRows();
+        UI.toast("success", r.message);
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+    };
+
+    const drawRows = () => {
+      rows.forEach((row, i) => {
+        const move = d => { [rows[i], rows[i + d]] = [rows[i + d], rows[i]]; drawRows(); };
+        const del = h("button", { class: "btn btn-sm btn-outline-danger ms-1", type: "button", title: `Borrar «${row.state.name}» de la hoja` }, icon("trash"));
+        del.addEventListener("click", () => removeColumn(row, del));
+        row.actions.replaceChildren(
+          h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Mover a la izquierda", "aria-label": "Subir", disabled: i === 0, onclick: () => move(-1) }, icon("arrow-up")),
+          h("button", { class: "btn btn-sm btn-outline-secondary ms-1", type: "button", title: "Mover a la derecha", "aria-label": "Bajar", disabled: i === rows.length - 1, onclick: () => move(1) }, icon("arrow-down")),
+          del);
+      });
+      tbody.replaceChildren(...rows.map(r => r.tr));
+    };
+    drawRows();
+
+    // Agregar columna (se escribe de inmediato en la hoja, al final, como Visible)
+    const newName = h("input", { class: "form-control form-control-sm", placeholder: "Nueva columna (ej. Parcial 4, SIAE)", maxlength: "40", "aria-label": "Nombre de la nueva columna" });
+    const addBtn = h("button", { class: "btn btn-sm btn-outline-primary", type: "button" }, icon("plus-lg", "me-1"), "Agregar columna");
+    addBtn.addEventListener("click", async () => {
+      const name = newName.value.trim();
+      if (!name) return newName.focus();
+      try {
+        const r = await UI.busy(addBtn, () => Api.call("addReportColumn", { idCurso: g.group.id, name }, "admin"));
+        rows.push(makeRow({ name, visible: true, link: null, suggested: null }));
+        changedSheet = true;
+        newName.value = "";
+        drawRows();
+        UI.toast("success", r.message);
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
+    newName.addEventListener("keydown", e => { if (e.key === "Enter") addBtn.click(); });
 
     const dates = info.dates.map(d => ({ key: d.key, visible: d.visible }));
     const dateChips = h("div", { class: "d-flex flex-wrap gap-1" }, info.dates.map((d, i) => {
@@ -1656,16 +1721,26 @@ const Admin = {
     }));
 
     body.replaceChildren(
-      h("p", { class: "small text-body-secondary" }, "Hoja ", h("b", { text: info.sheetName }), ". «Visible» = lo ven los alumnos (fila 1 de la hoja). Al enlazar, la columna se llena sola con los datos de la web cada vez que capturas o calificas."),
-      rows.length ? h("div", { class: "table-wrap auto-h mb-3" }, h("table", { class: "table table-sm table-cch mb-0" },
-        h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Columna" }), h("th", { text: "Visible" }), h("th", { class: "text-start", text: "Se llena con" }))),
-        h("tbody", {}, rows.map(r => r.node)))) : h("p", { class: "small text-body-secondary", text: "Este reporte solo tiene fechas." }),
-      h("div", { class: "small fw-semibold mb-1", text: "Fechas (clic para mostrar/ocultar)" }), dateChips);
+      h("p", { class: "small text-body-secondary" }, "Hoja ", h("b", { text: info.sheetName }), ". «Visible» = lo ven los alumnos (fila 1 de la hoja). Al enlazar, la columna se llena sola con los datos de la web. ",
+        "↑ ↓ cambian el orden en la hoja al guardar; 🗑 borra la columna de la hoja al momento (si tiene datos te pregunta antes)."),
+      notice,
+      h("div", { class: "table-wrap auto-h mb-2" }, h("table", { class: "table table-sm table-cch mb-0" },
+        h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Columna" }), h("th", { text: "Visible" }), h("th", { class: "text-start", text: "Se llena con" }), h("th", { text: "Orden / borrar" }))),
+        tbody)),
+      h("div", { class: "input-group input-group-sm mb-3", style: { maxWidth: "420px" } }, newName, addBtn),
+      h("div", { class: "small fw-semibold mb-1", text: "Fechas (clic para mostrar/ocultar; las nuevas siempre salen visibles)" }), dateChips);
 
+    $("modal-generic").addEventListener("hidden.bs.modal", () => { if (changedSheet && !saved) Admin.loadGroup(); }, { once: true });
+    let saved = false;
     save.disabled = false;
     save.addEventListener("click", async () => {
+      const order = rows.map(x => x.state.name);
       try {
-        const r = await UI.busy(save, () => Api.call("saveColumns", { idCurso: g.group.id, columns: rows.map(x => x.state), dates }, "admin"));
+        const r = await UI.busy(save, () => Api.call("saveColumns", {
+          idCurso: g.group.id, columns: rows.map(x => x.state), dates,
+          order: order.join("|") === originalOrder ? [] : order
+        }, "admin"));
+        saved = true;
         UI.toast("success", r.message, 7000);
         m.close();
         Admin.loadGroup();
@@ -1877,7 +1952,8 @@ const Admin = {
 
           return h("tr", {}, cuenta, Admin.nameCell(s), cells,
             h("td", { class: `final-cell ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
-            h("td", { class: "text-body-secondary", text: Fmt.grade(s.finalStrict) }));
+            h("td", { class: "text-body-secondary", text: Fmt.grade(s.finalStrict) }),
+            h("td", { class: "fw-semibold", text: Fmt.int(s.finalStrict) }));
         }));
       // Los popovers de bonos se crean dentro de gradeWithBonus
     };
@@ -1897,7 +1973,7 @@ const Admin = {
           h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start", text: "Nombre" }),
           comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
             c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo === "manual" ? ` · /${c.maximo}` : " · auto"}` }))),
-          h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }))),
+          h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", text: "Entera" }))),
         tbody)),
       manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
     ));
@@ -2004,12 +2080,12 @@ const Admin = {
   },
 
   /* ---------------- Pestaña: Ponderaciones ---------------- */
-  tabWeights(content) {
+  tabWeights(content, opts = {}) {
     const g = Admin.group;
-    if (!Admin.compDraft) {
-      Admin.compDraft = g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo }));
-    }
-    const draft = Admin.compDraft;
+    const fresh = () => g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo }));
+    // En la pestaña el borrador sobrevive al cambiar de pestaña; en el modal siempre parte de lo guardado
+    if (!opts.modal && !Admin.compDraft) Admin.compDraft = fresh();
+    const draft = opts.modal ? fresh() : Admin.compDraft;
     const types = { manual: "Manual (capturo yo)", asistencia: "Asistencia (automática)", proyectos: "Proyectos en equipo (automática)" };
 
     const list = h("div", { class: "vstack gap-2" });
@@ -2026,7 +2102,7 @@ const Admin = {
     const draw = () => {
       list.replaceChildren(...draft.map((c, i) => {
         const maxInput = h("input", { class: "form-control form-control-sm", type: "number", min: "1", step: "any", value: c.maximo, disabled: c.tipo !== "manual", "aria-label": "Escala máxima", oninput: e => { c.maximo = e.target.value; } });
-        return h("div", { class: "card card-soft comp-row" }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
+        return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
           h("div", { class: "col-12 col-md-4" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; } })),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
@@ -2052,20 +2128,30 @@ const Admin = {
         const r = await UI.busy(saveBtn, () => Api.call("saveComponents", { idCurso: g.group.id, components: draft }, "admin"));
         UI.toast("success", r.message);
         Admin.compDraft = null;
+        if (opts.onSaved) opts.onSaved();
         Admin.loadGroup();
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
 
-    const importBtn = h("button", { class: "btn btn-outline-secondary btn-sm", type: "button" }, icon("box-arrow-in-down", "me-1"), "Importar de «Calificaciones» (AppSheet)");
-    importBtn.addEventListener("click", async () => {
-      if (!(await UI.confirm("Copiará Parcial_1, Parcial_2, Parcial_3, Sellos y Proyecto_Final de la hoja Calificaciones a este grupo (sin sobrescribir lo capturado en la web). Si el grupo no tiene componentes, primero se crea la plantilla por defecto."))) return;
-      try {
-        const r = await UI.busy(importBtn, () => Api.call("importLegacyGrades", { idCurso: g.group.id }, "admin"));
-        UI.toast("success", r.message, 9000);
-        Admin.compDraft = null;
-        Admin.loadGroup();
-      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-    });
+    /* Plantilla por defecto: conserva el ID de los componentes con el mismo nombre
+       (así no se pierden las calificaciones ya capturadas ni los enlaces de columnas). */
+    const applyTemplate = () => {
+      const byName = {};
+      draft.forEach(c => { if (c.id) byName[Fmt.normalize(c.nombre)] = c; });
+      const list = Admin.boot.defaults.components.map(c => {
+        const old = byName[Fmt.normalize(c.nombre)];
+        return Object.assign({}, c, old ? { id: old.id, maximo: old.tipo === c.tipo ? old.maximo : c.maximo } : { id: undefined });
+      });
+      draft.splice(0, draft.length, ...list);
+      draw();
+    };
+    const templateBtn = h("button", {
+      class: "btn btn-outline-secondary btn-sm", type: "button", title: "Los componentes con el mismo nombre conservan sus calificaciones",
+      onclick: async () => {
+        if (!opts.modal && draft.length && !(await UI.confirm("¿Reemplazar la lista actual por la plantilla por defecto? Los componentes con el mismo nombre conservan sus calificaciones. No se guarda hasta que presiones Guardar."))) return;
+        applyTemplate();
+      }
+    }, icon("magic", "me-1"), "Plantilla por defecto");
 
     content.replaceChildren(
       h("div", { class: "card card-soft mb-3" }, h("div", { class: "card-body" },
@@ -2076,20 +2162,13 @@ const Admin = {
         h("p", { class: "small text-body-secondary mb-0" },
           "«Manual» = lo capturas tú en Captura (parciales, sellos, Teams…) en su propia escala (/10, /15, /100) y se convierte a 10. ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
-          "«Proyectos» = promedio de los proyectos ligados a ese componente.")
+          "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
+          "La suma de porcentajes equivale a 10: «Calificación entera» suma lo obtenido y quita los decimales (no redondea).")
       )),
       list,
       h("div", { class: "d-flex flex-wrap gap-2 mt-3" },
         h("button", { class: "btn btn-outline-primary btn-sm", type: "button", onclick: () => { draft.push({ nombre: "", tipo: "manual", ponderacion: 0, maximo: 10 }); draw(); } }, icon("plus-lg", "me-1"), "Agregar componente"),
-        h("button", {
-          class: "btn btn-outline-secondary btn-sm", type: "button",
-          onclick: async () => {
-            if (draft.length && !(await UI.confirm("¿Reemplazar la lista actual por la plantilla por defecto? (No se guarda hasta que presiones Guardar)"))) return;
-            Admin.compDraft = Admin.boot.defaults.components.map(c => Object.assign({}, c));
-            Admin.renderTab();
-          }
-        }, icon("magic", "me-1"), "Plantilla por defecto"),
-        importBtn,
+        templateBtn,
         h("div", { class: "ms-auto" }, saveBtn))
     );
   },
@@ -2179,7 +2258,7 @@ const Admin = {
   /** Tarjeta editable de un equipo. onSaved: se llama tras guardar (p. ej. cerrar el modal). */
   teamCard(project, team, onSaved) {
     const stars = Object.assign({}, team.stars);
-    const obs = h("textarea", { class: "form-control form-control-sm", rows: "2", placeholder: "Observaciones (las ve el equipo)", maxlength: "1000" });
+    const obs = h("textarea", { class: "form-control form-control-sm", rows: "2", placeholder: "Observaciones (solo para ti; los alumnos no las ven)", maxlength: "1000" });
     obs.value = team.observaciones || "";
     const preview = h("span", { class: "badge fs-6" });
     const paintPreview = () => {

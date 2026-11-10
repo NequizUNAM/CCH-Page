@@ -1,4 +1,4 @@
-# Dashboard CCH v6.3 · Instalación y ajustes
+# Dashboard CCH v6.4 · Instalación y ajustes
 
 ## Archivos
 
@@ -14,6 +14,16 @@
 3. Sube `index.html`, `estilo.css` y `script.js` a GitHub.
 
 La migración ya se ejecutó en tu hoja y **ya no forma parte del código**.
+
+### Calificaciones de Estadística (una sola vez)
+
+`apps-script-una-vez/ImportarEstadistica.gs` trae dentro las calificaciones de tu antigua hoja Calificaciones (504, 512 y 526).
+
+1. En Apps Script: **+ → Secuencia de comandos**, nómbrala `ImportarEstadistica` y pega el archivo.
+2. Elige la función `importarCalificacionesEstadistica` → **▶ Ejecutar** → revisa el registro.
+3. **Borra ese archivo.** Si lo corres otra vez no pasa nada: solo llena lo vacío.
+
+Busca los componentes por nombre (Parcial 1, 2, 3 y el que diga «Sello») y **nunca sobrescribe** lo que ya capturaste. Un valor mayor al máximo (ej. 10.2 de 10) se guarda como el máximo.
 
 ### Course y W_Grupos ahora son una sola hoja (v6.3)
 
@@ -37,7 +47,10 @@ En **AppSheet**: Data → Course → **Regenerate schema**. Pon `Hoja_Reporte` c
 
 En la web, pestaña **Asistencia → botón «Columnas»**:
 
-- **Visible:** el interruptor escribe «Visible» u «Oculto» en la fila 1 de la hoja `Reporte_`. Los alumnos solo ven lo que está como Visible. Las fechas se ocultan o muestran con un clic. También puedes escribirlo a mano en la fila 1.
+- **Visible:** el interruptor escribe «Visible» u «Oculto» en la fila 1 de la hoja `Reporte_`. Los alumnos solo ven lo que está como Visible. Las fechas se ocultan o muestran con un clic; **las fechas nuevas siempre se crean Visibles**. También puedes escribirlo a mano en la fila 1.
+- **Orden ↑ ↓:** mueve la columna en la hoja al presionar Guardar (con sus datos).
+- **Borrar 🗑:** se borra de la hoja al momento. Si está vacía se borra directo; si tiene datos aparece un aviso con cuántos tiene y el botón «Sí, borrar». No se puede deshacer (usa Archivo → Historial de versiones si te equivocas).
+- **Agregar columna:** se crea al final de la hoja, como Visible; después enlázala o déjala para escribir a mano.
 - **Se llena con:** enlaza la columna con un componente, un proyecto, el promedio actual o la final estricta. Desde ese momento la web **reescribe esa columna** en la hoja cada vez que capturas, calificas un equipo, aplicas puntos, pasas lista o sincronizas. Así se reemplazan las fórmulas viejas (VLOOKUP/XLOOKUP) que apuntaban a Calificaciones y Proyectos.
 - Las sugerencias ya vienen marcadas y se aplican al presionar Guardar:
 
@@ -47,10 +60,12 @@ En la web, pestaña **Asistencia → botón «Columnas»**:
 | Sellos | Componente Sellos |
 | Proyecto_Final (Estadística) | Componente Proyectos |
 | Ejercicio Clase (CYC) | Proyecto «Proyecto (AppSheet)», el que se migró |
-| Calificación | Promedio actual |
-| Puntos Adicionales, SIAE | Sin enlace: se quedan como están |
+| Calificación, SIAE | **Calificación entera** |
+| Puntos Adicionales | Sin enlace: se queda como está |
 
-- En la tabla de asistencia, los encabezados enlazados tienen 🔗. Al hacer clic te llevan a Captura (componente) o a ese proyecto, resaltado.
+**Calificación entera:** los porcentajes suman 10 (100 % = 10). Se suma lo obtenido en cada componente y **se quitan los decimales, sin redondear**: 7.96 → 7. Si ya tenías Calificación o SIAE enlazadas a «Promedio actual», se cambian solas a entera al entrar como admin. En Captura verás la columna **Entera** junto a Final y Estricta.
+
+- En la tabla de asistencia, al hacer clic en el encabezado de una columna (Parcial_1, Sellos, Calificación…) se abre un **modal con la ponderación** del grupo, con el componente de esa columna resaltado. Ahí cambias porcentajes y guardas sin salir de Asistencia. 🔗 = la columna está enlazada.
 
 > En `Reporte_ESTADISTICA_512` la fórmula vieja de **Parcial_1** leía la columna de **Parcial_2** de Calificaciones. Al enlazar desde la web queda corregido.
 
@@ -81,6 +96,14 @@ Siempre se guarda primero el ZIP y un resumen por alumno en W_Historial.
 
 Dos pestañas: **Mi avance** (una sola tarjeta con asistencia, calificaciones por componente y su equipo con estrellas) y **Extracurriculares**. **Nunca** ve comentarios, observaciones de equipo, notas de evidencias ni promedios calculados.
 
+## Alumnos por tabla
+
+Por defecto se ven **60 alumnos** antes de que la tabla haga scroll. Se cambia en ⚙️ Preferencias → «Alumnos visibles por tabla» (15, 30, 60, 100 o Todos).
+
+## Plantilla por defecto (Ponderaciones)
+
+Los componentes que se llamen igual que en la plantilla **conservan sus calificaciones** (antes se creaban de nuevo y quedaban vacíos).
+
 ## Carga rápida del panel (caché)
 
 El panel guarda en este navegador lo último que viste de cada grupo. Al abrirlo, se muestra **al instante** y se actualiza en segundo plano; un pequeño indicador ↻ aparece mientras tanto. La caché se borra sola al guardar cualquier cambio y al presionar **Salir**. En una computadora compartida, desactívala en Preferencias («carga instantánea»).
@@ -102,7 +125,7 @@ El estatus se cambia desde la ficha del alumno. La función «Buscar alumnos dup
 | Course, Students, Attendance Log, Roles | **Sí** | AppSheet pasa lista ahí con el QR. |
 | Reporte_* | **Sí (recomendado)** | Son la asistencia oficial del grupo y te las piden. El botón **Exportar** de la web genera además un reporte con calificaciones. |
 | W_* | Sí | Todo lo de la web (ya no existe W_Grupos: está dentro de Course). |
-| Calificaciones | Opcional | Primero enlaza las columnas del reporte (botón «Columnas») para que ya no dependan de ella. Después bórrala a mano y quítala de AppSheet. El botón «Importar de Calificaciones» de Ponderaciones solo funciona mientras exista. |
+| Calificaciones | Ya se borró | Lo de Estadística se recupera con `ImportarEstadistica.gs` (arriba). |
 | Proyectos | Ya se borró | Está en la web. |
 | Asesorias | Tú decides | El sistema no la usa. |
 
@@ -136,7 +159,7 @@ En **Asistencia**, el botón verde **Exportar a PSI** abre la vista previa de la
 
 | Campo PSI | Regla |
 |---|---|
-| Avance académico | Promedio actual redondeado (5–10); NP si nunca se presentó |
+| Avance académico | Promedio actual **sin redondear** (solo el entero, 5–10); NP si nunca se presentó |
 | % asistencia | asistencias ÷ (asistencias + faltas) |
 | Entrega tareas | El componente que elijas: ≥ 8 SI, 5–7.9 OCASIONALMENTE, < 5 NO |
 | Dificultades | Psicoemocional si tus comentarios lo mencionan; Académico si promedio < 6 |
