@@ -168,6 +168,11 @@ body {
 [data-bs-theme="dark"] .dash-tab:not(.active) { color: #cbd5e1; }
 [data-bs-theme="dark"] .exam-row { background: #141b2e; }
 
+/* Panel del examen dentro del Dashboard */
+.exam-host { position: relative; overflow: hidden; padding: 0; }
+.exam-frame { display: block; width: 100%; height: calc(100vh - 170px); min-height: 520px; border: 0; background: #eef2f9; }
+.exam-host-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bs-body-bg); z-index: 2; }
+
 /* ---------- 6. Pestañas (pastillas blancas; la activa en degradado) ---------- */
 .tab-scroll, .pill-scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: .25rem .15rem .5rem; }
 .tab-scroll .nav-link, .pill-scroll .nav-link { white-space: nowrap; }

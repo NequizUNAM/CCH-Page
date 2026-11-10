@@ -13,6 +13,7 @@ const CONFIG = {
   // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
   // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
+  VERSION: "6.8",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -834,6 +835,11 @@ const App = {
     }
 
     ApiUrl.fromQuery();
+    // El panel del examen (en el marco) avisa si la sesión venció
+    window.addEventListener("message", e => {
+      if (e.origin !== location.origin || !e.data || e.data.cchExam !== "logout") return;
+      App.sessionExpired("admin", "Tu sesión de administrador expiró. Vuelve a entrar.");
+    });
     App.renderQr();
 
     // Al cruzar el tamaño celular ↔ computadora se redibuja la pestaña del panel
@@ -1363,29 +1369,76 @@ const Admin = {
 
   reset() {
     Admin.boot = null; Admin.group = null; Admin.dirty = new Map(); Admin.compDraft = null; Admin.evidence = null;
+    // Cierra el panel del examen (tiene el token en memoria)
+    Admin.examView = ""; Admin.exams = null;
+    const frame = $("exam-frame");
+    if (frame) { frame.onload = null; frame.src = "about:blank"; frame.dataset.exam = ""; frame.dataset.ready = "0"; }
   },
 
-  /** Barra para cambiar entre el panel de Asistencias y los paneles de los exámenes. */
+  /** Barra para cambiar entre el panel de Asistencias y los paneles de los exámenes (todo dentro de esta página). */
   async drawSwitch() {
     const nav = $("adm-switch");
-    const item = (href, iconName, label, active, badge) => h(active ? "span" : "a", Object.assign({ class: `dash-tab ${active ? "active" : ""}` }, active ? { "aria-current": "page" } : { href }),
-      icon(iconName), h("span", { text: label }), badge || null);
-    nav.replaceChildren(item("#", "calendar-check", "Asistencias", true));
+    const current = Admin.examView || "";
+    const item = (id, iconName, label, badge) => {
+      const b = h("button", { type: "button", class: `dash-tab ${current === id ? "active" : ""}`, "aria-pressed": String(current === id) }, icon(iconName), h("span", { text: label }), badge || null);
+      b.addEventListener("click", () => Admin.showView(id));
+      return b;
+    };
+    const paint = list => nav.replaceChildren(item("", "calendar-check", "Asistencias"),
+      ...list.map(x => {
+        const open = x.abierto1 || x.abierto2;
+        return item(x.id, x.id === "cib" ? "cpu" : "bar-chart-line", `Examen ${x.nombre}`,
+          h("span", { class: `dash-badge ${open ? "on" : ""}`, title: open ? "Visible en la página de inicio" : "Oculto en la página de inicio", text: !x.existe ? "sin hojas" : open ? "abierto" : "cerrado" }));
+      }));
+    paint((Admin.exams && Admin.exams.exams) || []);
     try {
-      const r = await Api.call("examAdmin", {}, "admin");
-      Admin.exams = r;
-      nav.replaceChildren(item("#", "calendar-check", "Asistencias", true),
-        ...(r.exams || []).map(x => {
-          const open = x.abierto1 || x.abierto2;
-          return item(`./${x.page}`, x.id === "cib" ? "cpu" : "bar-chart-line", `Examen ${x.nombre}`, false,
-            h("span", { class: `dash-badge ${open ? "on" : ""}`, title: open ? "Visible en la página de inicio" : "Oculto en la página de inicio", text: !x.existe ? "sin hojas" : open ? "abierto" : "cerrado" }));
-        }));
+      Admin.exams = await Api.call("examAdmin", {}, "admin");
+      paint(Admin.exams.exams || []);
     } catch (e) { /* sin exámenes: solo Asistencias */ }
+  },
+
+  /** "" = Asistencias; "cib" / "est" = panel de ese examen en el marco. */
+  showView(id) {
+    Admin.examView = id || "";
+    $("adm-asis").classList.toggle("d-none", !!id);
+    $("adm-exam").classList.toggle("d-none", !id);
+    Admin.drawSwitch();
+    if (id) Admin.loadExamPanel(id);
+  },
+
+  /**
+   * Carga la página del examen en modo panel (?panel=1): ahí vive el motor que reconstruye
+   * cada examen. Le pasamos el token del Dashboard (vale también para el examen) e
+   * inyectamos panel_examen_*.js, que dibuja Resumen, Métricas, Resultados, Por alumno,
+   * Contraseñas y Vista previa.
+   */
+  loadExamPanel(id) {
+    const page = id === "cib" ? "examenes_cibernetica.html" : "examenes_estadistica.html";
+    const script = id === "cib" ? "panel_examen_cibernetica.js" : "panel_examen_estadistica.js";
+    const frame = $("exam-frame");
+    if (frame.dataset.exam === id && frame.dataset.ready === "1") return;
+    frame.dataset.exam = id;
+    frame.dataset.ready = "0";
+    $("exam-loading").classList.remove("d-none");
+    frame.onload = () => {
+      try {
+        const w = frame.contentWindow, d = frame.contentDocument;
+        w.eval(`ADMIN = ${JSON.stringify(Session.get("admin"))};`);
+        const tag = d.createElement("script");
+        tag.src = `./${script}?v=${encodeURIComponent(CONFIG.VERSION || "")}`;
+        tag.onload = () => { w.eval("openAdmin()"); frame.dataset.ready = "1"; $("exam-loading").classList.add("d-none"); };
+        tag.onerror = () => { $("exam-loading").replaceChildren(UI.empty("exclamation-triangle", `No se encontró ${script} en el sitio.`)); };
+        d.body.appendChild(tag);
+      } catch (error) {
+        $("exam-loading").replaceChildren(UI.empty("exclamation-triangle", `No se pudo abrir el panel del examen (${error.message}). Las páginas del examen deben estar en el mismo sitio que el Dashboard.`));
+      }
+    };
+    frame.src = `./${page}?panel=1`;
   },
 
   async open() {
     App.show("view-admin");
-    Admin.drawSwitch();
+    Admin.showView(Admin.examView || "");
     $("adm-banner").replaceChildren(...kids(Session.get("factory") ? h("div", { class: "alert alert-warning d-flex align-items-start gap-2 py-2 small", role: "alert" },
       icon("shield-exclamation"), h("span", {}, "Estás usando la contraseña de fábrica ", h("b", { class: "mono", text: "123456789" }),
         ". Cámbiala en Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → ", h("b", { class: "mono", text: "CCH_ADMIN_PASSWORD" }), ".")) : null));
@@ -3281,7 +3334,7 @@ const Admin = {
       if (!r.installed) { examBox.replaceChildren(h("p", { class: "small text-body-secondary mb-0" }, "Falta el archivo ", h("b", { text: "Examenes" }), " en Apps Script.")); return; }
       examBox.replaceChildren(...r.exams.map(x => h("div", { class: "exam-row" },
         h("div", { class: "d-flex align-items-center gap-2 mb-1" }, icon(x.id === "cib" ? "cpu" : "bar-chart-line"), h("b", { text: `Examen ${x.nombre}` }),
-          h("a", { class: "btn btn-sm btn-outline-primary ms-auto", href: `./${x.page}`, target: "_blank", rel: "noopener" }, icon("box-arrow-up-right", "me-1"), "Abrir su panel")),
+          h("button", { class: "btn btn-sm btn-outline-primary ms-auto", type: "button", onclick: () => { Admin.showView(x.id); window.scrollTo(0, 0); } }, icon("speedometer2", "me-1"), "Abrir su panel")),
         !x.existe ? h("div", { class: "small text-warning-emphasis", text: "Aún no existen sus hojas: usa «Verificar / crear hojas» o ejecuta instalarTodo." })
           : h("div", { class: "d-flex flex-wrap gap-3" }, [1, 2].map(p => {
             const sw = h("input", { class: "form-check-input", type: "checkbox", role: "switch", id: `ex-${x.id}-${p}`, checked: x["abierto" + p] });
@@ -3297,7 +3350,7 @@ const Admin = {
     Api.call("examAdmin", {}, "admin").then(drawExams).catch(e => examBox.replaceChildren(h("p", { class: "small text-danger", text: e.message })));
     const examCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
       h("h2", { class: "h6" }, icon("journal-check", "me-1"), "Exámenes en línea"),
-      h("p", { class: "small text-body-secondary", text: "El botón de cada examen aparece en la página de inicio solo si tiene algún parcial abierto. Sus contraseñas y resultados se manejan en su propio panel (entra con la contraseña de administrador)." }),
+      h("p", { class: "small text-body-secondary", text: "El botón de cada examen aparece en la página de inicio solo si tiene algún parcial abierto. Sus resultados, métricas, contraseñas y configuración están en la barra de arriba: Examen Cibernética / Examen Estadística." }),
       examBox));
 
     // ---- Servidor (URL del Web App) ----

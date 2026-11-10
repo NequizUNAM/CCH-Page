@@ -1,11 +1,12 @@
-# Dashboard CCH v6.7 · Instalación y ajustes
+# Dashboard CCH v6.8 · Instalación y ajustes
 
 ## Archivos
 
 | Va en… | Archivo |
 |---|---|
 | GitHub (tu página) | `index.html`, `estilo.css`, `script.js` |
-| GitHub (exámenes) | `examenes_cibernetica.html`, `examenes_estadistica.html` (ya apuntan a la URL de Asistencias) |
+| GitHub (exámenes) | `examenes_cibernetica.html`, `examenes_estadistica.html` (solo el examen del alumno) |
+| GitHub (paneles de examen) | `panel_examen_cibernetica.js`, `panel_examen_estadistica.js` (los usa el Dashboard) |
 | Apps Script | `apps-script/Codigo.gs`, `apps-script/Examenes.gs` (archivo aparte) y `appsscript.json` |
 
 ## Exámenes en línea (mismo proyecto, misma URL)
@@ -19,6 +20,10 @@ Los dos exámenes ya no usan su hoja aparte: viven en la hoja de **Asistencias**
 5. Sube `examenes_cibernetica.html` y `examenes_estadistica.html` a GitHub (solo cambió su `CFG.ENDPOINT`). La página de inicio tiene un botón para cada examen.
 
 **Crear todas las tablas de una vez:** en Apps Script elige la función **`instalarTodo`** → ▶ Ejecutar. Crea lo que falte (Course, Students, Attendance Log, Roles, hojas W_, carpetas y las 4 hojas de exámenes) sin tocar lo que ya existe. El registro muestra el nombre y el ID de la hoja donde quedó todo. Desde la web hace lo mismo **Mantenimiento → Verificar / crear hojas y carpetas**.
+
+**Panel de cada examen dentro del Dashboard (v6.8):** Admin → barra superior **Examen Cibernética** o **Examen Estadística**. Ahí están Resumen, Métricas, Resultados (cerrar, liberar, CSV), Por alumno (revisión con procedimiento), Contraseñas y configuración, y Vista previa. Las páginas de examen ya **no** tienen panel: si alguien escribe ahí la contraseña de administrador, se le indica que use el Dashboard.
+
+Cómo funciona: el Dashboard abre la página del examen en un marco oculto con `?panel=1` (sin pantallas para el alumno) y le carga `panel_examen_*.js`. Así el panel usa el motor del examen —el que reconstruye cada examen con su semilla para revisar respuestas, procedimientos y métricas— sin duplicarlo. Las 4 páginas y los 2 archivos de panel deben estar en el mismo sitio de GitHub.
 
 **Mostrar u ocultar los exámenes en la página de inicio:** el botón de cada examen aparece solo si tiene algún parcial abierto. Se abre o cierra cada parcial en **Mantenimiento → Exámenes en línea** (o desde el panel del propio examen). Arriba del panel, la barra **Asistencias · Examen Cibernética · Examen Estadística** te lleva al panel de cada examen.
 

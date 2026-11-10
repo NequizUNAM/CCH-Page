@@ -154,6 +154,16 @@
     <section id="view-admin" class="view d-none">
       <div id="adm-banner"></div>
       <nav class="dash-switch mb-3" id="adm-switch" aria-label="Cambiar de panel"></nav>
+
+      <!-- Panel de un examen (Cibernética / Estadística): su motor se carga en el marco -->
+      <div id="adm-exam" class="d-none">
+        <div class="exam-host card card-soft">
+          <div class="exam-host-loading" id="exam-loading"><div class="spinner-border text-primary" role="status"></div><div class="small mt-2 text-body-secondary">Cargando el panel del examen…</div></div>
+          <iframe id="exam-frame" title="Panel del examen" class="exam-frame"></iframe>
+        </div>
+      </div>
+
+      <div id="adm-asis">
       <div class="card card-soft mb-3">
         <div class="card-body d-flex flex-wrap align-items-center gap-2 p-2 p-md-3">
           <label class="visually-hidden" for="adm-group">Grupo</label>
@@ -182,6 +192,7 @@
 
       <div id="adm-toolbar" class="mb-2"></div>
       <div id="adm-content"></div>
+      </div>
     </section>
   </main>
 
