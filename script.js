@@ -10,6 +10,8 @@
    ============================================================ */
 
 const CONFIG = {
+  // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
+  // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
@@ -66,6 +68,34 @@ const Session = {
   get(key) { return this.data[key] || null; },
   set(key, value) { this.data[key] = value; this.save(); },
   clear(key) { if (key) delete this.data[key]; else this.data = {}; this.save(); }
+};
+
+/** Dirección del servidor (Apps Script): CONFIG.API_URL o la que se guardó en este navegador. */
+const ApiUrl = {
+  KEY: "cch.apiUrl",
+  valid: u => /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec$/.test(String(u || "").trim()),
+  get() {
+    if (CONFIG.API_URL) return CONFIG.API_URL;
+    try { return localStorage.getItem(this.KEY) || ""; } catch (e) { return this.memory || ""; }
+  },
+  set(url) {
+    this.memory = url.trim();
+    try { localStorage.setItem(this.KEY, this.memory); } catch (e) { /* solo en memoria */ }
+  },
+  /** ?api=… en la dirección (lo trae el QR) → se guarda y se limpia de la barra. */
+  fromQuery() {
+    const params = new URLSearchParams(location.search);
+    const url = params.get("api");
+    if (!url) return;
+    if (ApiUrl.valid(url) && !CONFIG.API_URL) ApiUrl.set(url);
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
+};
+
+/** Celular: menos de 768 px de ancho. */
+const Mobile = {
+  query: window.matchMedia ? window.matchMedia("(max-width: 767.98px)") : null,
+  is() { return !!(this.query && this.query.matches); }
 };
 
 /* ============================================================
@@ -136,14 +166,16 @@ const Api = {
 
     let response;
     try {
-      response = await fetch(CONFIG.API_URL, {
+      if (!ApiUrl.get()) throw new Error("Falta configurar la dirección del servidor (Apps Script).");
+      response = await fetch(ApiUrl.get(), {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(Object.assign({ action, token }, params)),
         signal: controller.signal
       });
     } catch (error) {
-      throw new Error(error.name === "AbortError" ? "El servidor tardó demasiado en responder." : "No fue posible conectar con el servidor.");
+      throw new Error(error.name === "AbortError" ? "El servidor tardó demasiado en responder."
+        : !ApiUrl.get() ? error.message : "No fue posible conectar con el servidor.");
     } finally {
       clearTimeout(timer);
     }
@@ -283,12 +315,42 @@ const Parts = {
   },
 
   /** Tabla de una fila: cuenta (rojo por faltas) + una celda por fecha. */
-  attendanceStrip(cuenta, dates, faltas) {
+  attendanceStrip(cuenta, dates, faltas, onJustify) {
     const cell = h("td", { class: "sticky-col cuenta-cell", text: cuenta });
     Parts.applyFaltas(cell, faltas);
+    // onJustify(d): solo las faltas se pueden tocar para cambiarlas a Justificante
+    const cellFor = d => {
+      const td = Parts.statusCell(d.status, d.label);
+      if (!onJustify || Fmt.normalize(d.status) !== "falta") return td;
+      td.classList.add("st-justify");
+      td.tabIndex = 0;
+      td.setAttribute("role", "button");
+      td.title = `${d.label} · Falta — toca para justificar`;
+      const go = async () => {
+        if (td.classList.contains("busy")) return;
+        td.classList.add("busy");
+        try {
+          await onJustify(d);
+          const j = Parts.statusInfo("Justificante");
+          td.className = `st ${j.cls}`;
+          td.textContent = j.sym;
+          td.title = `${d.label} · Justificante`;
+          td.removeAttribute("role");
+          td.removeAttribute("tabindex");
+          td.onclick = td.onkeydown = null;
+          d.status = "Justificante";
+        } catch (error) {
+          td.classList.remove("busy");
+          if (error.code !== "AUTH") UI.toast("danger", error.message);
+        }
+      };
+      td.onclick = go;
+      td.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+      return td;
+    };
     return h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-bordered table-cch att-table mb-0" },
       h("thead", {}, h("tr", {}, h("th", { class: "sticky-col", text: "Cuenta" }), dates.map(d => h("th", { text: d.label })))),
-      h("tbody", {}, h("tr", {}, cell, dates.map(d => Parts.statusCell(d.status, d.label))))));
+      h("tbody", {}, h("tr", {}, cell, dates.map(cellFor)))));
   },
 
   pct(counts) {
@@ -754,7 +816,13 @@ const App = {
       $("login-remember").checked = true;
     }
 
+    ApiUrl.fromQuery();
     App.renderQr();
+
+    // Al cruzar el tamaño celular ↔ computadora se redibuja la pestaña del panel
+    if (Mobile.query) Mobile.query.addEventListener("change", () => {
+      if (Session.get("admin") && Admin.group && !$("view-admin").classList.contains("d-none")) Admin.renderTab();
+    });
 
     window.addEventListener("beforeunload", e => {
       if (Admin.dirty && Admin.dirty.size) { e.preventDefault(); e.returnValue = ""; }
@@ -767,7 +835,8 @@ const App = {
   renderQr() {
     const box = $("page-qr");
     if (!box) return;
-    const url = location.origin + location.pathname;
+    // Sin URL fija en script.js, el QR lleva el servidor para que el alumno no tenga que configurarlo
+    const url = location.origin + location.pathname + (!CONFIG.API_URL && ApiUrl.get() ? `?api=${encodeURIComponent(ApiUrl.get())}` : "");
     box.title = url;
     if (typeof QRCode === "undefined") {
       box.replaceChildren(h("a", { href: url, class: "small", text: url }));
@@ -786,9 +855,45 @@ const App = {
   },
 
   route() {
+    if (!ApiUrl.get()) return App.showSetup();
     if (Session.get("admin")) return Admin.open();
     if (Session.get("student")) return Student.open();
     App.show("view-login");
+  },
+
+  /** Instalación nueva: pide la URL del Web App y la prueba antes de guardarla. */
+  showSetup(onDone) {
+    const input = h("input", { class: "form-control mono", id: "setup-url", type: "url", placeholder: "https://script.google.com/macros/s/…/exec", value: ApiUrl.get(), autocomplete: "off" });
+    const out = h("div", { class: "small mt-2" });
+    const btn = h("button", { class: "btn btn-primary", type: "submit" }, icon("plug", "me-1"), "Probar y guardar");
+    const form = h("form", {
+      onsubmit: async e => {
+        e.preventDefault();
+        const url = input.value.trim();
+        if (!ApiUrl.valid(url)) { out.replaceChildren(h("span", { class: "text-danger", text: "La dirección debe ser la del Web App: https://script.google.com/macros/s/…/exec" })); return; }
+        const previous = ApiUrl.get();
+        ApiUrl.set(url);
+        try {
+          const r = await UI.busy(btn, () => Api.call("ping"));
+          UI.toast("success", `Conectado: ${r.message} (v${r.version})`);
+          bootstrap.Modal.getOrCreateInstance($("modal-generic")).hide();
+          App.renderQr();
+          if (onDone) onDone(); else App.route();
+        } catch (error) {
+          if (previous) ApiUrl.set(previous); else ApiUrl.set("");
+          out.replaceChildren(h("span", { class: "text-danger", text: `No respondió: ${error.message}. Revisa que la implementación sea «Cualquier usuario».` }));
+        }
+      }
+    },
+      h("p", { class: "small", text: "Es la dirección que te da Apps Script en Implementar → Gestionar implementaciones (termina en /exec)." }),
+      h("label", { class: "form-label", for: "setup-url", text: "URL del Web App" }), input, out,
+      h("div", { class: "d-flex justify-content-end mt-3" }, btn),
+      h("p", { class: "small text-body-secondary mt-3 mb-0" },
+        "Se guarda en este navegador. Los alumnos que entren con el QR de la página ya la reciben. ",
+        "Para dejarla fija para todos, pégala en ", h("code", { text: "API_URL" }), " al inicio de script.js."));
+    App.show("view-login");
+    UI.modal({ title: [icon("plug", "me-2"), "Conectar con el servidor"], body: form });
+    setTimeout(() => input.focus(), 300);
   },
 
   openAdmin() {
@@ -807,6 +912,7 @@ const App = {
       await UI.busy($("admin-submit"), async () => {
         const result = await Api.call("adminLogin", { password: $("admin-pass").value });
         Session.set("admin", result.token);
+        Session.set("factory", !!result.factoryPassword);
       });
       bootstrap.Modal.getOrCreateInstance($("modal-admin")).hide();
       Admin.open();
@@ -1231,6 +1337,9 @@ const Admin = {
 
   async open() {
     App.show("view-admin");
+    $("adm-banner").replaceChildren(...kids(Session.get("factory") ? h("div", { class: "alert alert-warning d-flex align-items-start gap-2 py-2 small", role: "alert" },
+      icon("shield-exclamation"), h("span", {}, "Estás usando la contraseña de fábrica ", h("b", { class: "mono", text: "123456789" }),
+        ". Cámbiala en Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → ", h("b", { class: "mono", text: "CCH_ADMIN_PASSWORD" }), ".")) : null));
     if (!Admin.wired) {
       Admin.wired = true;
       $("adm-tabs").addEventListener("click", async e => {
@@ -1804,7 +1913,12 @@ const Admin = {
         : key === "falta" ? "Falta"
         : key.startsWith("justific") ? "Justificante" : "";
     });
-    const marks = Object.assign({}, original);
+    // El borrador sobrevive a redibujar (girar el celular, cambiar de pestaña)
+    const draftKey = `${g.group.id}|${date}`;
+    const marks = Admin.rollDraft && Admin.rollDraft.key === draftKey ? Admin.rollDraft.marks : Object.assign({}, original);
+    Admin.rollDraft = { key: draftKey, marks };
+    const mobile = Mobile.is();
+    const size = mobile ? "btn-lg" : "btn-sm";
 
     const useRetardo = useRetardoFlag;
     const OPTIONS = [
@@ -1815,7 +1929,7 @@ const Admin = {
     ].filter(Boolean);
 
     const counter = h("span", { class: "small text-body-secondary" });
-    const saveBtn = h("button", { class: "btn btn-sm btn-primary", type: "button" });
+    const saveBtn = h("button", { class: `btn ${mobile ? "btn-primary flex-grow-1" : "btn-sm btn-primary"}`, type: "button" });
     const refresh = () => {
       const changed = g.students.filter(s => marks[s.cuenta] !== original[s.cuenta]).length;
       const c = { Asistencia: 0, Retardo: 0, Falta: 0, Justificante: 0, "": 0 };
@@ -1831,13 +1945,31 @@ const Admin = {
       tr.querySelectorAll(".roll-btns .btn").forEach(b => {
         const opt = OPTIONS.find(o => o.v === b.dataset.v);
         const on = marks[cuenta] === opt.v;
-        b.className = `btn btn-sm ${on ? "btn-" + opt.cls : "btn-outline-" + opt.cls}`;
+        b.className = `btn ${size} ${on ? "btn-" + opt.cls : "btn-outline-" + opt.cls}`;
         b.setAttribute("aria-pressed", String(on));
       });
     };
+    const list = h("div", { class: "roll-list" });
+    const mobileItem = s => {
+      const faltas = s.counts ? s.counts.falta : 0;
+      const item = h("div", { class: "roll-card" },
+        h("div", { class: "d-flex justify-content-between align-items-start gap-2 mb-2" },
+          h("div", { class: "min-w-0" },
+            h("div", { class: "fw-semibold roll-name", text: s.nombre || s.cuenta }),
+            h("div", { class: "small mono text-body-secondary", text: s.cuenta })),
+          faltas ? h("span", { class: `badge ${faltas > CONFIG.FALTAS_UMBRAL ? "text-bg-danger" : "text-bg-light border"}`, text: `${faltas} falta${faltas > 1 ? "s" : ""}` }) : null),
+        h("div", { class: "roll-btns roll-choices", role: "group", style: `--roll-n:${OPTIONS.length}`, "aria-label": `Asistencia de ${s.nombre || s.cuenta}` },
+          OPTIONS.map(o => h("button", {
+            type: "button", class: "btn", dataset: { v: o.v }, title: o.v,
+            onclick: () => { marks[s.cuenta] = marks[s.cuenta] === o.v ? "" : o.v; paintRow(item, s.cuenta); refresh(); }
+          }, h("span", { class: "roll-sym", text: o.k }), h("span", { class: "roll-lbl", text: o.v === "Justificante" ? "Justif." : o.v })))));
+      paintRow(item, s.cuenta);
+      return item;
+    };
     const draw = (q = "") => {
-      tbody.replaceChildren(...g.students
-        .filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q))
+      const shown = g.students.filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q));
+      if (mobile) { list.replaceChildren(...shown.map(mobileItem)); return; }
+      tbody.replaceChildren(...shown
         .map(s => {
           const cuenta = h("td", { class: "sticky-col cuenta-cell", text: s.cuenta });
           Parts.applyFaltas(cuenta, s.counts && s.counts.falta);
@@ -1861,6 +1993,7 @@ const Admin = {
         dateInput.value = date; return;
       }
       Admin.rollDate = dateInput.value || today;
+      Admin.rollDraft = null;
       Admin.renderTab();
     });
 
@@ -1875,9 +2008,23 @@ const Admin = {
         const r = await UI.busy(saveBtn, () => Api.call("saveRollCall", { idCurso: g.group.id, date: dateInput.value, marks: list }, "admin"));
         UI.toast("success", r.message);
         Admin.rollDate = dateInput.value;
+        Admin.rollDraft = null;
         Admin.loadGroup();
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
+
+    if (mobile) {
+      // Celular: tarjetas a todo el ancho y barra fija abajo con el contador y Guardar
+      dateInput.style.width = "100%";
+      $("adm-toolbar").replaceChildren(h("div", { class: "vstack gap-2" },
+        h("div", { class: "d-flex gap-2" }, h("div", { class: "flex-grow-1" }, dateInput), allPresent),
+        Admin.searchBox("Buscar alumno…", draw)));
+      content.replaceChildren(...kids(
+        di === -1 ? h("div", { class: "alert alert-info py-2 small" }, icon("info-circle", "me-1"), `Se creará la columna del ${Fmt.date(date + "T12:00:00")} al guardar.`) : null,
+        list,
+        h("div", { class: "roll-savebar" }, h("div", { class: "roll-counter" }, counter), saveBtn)));
+      return;
+    }
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
       dateInput, Admin.searchBox("Buscar…", draw), allPresent, counter,
@@ -2208,9 +2355,10 @@ const Admin = {
       class: `btn btn-sm ${view === v ? "btn-dark" : "btn-outline-secondary"}`, type: "button", "aria-pressed": String(view === v),
       onclick: () => { Prefs.set("projView", v); Admin.renderTab(); }
     }, icon(iconName, "me-1"), label);
+    const mobile = Mobile.is();
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap gap-2" },
       h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.editProject(null) }, icon("plus-lg", "me-1"), "Nuevo proyecto"),
-      h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"))));
+      mobile ? null : h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"))));
 
     if (!g.projects.length) {
       content.replaceChildren(UI.empty("star", "Aún no hay proyectos en este grupo. Crea uno y abre el registro para que los alumnos den de alta su equipo."));
@@ -2244,7 +2392,7 @@ const Admin = {
         h("div", { class: "card-body" },
           h("div", { class: "mb-3" }, p.rubros.map(r => h("span", { class: "chip", text: r }))),
           p.teams.length
-            ? (view === "tabla" ? Admin.teamsTable(p) : h("div", { class: "row g-3" }, p.teams.map(t => h("div", { class: "col-12 col-md-6 col-xl-4" }, Admin.teamCard(p, t)))))
+            ? (mobile ? Admin.teamStepper(p) : view === "tabla" ? Admin.teamsTable(p) : h("div", { class: "row g-3" }, p.teams.map(t => h("div", { class: "col-12 col-md-6 col-xl-4" }, Admin.teamCard(p, t)))))
             : h("p", { class: "text-body-secondary small", text: "Sin equipos registrados." }),
           without.length ? h("details", { class: "mt-3" },
             h("summary", { class: "small text-body-secondary", text: `${without.length} alumno(s) sin equipo` }),
@@ -2274,6 +2422,44 @@ const Admin = {
       }))));
   },
 
+  /** Celular: un equipo a la vez; ‹ › o deslizar para pasar al siguiente. Al calificar avanza solo. */
+  teamStepper(project) {
+    Admin.projStep = Admin.projStep || {};
+    const n = project.teams.length;
+    let i = Math.min(Admin.projStep[project.id] || 0, n - 1);
+    const holder = h("div", { class: "team-stepper" });
+    const go = k => { i = Math.max(0, Math.min(n - 1, k)); draw(); holder.scrollIntoView({ block: "nearest" }); };
+    const draw = () => {
+      Admin.projStep[project.id] = i;
+      const team = project.teams[i];
+      const graded = project.teams.filter(t => t.calificacion !== null).length;
+      const card = Admin.teamCard(project, team, () => { Admin.projStep[project.id] = Math.min(i + 1, n - 1); });
+      holder.replaceChildren(
+        h("div", { class: "d-flex align-items-center justify-content-between gap-2 mb-2" },
+          h("button", { class: "btn btn-outline-secondary step-nav", type: "button", disabled: i === 0, "aria-label": "Equipo anterior", onclick: () => go(i - 1) }, icon("chevron-left")),
+          h("div", { class: "text-center" },
+            h("div", { class: "fw-semibold", text: `Equipo ${i + 1} de ${n}` }),
+            h("div", { class: "small text-body-secondary", text: `${graded} de ${n} calificados` })),
+          h("button", { class: "btn btn-outline-secondary step-nav", type: "button", disabled: i === n - 1, "aria-label": "Equipo siguiente", onclick: () => go(i + 1) }, icon("chevron-right"))),
+        h("div", { class: "step-dots mb-2" }, project.teams.map((t, k) => h("button", {
+          type: "button", class: `step-dot ${k === i ? "active" : ""} ${t.calificacion !== null ? "done" : ""}`,
+          "aria-label": `Equipo ${k + 1}: ${t.nombre}${t.calificacion !== null ? " (calificado)" : ""}`, onclick: () => go(k)
+        }))),
+        h("div", { class: "step-card" }, card));
+    };
+    // Deslizar con el dedo
+    let x0 = null, y0 = null;
+    holder.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    holder.addEventListener("touchend", e => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(i + (dx < 0 ? 1 : -1));
+    });
+    draw();
+    return holder;
+  },
+
   teamModal(project, team) {
     let modal;
     const card = Admin.teamCard(project, team, () => modal && modal.close());
@@ -2289,8 +2475,8 @@ const Admin = {
     const paintPreview = () => {
       const total = project.rubros.reduce((s, r) => s + (stars[r] || 0), 0);
       const grade = total / (5 * project.rubros.length) * 10;
-      preview.textContent = Fmt.grade(grade);
-      preview.className = `badge fs-6 ${grade < CONFIG.RISK_THRESHOLD ? "text-bg-danger" : "text-bg-success"}`;
+      preview.textContent = total ? Fmt.grade(grade) : "—";
+      preview.className = `badge fs-6 ${!total ? "text-bg-light border" : grade < CONFIG.RISK_THRESHOLD ? "text-bg-danger" : "text-bg-success"}`;
     };
     paintPreview();
 
@@ -2624,7 +2810,15 @@ const Admin = {
         h("div", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" },
           h("div", { class: "fw-semibold me-auto" }, icon("journal-text", "me-1"), gr.label), statusSel, remove),
         section("Asistencia", "calendar-check",
-          gr.attendance && gr.attendance.dates.length ? Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta) : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros." })),
+          gr.attendance && gr.attendance.dates.length ? [
+            Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta, async d => {
+              const r = await Api.call("saveRollCall", { idCurso: gr.idCurso, date: d.key, marks: [{ cuenta: p.cuenta, status: "Justificante" }] }, "admin");
+              UI.toast("success", `${d.label}: falta justificada. ${r.message}`);
+              gr.attendance.counts.falta = Math.max(0, gr.attendance.counts.falta - 1);
+              if (Admin.group && Admin.group.group.id === gr.idCurso) Admin.loadGroup();
+            }),
+            gr.attendance.counts.falta ? h("div", { class: "small text-body-secondary mt-1" }, icon("hand-index", "me-1"), "Toca una ✗ para justificarla.") : null
+          ] : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros." })),
         h("div", { class: "row g-3" },
           h("div", { class: "col-12 col-lg-6" }, section("Calificaciones", "bar-chart", gradesTable)),
           h("div", { class: "col-12 col-lg-6" }, section("Proyectos", "people", ...projects))));
@@ -3010,7 +3204,7 @@ const Admin = {
     });
     const structureCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
       h("h2", { class: "h6" }, icon("diagram-3", "me-1"), "Estructura (hoja nueva en blanco)"),
-      h("p", { class: "small text-body-secondary", text: "Crea las hojas de la plantilla Attendance Log (Course, Students, Attendance Log, Calificaciones, Roles), las hojas W_ de la web y las carpetas (Students_Images, Course_Images, Material_Archivos…) junto a la hoja, solo si faltan. Las que ya existen no se modifican." }),
+      h("p", { class: "small text-body-secondary", text: "Crea las hojas base (Course, Students, Attendance Log, Roles), las hojas W_ de la web y las carpetas (Students_Images, Course_Images, Material_Archivos…) junto a la hoja, solo si faltan. Las que ya existen no se modifican." }),
       setupBtn, setupOut));
 
     const en = info.enrollment || { sinCurso: 0, inexistente: [], totalInexistente: 0, gruposVacios: [], ids: [] };
@@ -3027,9 +3221,51 @@ const Admin = {
           en.inexistente.length ? h("div", { class: "mt-1" }, en.inexistente.slice(0, 10).map(x => h("div", { class: "mono", text: `${x.cuenta} → «${x.course}»` }))) : null),
         en.gruposVacios.length ? h("li", { class: "text-warning-emphasis" }, "Grupos activos sin alumnos: ", en.gruposVacios.map(x => x.label).join(", ")) : null)));
 
+    // ---- Servidor (URL del Web App) ----
+    const serverCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
+      h("h2", { class: "h6" }, icon("plug", "me-1"), "Servidor (Apps Script)"),
+      h("div", { class: "small mono text-break mb-2", text: ApiUrl.get() }),
+      h("p", { class: "small text-body-secondary" }, CONFIG.API_URL
+        ? "Fija en script.js (API_URL)."
+        : "Guardada en este navegador. El QR de la página de inicio la comparte con los alumnos."),
+      CONFIG.API_URL ? null : h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => App.showSetup(() => Admin.open()) }, icon("pencil", "me-1"), "Cambiar")));
+
+    // ---- Restaurar a fábrica (DEMO) ----
+    const factoryBtn = h("button", { class: "btn btn-sm btn-danger", type: "button" }, icon("arrow-counterclockwise", "me-1"), "Restaurar a fábrica");
+    factoryBtn.addEventListener("click", async () => {
+      const ok = await UI.confirmTyped({
+        title: "Restaurar a fábrica",
+        word: "RESTAURAR",
+        okText: "Restaurar",
+        body: h("div", { class: "small" },
+          h("p", { text: "Deja la hoja como recién instalada, con un grupo DEMO de 12 alumnos:" }),
+          h("ul", {},
+            h("li", {}, "Primero guarda un ", h("b", { text: "ZIP con todas las hojas" }), " en la carpeta de la hoja de cálculo."),
+            h("li", {}, "Borra las hojas ", h("b", { text: "W_*" }), " y ", h("b", { text: "Reporte_*" }), ", y vacía Course, Students, Attendance Log y Roles (quedan los encabezados)."),
+            h("li", {}, "Borra la configuración guardada (ciclo fijo, carpetas) y la contraseña: vuelve a ser ", h("b", { class: "mono", text: "123456789" }), "."),
+            h("li", { text: "Otras hojas que hayas agregado tú no se tocan." })),
+          h("p", { class: "text-danger fw-semibold mb-0", text: "No se puede deshacer desde la web (solo con el ZIP o el historial de versiones de Google)." }))
+      });
+      if (!ok) return;
+      try {
+        const r = await UI.busy(factoryBtn, () => Api.call("factoryReset", { confirm: "RESTAURAR" }, "admin"), "Restaurando…");
+        Cache.clear();
+        Session.clear();
+        Admin.reset();
+        App.show("view-login");
+        UI.modal({ title: [icon("check-circle", "text-success me-2"), "Restaurado a fábrica"], body: h("div", {},
+          h("p", { text: r.message }),
+          r.backup ? h("a", { class: "btn btn-sm btn-outline-primary", href: r.backup.download, target: "_blank", rel: "noopener noreferrer" }, icon("download", "me-1"), "Descargar respaldo") : null) });
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+    });
+    const factoryCard = h("div", { class: "card card-soft border-danger" }, h("div", { class: "card-body" },
+      h("h2", { class: "h6 text-danger" }, icon("arrow-counterclockwise", "me-1"), "Restaurar a fábrica (DEMO)"),
+      h("p", { class: "small text-body-secondary", text: "Para instalar en otra escuela o empezar de cero: respalda todo en ZIP, borra los datos y deja un grupo DEMO para probar. La contraseña vuelve a 123456789 hasta que crees CCH_ADMIN_PASSWORD." }),
+      factoryBtn));
+
     content.replaceChildren(h("div", { class: "row g-3" },
-      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard),
-      h("div", { class: "col-12 col-xl-7 vstack gap-3" }, backupCard, dangerCard)));
+      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard, serverCard),
+      h("div", { class: "col-12 col-xl-7 vstack gap-3" }, backupCard, dangerCard, factoryCard)));
   }
 };
 
