@@ -100,6 +100,12 @@ Dos pestañas: **Mi avance** (una sola tarjeta con asistencia, calificaciones po
 
 Por defecto se ven **60 alumnos** antes de que la tabla haga scroll. Se cambia en ⚙️ Preferencias → «Alumnos visibles por tabla» (15, 30, 60, 100 o Todos).
 
+## Ponderaciones: solo porcentaje
+
+Cada componente lleva solo su **%** y entre todos deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. Ejemplo: Parcial 1 al 40 % con 8 aporta 3.2 puntos.
+
+Todo se captura de 0 a 10. Si un componente viejo se capturaba en otra escala (Sellos de 0 a 15), aparece una nota y el enlace «Capturar de 0 a 10» para cambiarlo.
+
 ## Plantilla por defecto (Ponderaciones)
 
 Los componentes que se llamen igual que en la plantilla **conservan sus calificaciones** (antes se creaban de nuevo y quedaban vacíos).

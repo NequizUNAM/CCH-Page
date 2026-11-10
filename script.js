@@ -1972,7 +1972,7 @@ const Admin = {
         h("thead", {}, h("tr", {},
           h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start", text: "Nombre" }),
           comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
-            c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo === "manual" ? ` · /${c.maximo}` : " · auto"}` }))),
+            c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo !== "manual" ? " · auto" : Number(c.maximo) !== 10 ? ` · 0–${c.maximo}` : ""}` }))),
           h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", text: "Entera" }))),
         tbody)),
       manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
@@ -2096,23 +2096,30 @@ const Admin = {
       const sum = draft.reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
       sumText.textContent = `${Fmt.num(sum)}%`;
       sumBar.style.width = `${Math.min(sum, 100)}%`;
-      sumBar.className = `progress-bar ${sum === 100 ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
+      const exact = Math.abs(sum - 100) < 0.001;
+      sumBar.className = `progress-bar ${exact ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
+      sumHint.textContent = exact ? "" : `Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`;
+      saveBtn.disabled = !exact;
     };
+    const sumHint = h("span", { class: "small text-danger fw-semibold ms-2" });
+    const saveBtn = h("button", { class: "btn btn-primary", type: "button", title: "Las ponderaciones deben sumar 100 %" }, icon("save", "me-1"), "Guardar ponderaciones");
 
     const draw = () => {
       list.replaceChildren(...draft.map((c, i) => {
-        const maxInput = h("input", { class: "form-control form-control-sm", type: "number", min: "1", step: "any", value: c.maximo, disabled: c.tipo !== "manual", "aria-label": "Escala máxima", oninput: e => { c.maximo = e.target.value; } });
+        // Solo porcentaje. Si un componente viejo se captura en otra escala (Sellos 0–15), se avisa aquí.
+        const scaleNote = c.tipo === "manual" && Number(c.maximo) !== 10 ? h("div", { class: "small text-body-secondary mt-1" },
+          `En Captura se escribe de 0 a ${c.maximo}. `,
+          h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
         return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
-          h("div", { class: "col-12 col-md-4" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; } })),
+          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
             onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; draw(); }
           }, Object.entries(types).map(([v, t]) => h("option", { value: v, selected: c.tipo === v, text: t })))),
-          h("div", { class: "col-4 col-md-2" }, h("div", { class: "input-group input-group-sm" },
+          h("div", { class: "col-6 col-md-2" }, h("div", { class: "input-group input-group-sm" },
             h("input", { class: "form-control", type: "number", min: "0", max: "100", step: "any", value: c.ponderacion, "aria-label": "Ponderación", oninput: e => { c.ponderacion = e.target.value; updateSum(); } }),
             h("span", { class: "input-group-text", text: "%" }))),
-          h("div", { class: "col-4 col-md-1" }, h("div", { class: "input-group input-group-sm" }, h("span", { class: "input-group-text", text: "/" }), maxInput)),
-          h("div", { class: "col-4 col-md-2 text-end" },
+          h("div", { class: "col-6 col-md-2 text-end" },
             h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Subir", disabled: i === 0, onclick: () => { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); } }, icon("arrow-up")),
             h("button", { class: "btn btn-sm btn-outline-secondary ms-1", type: "button", title: "Bajar", disabled: i === draft.length - 1, onclick: () => { [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; draw(); } }, icon("arrow-down")),
             h("button", { class: "btn btn-sm btn-outline-danger ms-1", type: "button", title: "Quitar", onclick: () => { draft.splice(i, 1); draw(); } }, icon("trash")))
@@ -2122,7 +2129,6 @@ const Admin = {
     };
     draw();
 
-    const saveBtn = h("button", { class: "btn btn-primary", type: "button" }, icon("save", "me-1"), "Guardar ponderaciones");
     saveBtn.addEventListener("click", async () => {
       try {
         const r = await UI.busy(saveBtn, () => Api.call("saveComponents", { idCurso: g.group.id, components: draft }, "admin"));
@@ -2157,13 +2163,14 @@ const Admin = {
       h("div", { class: "card card-soft mb-3" }, h("div", { class: "card-body" },
         h("div", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" },
           h("h2", { class: "h6 mb-0" }, `Forma de evaluación · ${g.group.label}`),
-          h("span", { class: "small" }, "Suma: ", sumText)),
+          h("span", { class: "small" }, "Suma: ", sumText, sumHint)),
         h("div", { class: "progress weight-bar mb-2", role: "progressbar", "aria-label": "Suma de ponderaciones" }, sumBar),
         h("p", { class: "small text-body-secondary mb-0" },
-          "«Manual» = lo capturas tú en Captura (parciales, sellos, Teams…) en su propia escala (/10, /15, /100) y se convierte a 10. ",
+          "Cada componente vale el % que le pongas y entre todos deben sumar 100 % (= 10). Ej.: Parcial 1 al 40 % con 8 aporta 3.2. ",
+          "«Manual» = lo capturas tú en Captura. ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
-          "La suma de porcentajes equivale a 10: «Calificación entera» suma lo obtenido y quita los decimales (no redondea).")
+          "«Calificación entera» suma lo obtenido y quita los decimales (no redondea).")
       )),
       list,
       h("div", { class: "d-flex flex-wrap gap-2 mt-3" },
