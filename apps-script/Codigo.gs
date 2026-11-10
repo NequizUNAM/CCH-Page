@@ -17,6 +17,7 @@
  *   AppSheet (pase de lista QR): Course, Students, Attendance Log, Roles
  *   Asistencia por grupo:        Reporte_*
  *   Web:                         W_* (las crea el sistema)
+ *   Course también guarda, para la web: Hoja_Reporte (su hoja Reporte_) y Activo
  *
  * SECCIONES DE ESTE ARCHIVO
  *   Configuración · API · Sesiones · Tablas · Asistencia (sync) ·
@@ -25,7 +26,7 @@
  * ============================================================
  */
 
-const API_VERSION = "6.2.0";
+const API_VERSION = "6.3.0";
 const REPORT_PREFIX = "Reporte_";
 
 const SHEETS = {
@@ -37,7 +38,6 @@ const SHEETS = {
 
 /** Hojas nuevas de la web: nombre + encabezados (fila 1). */
 const WEB = {
-  GROUPS:      { name: "W_Grupos",         headers: ["ID_Curso", "Etiqueta", "Hoja_Reporte", "Ciclo", "Activo"], text: ["Ciclo"] },
   COMPONENTS:  { name: "W_Componentes",    headers: ["ID", "ID_Curso", "Nombre", "Tipo", "Ponderacion", "Maximo", "Orden"] },
   GRADES:      { name: "W_Calificaciones", headers: ["ID_Curso", "Cuenta", "ID_Componente", "Valor", "Actualizado"] },
   PROJECTS:    { name: "W_Proyectos",      headers: ["ID", "ID_Curso", "Nombre", "Rubros", "ID_Componente", "Registro_Abierto", "Creado"] },
@@ -62,7 +62,7 @@ const WEB = {
 // ============================================================
 const BASE_SHEETS = [
   { name: "Course", cycleKey: "ID_Curso",
-    required: ["ID_Curso", "Nombre Curso", "Grupo", "Horario", "Ciclo_Escolar"],
+    required: ["ID_Curso", "Nombre Curso", "Grupo", "Horario", "Ciclo_Escolar", "Hoja_Reporte", "Activo"],
     optional: ["Description", "PDF Programas Estudio", "Image"] },
   { name: "Students", cycleKey: "Course",
     required: ["ID", "Cuenta", "First Name", "Email", "Course"],
@@ -434,31 +434,22 @@ function setupWeb_(options) {
   const folders = opts.folders ? ensureFolders_() : [];
   const linked = [];
 
-  const groups = Db.read(WEB.GROUPS);
-  if (groups.rows.length === 0) {
-    const courses = courseMap_();
-    const studentCourses = studentCourseMap_();
+  ensureCourseWebColumns_();
 
-    getReportSheets_().forEach(report => {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(report.name);
-      let accounts = [];
-      try { accounts = readReport_(sheet).students.map(s => s.account); } catch (e) { /* hoja vacía */ }
-
-      const match = findReportCourseId_(report.name, courses, accounts, studentCourses);
-      if (!match.courseId || linked.some(g => g.ID_Curso === match.courseId)) return;
-
-      const course = courses[match.courseId];
-      linked.push({
-        ID_Curso: match.courseId,
-        Etiqueta: `${course.name} · ${course.group}`.trim(),
-        Hoja_Reporte: report.name,
-        Ciclo: course.ciclo,
-        Activo: true
-      });
-    });
-
-    if (linked.length) Db.append(WEB.GROUPS, linked);
-  }
+  // Hojas Reporte_ que ningún curso tiene ligadas → se ligan al curso detectado (si no tiene hoja)
+  const courses = courseMap_();
+  const usedSheets = new Set(Object.values(courses).map(c => c.sheet).filter(Boolean));
+  const studentCourses = studentCourseMap_();
+  getReportSheets_().forEach(report => {
+    if (usedSheets.has(report.name)) return;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(report.name);
+    let accounts = [];
+    try { accounts = readReport_(sheet).students.map(s => s.account); } catch (e) { /* hoja vacía */ }
+    const match = findReportCourseId_(report.name, courses, accounts, studentCourses);
+    if (!match.courseId || courses[match.courseId].sheet || linked.some(g => g.ID_Curso === match.courseId)) return;
+    updateCourse_(match.courseId, { Hoja_Reporte: report.name, Activo: true });
+    linked.push({ ID_Curso: match.courseId, Hoja_Reporte: report.name });
+  });
 
   return { sheets, linked, created: base.created, missingColumns: base.missingColumns, folders };
 }
@@ -710,7 +701,8 @@ function courseMap_() {
   const headers = (data[0] || []).map(cleanText_);
   const col = name => findColumn_(headers, name);
   const iId = col("ID_Curso"), iName = col("Nombre Curso"), iGroup = col("Grupo"),
-        iSchedule = col("Horario"), iCiclo = col("Ciclo_Escolar");
+        iSchedule = col("Horario"), iCiclo = col("Ciclo_Escolar"),
+        iSheet = col("Hoja_Reporte"), iActive = col("Activo");
 
   const map = {};
   data.slice(1).forEach(row => {
@@ -721,7 +713,9 @@ function courseMap_() {
       name: iName !== -1 ? cleanText_(row[iName]) : id,
       group: iGroup !== -1 ? cleanText_(row[iGroup]) : "",
       schedule: iSchedule !== -1 ? cleanText_(row[iSchedule]) : "",
-      ciclo: iCiclo !== -1 ? normalizeCiclo_(row[iCiclo]) : ""
+      ciclo: iCiclo !== -1 ? normalizeCiclo_(row[iCiclo]) : "",
+      sheet: iSheet !== -1 ? cleanText_(row[iSheet]) : "",
+      active: iActive !== -1 ? toBool_(row[iActive]) : false
     };
   });
 
@@ -774,25 +768,86 @@ function studentNames_() {
   return names;
 }
 
-/** W_Grupos → { ID_Curso: grupo } enriquecido con Course. */
+/** Grupos de la web = filas de Course (Hoja_Reporte y Activo viven en Course). */
 function groupsMap_() {
-  const courses = courseMap_();
   const map = {};
-  Db.read(WEB.GROUPS).rows.forEach(row => {
-    const id = cleanText_(row.ID_Curso);
-    if (!id) return;
-    const course = courses[id] || {};
-    map[id] = {
-      id,
-      label: cleanText_(row.Etiqueta) || `${course.name || id} · ${course.group || ""}`,
-      sheet: cleanText_(row.Hoja_Reporte),
-      ciclo: normalizeCiclo_(row.Ciclo) || course.ciclo || "",
-      active: toBool_(row.Activo),
-      courseName: course.name || "",
-      group: course.group || ""
+  Object.values(courseMap_()).forEach(c => {
+    map[c.id] = {
+      id: c.id,
+      label: `${c.name || c.id} · ${c.group || ""}`.trim(),
+      sheet: c.sheet,
+      ciclo: c.ciclo,
+      active: c.active,
+      courseName: c.name,
+      group: c.group
     };
   });
   return map;
+}
+
+/**
+ * Escribe celdas de una fila de Course por nombre de columna.
+ * data: { Hoja_Reporte: "...", Activo: true, Ciclo_Escolar: "2027-1" }
+ */
+function updateCourse_(idCurso, data) {
+  const sheet = requireSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEETS.COURSE);
+  ensureCourseWebColumns_();
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(cleanText_);
+  const iId = findColumn_(headers, "ID_Curso");
+  const r = values.findIndex((row, i) => i > 0 && cleanText_(row[iId]) === idCurso);
+  if (r === -1) throw new Error(`No existe ${idCurso} en Course.`);
+  Object.keys(data).forEach(key => {
+    const c = findColumn_(headers, key);
+    if (c === -1) return;
+    const cell = sheet.getRange(r + 1, c + 1);
+    if (key === "Ciclo_Escolar") cell.setNumberFormat("@");
+    cell.setValue(data[key]);
+  });
+  delete Db._cache.__courses;
+}
+
+/**
+ * Agrega a Course las columnas Hoja_Reporte y Activo si faltan y, si aún
+ * existe la hoja W_Grupos (versiones anteriores), copia sus datos y la borra.
+ */
+function ensureCourseWebColumns_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const course = spreadsheet.getSheetByName(SHEETS.COURSE);
+  if (!course) return { added: [], moved: 0 };
+  const width = Math.max(course.getLastColumn(), 1);
+  const headers = course.getRange(1, 1, 1, width).getValues()[0].map(cleanText_);
+  const added = ["Hoja_Reporte", "Activo"].filter(h => findColumn_(headers, h) === -1);
+  if (added.length) {
+    course.getRange(1, headers.filter(Boolean).length + 1, 1, added.length).setValues([added]).setFontWeight("bold");
+    delete Db._cache.__courses;
+  }
+
+  let moved = 0;
+  const old = spreadsheet.getSheetByName("W_Grupos");
+  if (old && old.getLastRow() > 1) {
+    const rows = old.getDataRange().getValues();
+    const h = rows[0].map(cleanText_);
+    const all = course.getDataRange().getValues();
+    const ch = all[0].map(cleanText_);
+    const iId = findColumn_(ch, "ID_Curso"), iSheet = findColumn_(ch, "Hoja_Reporte"),
+          iActive = findColumn_(ch, "Activo"), iCiclo = findColumn_(ch, "Ciclo_Escolar");
+    rows.slice(1).forEach(r => {
+      const id = cleanText_(r[findColumn_(h, "ID_Curso")]);
+      const at = all.findIndex((x, i) => i > 0 && cleanText_(x[iId]) === id);
+      if (at === -1) return;
+      course.getRange(at + 1, iSheet + 1).setValue(cleanText_(r[findColumn_(h, "Hoja_Reporte")]));
+      course.getRange(at + 1, iActive + 1).setValue(toBool_(r[findColumn_(h, "Activo")]));
+      const ciclo = normalizeCiclo_(r[findColumn_(h, "Ciclo")]);
+      if (/^\d{4}-[12]$/.test(ciclo) && !/^\d{4}-[12]$/.test(normalizeCiclo_(all[at][iCiclo]))) {
+        course.getRange(at + 1, iCiclo + 1).setNumberFormat("@").setValue(ciclo);
+      }
+      moved++;
+    });
+  }
+  if (old) spreadsheet.deleteSheet(old);
+  delete Db._cache.__courses;
+  return { added, moved };
 }
 
 function requireGroup_(idCurso) {
@@ -3052,11 +3107,20 @@ function buildStudentCourse_(idCurso, cuenta, opts) {
 function studentData_(params, ctx) {
   const cuenta = ctx.cuenta;
   const ids = studentCourseIds_(cuenta);
+  // Al alumno nunca se le envían comentarios, observaciones de equipo ni notas,
+  // ni los promedios calculados (solo sus calificaciones por componente).
+  const courses = ids.map(id => {
+    const c = buildStudentCourse_(id, cuenta);
+    delete c.final;
+    delete c.finalStrict;
+    c.projects.forEach(p => { if (p.team) delete p.team.observaciones; });
+    return c;
+  });
   return {
     student: { cuenta, nombre: studentNames_()[cuenta] || "" },
-    courses: ids.map(id => buildStudentCourse_(id, cuenta)),
+    courses,
     links: linksFor_(ids),
-    evidences: evidenceForStudent_(cuenta),
+    evidences: evidenceForStudent_(cuenta).map(e => { const copy = Object.assign({}, e); delete copy.nota; return copy; }),
     evidenceTypes: SETTINGS.EVIDENCE_TYPES,
     maxFileMb: SETTINGS.MAX_FILE_MB,
     maxTeamSize: SETTINGS.MAX_TEAM_SIZE,
@@ -3102,17 +3166,11 @@ function saveGroup_(params) {
     throw new Error(`No existe la hoja "${sheetName}".`);
   }
 
-  const data = {
-    ID_Curso: id,
-    Etiqueta: cleanText_(params.etiqueta).slice(0, 60) || `${course.name} · ${course.group}`,
-    Hoja_Reporte: sheetName,
-    Ciclo: cleanText_(params.ciclo) || course.ciclo,
-    Activo: params.activo !== false
-  };
-
-  const row = Db.read(WEB.GROUPS).rows.find(r => cleanText_(r.ID_Curso) === id);
-  if (row) Db.update(WEB.GROUPS, Object.assign(row, data));
-  else Db.append(WEB.GROUPS, [data]);
+  const ciclo = normalizeCiclo_(params.ciclo);
+  if (ciclo && !/^\d{4}-[12]$/.test(ciclo)) throw new Error("Ciclo inválido (ej. 2027-1).");
+  const data = { Hoja_Reporte: sheetName, Activo: params.activo !== false };
+  if (ciclo) data.Ciclo_Escolar = ciclo;
+  updateCourse_(id, data);
 
   return { message: "Grupo guardado ✅" };
 }
@@ -3390,13 +3448,13 @@ function createGroup_(params) {
   if (courseMap_()[idCurso]) throw new Error(`Ya existe el curso ${idCurso}.`);
 
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  appendByHeaders_(requireSheet_(spreadsheet, SHEETS.COURSE), {
-    ID_Curso: idCurso, "Nombre Curso": materia, Grupo: Number(grupo), Horario: horario, Ciclo_Escolar: ciclo
-  });
-
   const report = createReportSheet(`${slug}_${grupo}`);
+  ensureCourseWebColumns_();
+  appendByHeaders_(requireSheet_(spreadsheet, SHEETS.COURSE), {
+    ID_Curso: idCurso, "Nombre Curso": materia, Grupo: Number(grupo), Horario: horario, Ciclo_Escolar: ciclo,
+    Hoja_Reporte: report.sheetName, Activo: true
+  });
   Db.clearCache();
-  Db.append(WEB.GROUPS, [{ ID_Curso: idCurso, Etiqueta: `${materia} · ${grupo}`, Hoja_Reporte: report.sheetName, Ciclo: ciclo, Activo: true }]);
 
   return { idCurso, sheetName: report.sheetName, message: `Grupo creado: ${materia} ${grupo} (${ciclo}) con hoja ${report.sheetName}.` };
 }
@@ -3653,6 +3711,7 @@ function maintenanceInfo_() {
     folder: { name: folder.getName(), url: folder.getUrl() },
     backups: listBackups_(folder),
     confirmWord: SETTINGS.PURGE_CONFIRM_WORD,
+    purgeParts: Object.keys(PURGE_PARTS).map(k => ({ key: k, label: PURGE_PARTS[k].label })),
     clearAllWord: SETTINGS.CLEAR_ALL_WORD
   };
 }
@@ -3824,7 +3883,7 @@ function backupCycles_(params) {
   const deleted = {};
   perCycle.forEach(({ ids }) => writeHistory_(ids, file.name));
   perCycle.forEach(({ ids, data }) => {
-    const result = purgeCourses_(ids, data, !!params.keepCourses);
+    const result = purgeCourses_(ids, data, purgeOptions_(params));
     Object.keys(result).forEach(k => { deleted[k] = (deleted[k] || 0) + result[k]; });
   });
   Db.clearCache();
@@ -3854,24 +3913,48 @@ function deleteMatchingRows_(sheet, keyColumn, keySet) {
   return rows.length;
 }
 
-function purgeCourses_(ids, data, keepCourses) {
+/**
+ * Qué se borra al respaldar un ciclo (cada parte con su interruptor en la web).
+ * Lo que no se borra se conserva como histórico en la hoja.
+ */
+const PURGE_PARTS = {
+  attendance: { label: "Asistencias (Attendance Log)", tables: ["Attendance Log"] },
+  reports:    { label: "Hojas Reporte_ de esos grupos", tables: ["W_Columnas"], reports: true },
+  students:   { label: "Inscripciones (Students y Roles)", tables: ["Students", "Roles"] },
+  grades:     { label: "Calificaciones, proyectos y evidencias de la web", tables: ["W_Componentes", "W_Calificaciones", "W_Proyectos", "W_Equipos", "W_EvalEquipos", "W_Evidencias", "W_Enlaces"] },
+  comments:   { label: "Comentarios", tables: ["W_Comentarios"] },
+  courses:    { label: "Cursos (Course)", tables: ["Course"] }
+};
+
+function purgeOptions_(params) {
+  const what = params.what || {};
+  const out = {};
+  Object.keys(PURGE_PARTS).forEach(k => { out[k] = what[k] === undefined ? true : !!what[k]; });
+  if (params.keepCourses) out.courses = false;   // compatibilidad
+  return out;
+}
+
+function purgeCourses_(ids, data, options) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const deleted = {};
+  const allowed = new Set();
+  Object.keys(PURGE_PARTS).forEach(k => { if (options[k]) PURGE_PARTS[k].tables.forEach(t => allowed.add(t)); });
 
   data.tables.forEach(t => {
-    if (keepCourses && t.name === SHEETS.COURSE) return;
+    if (!allowed.has(t.name)) return;
     const n = deleteMatchingRows_(spreadsheet.getSheetByName(t.name), t.keyColumn, t.keySet);
     if (n) deleted[t.name] = n;
   });
 
-  data.reports.forEach(name => {
-    const sheet = spreadsheet.getSheetByName(name);
-    if (!sheet) return;
-    PropertiesService.getScriptProperties().deleteProperty(SETTINGS.LAST_DATE_PROP_PREFIX + sheet.getSheetId());
-    spreadsheet.deleteSheet(sheet);
-    deleted["Hojas Reporte_"] = (deleted["Hojas Reporte_"] || 0) + 1;
-  });
-
+  if (options.reports) {
+    data.reports.forEach(name => {
+      const sheet = spreadsheet.getSheetByName(name);
+      if (!sheet) return;
+      PropertiesService.getScriptProperties().deleteProperty(SETTINGS.LAST_DATE_PROP_PREFIX + sheet.getSheetId());
+      spreadsheet.deleteSheet(sheet);
+      deleted["Hojas Reporte_"] = (deleted["Hojas Reporte_"] || 0) + 1;
+    });
+  }
   return deleted;
 }
 

@@ -172,6 +172,25 @@ body {
 .mini-card { border: 1px solid var(--bs-border-color-translucent); border-radius: 10px; padding: .5rem .65rem; margin-bottom: .5rem; background: var(--bs-tertiary-bg); }
 .stars-text { color: #f59f00; letter-spacing: -1px; font-size: .8rem; }
 
+/* Vista del alumno: una sola tarjeta */
+.overview-card { overflow: hidden; }
+.overview-header { background: linear-gradient(90deg, #0f172a, #334155); color: #fff; border: 0; padding: .9rem 1.2rem; }
+.overview-section + .overview-section { border-top: 1px dashed var(--bs-border-color); margin-top: 1.25rem; padding-top: 1.25rem; }
+.overview-title { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--bs-secondary-color); margin-bottom: .75rem; }
+
+/* Estrellas calificadas: llenas en ámbar, vacías en gris y puntaje n/5 */
+.stars.readonly { align-items: center; }
+.stars.readonly i { font-size: 1.05rem; }
+.stars.readonly i.on { color: #f59f00; text-shadow: 0 0 1px rgba(180, 83, 9, .35); }
+.stars.readonly i.off { color: #d0d5dd; }
+.stars-score { margin-left: .35rem; font-size: .72rem; font-weight: 700; padding: .05rem .4rem; border-radius: 999px; background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.stars-score.hi { background: #d1e7dd; color: #0f5132; }
+.stars-score.mid { background: #fff3cd; color: #664d03; }
+.stars-score.lo { background: #f8d7da; color: #842029; }
+
+/* Respaldo: partes a borrar */
+.purge-parts { margin: .25rem 0 .75rem 1.9rem; padding: .5rem .75rem; border-left: 3px solid var(--bs-danger-border-subtle); background: var(--bs-tertiary-bg); border-radius: 0 8px 8px 0; }
+
 /* Extracurriculares (alumno) */
 .ev-form { overflow: hidden; }
 .ev-form-header { background: linear-gradient(90deg, #0f172a, #334155); color: #fff; border: 0; padding: .85rem 1.1rem; }

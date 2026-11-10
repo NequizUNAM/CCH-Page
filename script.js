@@ -31,10 +31,11 @@ const Prefs = {
     showHidden: true,       // admin: mostrar columnas "Oculto" del reporte
     remember: false,        // recordar el número de cuenta del alumno
     cuenta: "",
-    stuTab: "asistencia",
+    stuTab: "avance",
     admTab: "asistencia",
     admGroup: "",
-    evFilter: "Pendiente"
+    evFilter: "Pendiente",
+    cache: true
   },
   data: {},
   load() {
@@ -150,6 +151,8 @@ const Api = {
 
     let result;
     try { result = await response.json(); } catch (e) { throw new Error("La respuesta del servidor no es válida."); }
+
+    if (auth === "admin" && !READ_ACTIONS.has(action)) { Cache.clear("g:"); Cache.clear("boot"); }
 
     if (result.status !== "success") {
       const error = new Error(result.message || "Ocurrió un error inesperado.");
@@ -314,8 +317,10 @@ const Parts = {
   },
 
   starsReadonly(value) {
-    const wrap = h("span", { class: "stars readonly", "aria-label": `${value || 0} de 5 estrellas` });
-    for (let i = 1; i <= 5; i++) wrap.append(icon(i <= value ? "star-fill" : "star", i <= value ? "on" : ""));
+    const n = Number(value) || 0;
+    const wrap = h("span", { class: "stars readonly", "aria-label": `${n} de 5 estrellas` });
+    for (let i = 1; i <= 5; i++) wrap.append(icon(i <= n ? "star-fill" : "star", i <= n ? "on" : "off"));
+    wrap.append(h("span", { class: `stars-score ${n >= 4 ? "hi" : n >= 3 ? "mid" : n ? "lo" : ""}`, text: `${n}/5` }));
     return wrap;
   },
 
@@ -372,6 +377,184 @@ const Parts = {
     return wrap;
   }
 };
+
+/* ============================================================
+   EXCEL (.xlsx) SIN LIBRERÍAS
+   Lee y escribe hojas sencillas (texto y números). Para leer usa
+   DecompressionStream (Chrome, Edge, Firefox y Safari actuales).
+   ============================================================ */
+const Xlsx = {
+  _crc: null,
+  crc32(bytes) {
+    if (!Xlsx._crc) {
+      Xlsx._crc = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; Xlsx._crc[n] = c >>> 0; }
+    }
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) crc = Xlsx._crc[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  },
+
+  /** ZIP sin compresión (Excel lo abre sin problema). files: [{ name, text }] */
+  zip(files) {
+    const enc = new TextEncoder();
+    const parts = [], central = [];
+    let offset = 0;
+    files.forEach(f => {
+      const name = enc.encode(f.name), data = enc.encode(f.text), crc = Xlsx.crc32(data);
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0x0800, true);
+      local.setUint16(8, 0, true); local.setUint32(14, crc, true); local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true); local.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(local.buffer), name, data);
+      const cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+      cd.setUint32(16, crc, true); cd.setUint32(20, data.length, true); cd.setUint32(24, data.length, true);
+      cd.setUint16(28, name.length, true); cd.setUint32(42, offset, true);
+      central.push(new Uint8Array(cd.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    const cdSize = central.reduce((a, b) => a + b.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  },
+
+  async unzip(buffer) {
+    const view = new DataView(buffer), bytes = new Uint8Array(buffer), dec = new TextDecoder();
+    let eocd = -1;
+    for (let i = buffer.byteLength - 22; i >= Math.max(0, buffer.byteLength - 65557); i--) if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd === -1) throw new Error("El archivo no es un Excel (.xlsx) válido.");
+    const count = view.getUint16(eocd + 10, true);
+    let p = view.getUint32(eocd + 16, true);
+    const out = {};
+    for (let n = 0; n < count; n++) {
+      const method = view.getUint16(p + 10, true), csize = view.getUint32(p + 20, true);
+      const nameLen = view.getUint16(p + 28, true), extraLen = view.getUint16(p + 30, true), commentLen = view.getUint16(p + 32, true);
+      const localOff = view.getUint32(p + 42, true);
+      const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+      const start = localOff + 30 + view.getUint16(localOff + 26, true) + view.getUint16(localOff + 28, true);
+      const raw = bytes.subarray(start, start + csize);
+      if (method === 0) out[name] = raw;
+      else if (method === 8) {
+        if (typeof DecompressionStream === "undefined") throw new Error("Tu navegador no puede leer Excel; actualízalo o usa CSV.");
+        const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        out[name] = new Uint8Array(await new Response(stream).arrayBuffer());
+      }
+      p += 46 + nameLen + extraLen + commentLen;
+    }
+    return out;
+  },
+
+  colIndex(ref) { let n = 0; for (const ch of ref.replace(/\d+/g, "")) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; },
+  colName(i) { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; },
+  esc(t) { return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); },
+
+  /** → [{ name, rows: [[valor, …], …] }] */
+  async read(file) {
+    const files = await Xlsx.unzip(await file.arrayBuffer());
+    const dec = new TextDecoder();
+    const xml = name => files[name] ? new DOMParser().parseFromString(dec.decode(files[name]), "application/xml") : null;
+    const all = (doc, tag) => Array.from(doc.getElementsByTagNameNS("*", tag));
+    const shared = [];
+    const ss = xml("xl/sharedStrings.xml");
+    if (ss) all(ss, "si").forEach(si => shared.push(all(si, "t").map(t => t.textContent).join("")));
+    const wb = xml("xl/workbook.xml"), rels = xml("xl/_rels/workbook.xml.rels");
+    if (!wb) throw new Error("El archivo no es un Excel (.xlsx) válido.");
+    const target = {};
+    if (rels) all(rels, "Relationship").forEach(r => { target[r.getAttribute("Id")] = r.getAttribute("Target"); });
+    return all(wb, "sheet").map((sh, i) => {
+      const rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+      let path = target[rid] || `worksheets/sheet${i + 1}.xml`;
+      path = path.startsWith("/") ? path.slice(1) : "xl/" + path.replace(/^\.\//, "");
+      const doc = xml(path);
+      const rows = [];
+      if (doc) all(doc, "row").forEach(row => {
+        const r = Number(row.getAttribute("r")) - 1;
+        const arr = rows[r] || (rows[r] = []);
+        all(row, "c").forEach(c => {
+          const t = c.getAttribute("t"), v = all(c, "v")[0];
+          let value = v ? v.textContent : "";
+          if (t === "s") value = shared[Number(value)] || "";
+          else if (t === "inlineStr") value = all(c, "t").map(x => x.textContent).join("");
+          else if (t === "b") value = value === "1";
+          else if (t !== "str" && value !== "" && !isNaN(Number(value))) value = Number(value);
+          arr[Xlsx.colIndex(c.getAttribute("r"))] = value;
+        });
+      });
+      return { name: sh.getAttribute("name"), rows: Array.from(rows, r => r || []) };
+    });
+  },
+
+  /**
+   * sheets: [{ name, rows: [[celda…]], widths: [n…], header: true }]
+   * celda: valor o { v, s } con s = "head" | "miss" (amarillo) | undefined
+   */
+  write(sheets) {
+    const styleIx = { head: 1, miss: 2 };
+    const sheetXml = sh => {
+      const rows = sh.rows.map((row, r) => `<row r="${r + 1}">` + row.map((cell, c) => {
+        const o = cell !== null && typeof cell === "object" ? cell : { v: cell };
+        const ref = Xlsx.colName(c) + (r + 1);
+        const st = o.s ? ` s="${styleIx[o.s]}"` : "";
+        if (o.v === "" || o.v === null || o.v === undefined) return `<c r="${ref}"${st}/>`;
+        if (typeof o.v === "number" && isFinite(o.v)) return `<c r="${ref}"${st}><v>${o.v}</v></c>`;
+        return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${Xlsx.esc(o.v)}</t></is></c>`;
+      }).join("") + "</row>").join("");
+      const cols = (sh.widths || []).map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("");
+      const pane = sh.header ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : "";
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pane}${cols ? `<cols>${cols}</cols>` : ""}<sheetData>${rows}</sheetData></worksheet>`;
+    };
+    const files = [
+      { name: "[Content_Types].xml", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("") + "</Types>" },
+      { name: "_rels/.rels", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map((sh, i) => `<sheet name="${Xlsx.esc(String(sh.name).replace(/[\\/?*[\]:]/g, " ").slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("") + `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+      { name: "xl/styles.xml", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF212529"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/><xf fillId="3" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' }
+    ].concat(sheets.map((sh, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, text: sheetXml(sh) })));
+    return Xlsx.zip(files);
+  },
+
+  download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url }); a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+};
+
+/* ============================================================
+   CACHÉ DEL PANEL (localStorage)
+   Muestra al instante lo último que viste y actualiza en segundo plano.
+   Se borra al guardar algo, al presionar Salir y desde Preferencias.
+   ============================================================ */
+const Cache = {
+  PREFIX: "cch.cache.",
+  TTL_MS: 12 * 60 * 60 * 1000,
+  on() { return Prefs.get("cache") !== false; },
+  get(key) {
+    if (!Cache.on()) return null;
+    try {
+      const x = JSON.parse(localStorage.getItem(Cache.PREFIX + key) || "null");
+      return x && Date.now() - x.t < Cache.TTL_MS ? x : null;
+    } catch (e) { return null; }
+  },
+  set(key, data) {
+    if (!Cache.on()) return;
+    const value = JSON.stringify({ t: Date.now(), d: data });
+    try { localStorage.setItem(Cache.PREFIX + key, value); }
+    catch (e) { Cache.clear(); try { localStorage.setItem(Cache.PREFIX + key, value); } catch (e2) { /* sin espacio */ } }
+  },
+  clear(prefix = "") {
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX + prefix)).forEach(k => localStorage.removeItem(k));
+    } catch (e) { /* nada */ }
+  }
+};
+
+// Acciones que solo leen; cualquier otra acción de admin invalida la caché de grupos
+const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout"]);
 
 /* ============================================================
    EXPORTAR A PSI (psi.cch.unam.mx)
@@ -638,6 +821,7 @@ const App = {
     const tokens = [Session.get("admin"), (Session.get("student") || {}).token].filter(Boolean);
     tokens.forEach(token => Api.call("logout", { token }).catch(() => {}));
     Session.clear();
+    Cache.clear();
     Admin.reset();
     Student.data = null;
     App.show("view-login");
@@ -663,6 +847,7 @@ const App = {
         onchange: e => {
           Prefs.set(key, e.target.checked);
           if (key === "remember" && !e.target.checked) Prefs.set("cuenta", "");
+          if (key === "cache" && !e.target.checked) Cache.clear();
           document.body.classList.toggle("compact", !!Prefs.get("compact"));
           if (key === "showHidden" && Session.get("admin")) Admin.renderTab();
         }
@@ -679,6 +864,7 @@ const App = {
       sw("compact", "Tablas compactas"),
       sw("remember", "Recordar mi número de cuenta", "Útil en tu celular; no lo actives en computadoras compartidas."),
       sw("showHidden", "Admin: mostrar columnas «Oculto» del reporte", "Se ven en gris; los alumnos nunca las ven."),
+      sw("cache", "Admin: carga instantánea (guardar datos en este equipo)", "Abre el panel con lo último que viste y actualiza en segundo plano. Se borra al presionar Salir. Desactívalo en computadoras compartidas."),
       h("button", {
         class: "btn btn-sm btn-outline-danger", type: "button",
         onclick: () => { Prefs.reset(); App.applyTheme(); App.openPrefs(); UI.toast("info", "Preferencias restablecidas."); }
@@ -755,7 +941,7 @@ const Student = {
     $("stu-name").textContent = data.student.nombre || "Alumno";
     $("stu-links-count").textContent = (data.links || []).length || "";
     $("stu-cuenta").textContent = data.student.cuenta;
-    $("stu-tabs").querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    $("stu-tabs").querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === (tab === "evidencias" ? "evidencias" : "avance")));
 
     // Pastillas de grupos (solo si hay más de uno)
     const pills = $("stu-courses");
@@ -774,12 +960,7 @@ const Student = {
     }
 
     const course = data.courses[Student.courseIndex];
-    const view = {
-      asistencia: () => Student.renderAttendance(course),
-      calificaciones: () => Student.renderGrades(course),
-      equipos: () => Student.renderTeams(course),
-      evidencias: () => Student.renderEvidence()
-    }[tab] || (() => Student.renderAttendance(course));
+    const view = tab === "evidencias" ? () => Student.renderEvidence() : () => Student.renderOverview(course);
 
     content.replaceChildren(view());
   },
@@ -795,9 +976,23 @@ const Student = {
     });
   },
 
+  /** Una sola tarjeta por curso: asistencia, calificaciones y equipos. */
+  renderOverview(course) {
+    const section = (title, iconName, ...children) => h("section", { class: "overview-section" },
+      h("h2", { class: "overview-title" }, icon(iconName, "me-2"), title), ...children);
+    return h("div", { class: "card card-soft overview-card" },
+      h("div", { class: "card-header overview-header" },
+        h("div", { class: "fw-semibold", text: course.label }),
+        h("div", { class: "small opacity-75", text: `Ciclo ${course.ciclo}` })),
+      h("div", { class: "card-body" },
+        section("Asistencia", "calendar-check", Student.renderAttendance(course)),
+        section("Calificaciones", "bar-chart", Student.renderGrades(course)),
+        section("Equipos", "people", Student.renderTeams(course))));
+  },
+
   renderAttendance(course) {
     const att = course.attendance;
-    if (!att || !att.dates.length) return UI.empty("calendar-x", "Aún no hay registro de asistencia.");
+    if (!att || !att.dates.length) return h("p", { class: "text-body-secondary small mb-0", text: "Aún no hay registro de asistencia." });
 
     const c = att.counts;
     const pct = Parts.pct(c);
@@ -816,31 +1011,12 @@ const Student = {
 
   renderGrades(course) {
     const comps = course.components;
-
     if (!comps.length) {
       if (course.legacy.length) {
-        return h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
-          h("p", { class: "small text-body-secondary", text: "Calificaciones publicadas por tu profesor:" }),
-          h("table", { class: "table table-sm mb-0" }, h("tbody", {}, course.legacy.map(x => h("tr", {}, h("th", { text: x.label }), h("td", { class: "text-end", text: x.value || "—" })))))
-        ));
+        return h("table", { class: "table table-sm mb-0" }, h("tbody", {}, course.legacy.map(x => h("tr", {}, h("th", { text: x.label }), h("td", { class: "text-end", text: x.value || "—" })))));
       }
-      return UI.empty("hourglass-split", "Tu profesor aún no publica la forma de evaluación de este grupo.");
+      return h("p", { class: "text-body-secondary small mb-0", text: "Tu profesor aún no publica la forma de evaluación." });
     }
-
-    const totalW = comps.reduce((s, c) => s + c.ponderacion, 0);
-    const evaluatedW = comps.reduce((s, c) => s + (course.items[c.id] && course.items[c.id].score10 !== null ? c.ponderacion : 0), 0);
-
-    const summary = h("div", { class: "row g-2 mb-3" },
-      h("div", { class: "col-6 col-md-4" }, h("div", { class: "card card-soft h-100" }, h("div", { class: "card-body py-2" },
-        h("div", { class: "small text-body-secondary", text: "Promedio actual" }),
-        h("div", { class: `fs-3 fw-bold ${course.final !== null && course.final < CONFIG.RISK_THRESHOLD ? "text-danger" : ""}`, text: Fmt.grade(course.final) }),
-        h("div", { class: "small text-body-secondary", text: `sobre ${Fmt.num(evaluatedW)}% evaluado` })))),
-      h("div", { class: "col-6 col-md-4" }, h("div", { class: "card card-soft h-100" }, h("div", { class: "card-body py-2" },
-        h("div", { class: "small text-body-secondary", text: "Si hoy cerrara el curso" }),
-        h("div", { class: "fs-3 fw-bold text-body-secondary", text: Fmt.grade(course.finalStrict) }),
-        h("div", { class: "small text-body-secondary", text: "lo pendiente cuenta 0" }))))
-    );
-
     const typeHint = { asistencia: "según tu asistencia", proyectos: "según tu equipo" };
     const rows = comps.map(comp => {
       const item = course.items[comp.id] || { score10: null, bonus: 0 };
@@ -849,24 +1025,19 @@ const Student = {
         h("td", { class: "text-start" }, h("div", { class: "fw-semibold", text: comp.nombre }),
           typeHint[comp.tipo] ? h("div", { class: "small text-body-secondary", text: typeHint[comp.tipo] }) : null,
           rawText ? h("div", { class: "small text-body-secondary", text: rawText }) : null),
-        h("td", { text: `${Fmt.num(comp.ponderacion)}%` }),
-        h("td", {}, Parts.gradeWithBonus(item, comp)),
-        h("td", { class: "text-body-secondary", text: item.score10 === null || !totalW ? "—" : Fmt.num(item.score10 * comp.ponderacion / totalW) })
-      );
+        h("td", { class: "text-body-secondary", text: `${Fmt.num(comp.ponderacion)}%` }),
+        h("td", {}, Parts.gradeWithBonus(item, comp)));
     });
-
-    const table = h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-cch table-hover" },
-      h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calificación" }), h("th", { text: "Aporte" }))),
-      h("tbody", {}, rows)));
-
     const hasBonus = comps.some(c => course.items[c.id] && course.items[c.id].bonus > 0);
-    const hint = hasBonus ? h("p", { class: "small text-body-secondary mt-2 mb-0" }, icon("info-circle", "me-1"), "Pasa el cursor o toca la etiqueta ", h("span", { class: "bonus-tag" }, icon("stars"), "+"), " para ver los puntos adicionales aplicados.") : null;
-
-    return h("div", {}, summary, table, hint);
+    return h("div", {},
+      h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-cch table-hover mb-0" },
+        h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calificación" }))),
+        h("tbody", {}, rows))),
+      hasBonus ? h("p", { class: "small text-body-secondary mt-2 mb-0" }, icon("info-circle", "me-1"), "Toca la etiqueta ", h("span", { class: "bonus-tag" }, icon("stars"), "+"), " para ver tus puntos extracurriculares.") : null);
   },
 
   renderTeams(course) {
-    if (!course.projects.length) return UI.empty("people", "No hay proyectos en equipo por ahora.");
+    if (!course.projects.length) return h("p", { class: "text-body-secondary small mb-0", text: "No hay proyectos en equipo por ahora." });
 
     return h("div", { class: "row g-3" }, course.projects.map(project => {
       let body;
@@ -880,7 +1051,6 @@ const Student = {
               : h("span", { class: "badge text-bg-secondary", text: "Por calificar" })),
           h("ul", { class: "list-unstyled small mb-2" }, t.members.map(m => h("li", {}, icon("person", "me-1"), h("span", { class: "mono me-1", text: m.cuenta }), m.nombre))),
           t.stars ? h("div", { class: "border-top pt-2" }, project.rubros.map(r => h("div", { class: "rubric-row small" }, h("span", { text: r }), Parts.starsReadonly(t.stars[r] || 0)))) : null,
-          t.observaciones ? h("div", { class: "alert alert-light border small mt-2 mb-0" }, icon("chat-left-quote", "me-1"), t.observaciones) : null
         );
       } else if (project.abierto) {
         body = Student.teamForm(project);
@@ -888,8 +1058,8 @@ const Student = {
         body = h("p", { class: "text-body-secondary small mb-0" }, icon("lock", "me-1"), "El registro está cerrado. Si no tienes equipo, habla con tu profesor.");
       }
 
-      return h("div", { class: "col-12 col-lg-6" }, h("div", { class: "card card-soft h-100" }, h("div", { class: "card-body" },
-        h("h2", { class: "h6 mb-1", text: project.nombre }),
+      return h("div", { class: "col-12 col-lg-6" }, h("div", { class: "mini-card h-100 p-3" }, h("div", {},
+        h("h3", { class: "h6 mb-1", text: project.nombre }),
         h("div", { class: "mb-3" }, project.rubros.map(r => h("span", { class: "chip", text: r }))),
         body)));
     }));
@@ -989,7 +1159,7 @@ const Student = {
               h("h3", { class: "h6 mb-1", text: ev.titulo }),
               h("div", { class: "small text-body-secondary", text: `${ev.grupo} · ${Fmt.date(ev.enviado)}` }),
               ev.estado === "Aplicada" ? h("div", { class: "ev-points mt-3" }, h("span", { class: "fs-4 fw-bold", text: `+${Fmt.num(ev.puntos)}` }), h("span", { class: "small ms-2", text: `en ${ev.componente || "un examen"}` })) : null,
-              ev.nota ? h("div", { class: "small mt-2 p-2 rounded bg-body-tertiary" }, icon("chat-left-text", "me-1"), ev.nota) : null)));
+              null)));
         }))
       : UI.empty("trophy", "Aún no registras actividades.");
 
@@ -1064,15 +1234,29 @@ const Admin = {
     else Admin.renderTab();
   },
 
+  /** Panel: primero lo guardado en caché (instantáneo), luego lo fresco del servidor. */
   async loadBoot() {
-    UI.loading($("adm-content"), "Cargando panel…");
-    try {
-      Admin.boot = await Api.call("adminBootstrap", {}, "admin");
+    const cached = Cache.get("boot");
+    if (cached) {
+      Admin.boot = cached.d;
       Admin.renderGroupSelect();
       Admin.updateEvidenceBadge(Admin.boot.pendingEvidence);
-      await Admin.loadGroup();
+      Admin.loadGroup();
+    } else {
+      UI.loading($("adm-content"), "Cargando panel…");
+    }
+    try {
+      const fresh = await Api.call("adminBootstrap", {}, "admin");
+      Cache.set("boot", fresh);
+      const changed = !cached || JSON.stringify(cached.d) !== JSON.stringify(fresh);
+      Admin.boot = fresh;
+      if (changed) {
+        Admin.renderGroupSelect();
+        Admin.updateEvidenceBadge(fresh.pendingEvidence);
+      }
+      if (!cached) await Admin.loadGroup();
     } catch (error) {
-      if (error.code !== "AUTH") $("adm-content").replaceChildren(UI.empty("wifi-off", error.message));
+      if (error.code !== "AUTH" && !cached) $("adm-content").replaceChildren(UI.empty("wifi-off", error.message));
     }
   },
 
@@ -1099,14 +1283,29 @@ const Admin = {
     Admin.dirty = new Map();
     Admin.compDraft = null;
     if (!id) { Admin.group = null; Admin.renderTab(); return; }
-    UI.loading($("adm-content"));
-    $("adm-toolbar").replaceChildren();
-    try {
-      Admin.group = await Api.call("groupData", { idCurso: id }, "admin");
-      Admin.renderStats();
+    const token = (Admin._loadToken = (Admin._loadToken || 0) + 1);
+    const cached = Cache.get("g:" + id);
+    if (cached) {
+      Admin.group = cached.d;
+      Admin.renderStats(true);
       Admin.renderTab();
+    } else {
+      UI.loading($("adm-content"));
+      $("adm-toolbar").replaceChildren();
+    }
+    try {
+      const fresh = await Api.call("groupData", { idCurso: id }, "admin");
+      if (token !== Admin._loadToken) return;          // el usuario ya cambió de grupo
+      Cache.set("g:" + id, fresh);
+      const changed = !cached || JSON.stringify(cached.d) !== JSON.stringify(fresh);
+      Admin.group = fresh;
+      Admin.renderStats(false);
+      if (!changed) return;
+      const busy = Admin.dirty.size || $("modal-generic").classList.contains("show");
+      if (busy) UI.toast("info", "Hay datos más recientes; se mostrarán al recargar.");
+      else Admin.renderTab();
     } catch (error) {
-      if (error.code !== "AUTH") $("adm-content").replaceChildren(UI.empty("exclamation-octagon", error.message));
+      if (error.code !== "AUTH" && !cached) $("adm-content").replaceChildren(UI.empty("exclamation-octagon", error.message));
     }
   },
 
@@ -1117,19 +1316,20 @@ const Admin = {
     return ok;
   },
 
-  renderStats() {
+  renderStats(refreshing) {
     const g = Admin.group;
     if (!g) return $("adm-stats").replaceChildren();
     const finals = g.students.map(s => s.final).filter(v => v !== null);
     const avg = finals.length ? finals.reduce((a, b) => a + b, 0) / finals.length : null;
     const risk = finals.filter(v => v < CONFIG.RISK_THRESHOLD).length;
     const faltas = g.students.filter(s => s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL).length;
-    $("adm-stats").replaceChildren(
+    $("adm-stats").replaceChildren(...kids(
       h("span", { class: "stat" }, icon("people"), h("b", { text: g.students.length })),
       h("span", { class: "stat", title: "Promedio del grupo (sobre lo evaluado)" }, icon("graph-up"), h("b", { text: Fmt.grade(avg) })),
       h("span", { class: "stat", title: `Promedio menor a ${CONFIG.RISK_THRESHOLD}` }, icon("exclamation-triangle", "text-danger"), h("b", { text: risk })),
-      h("span", { class: "stat", title: `Más de ${CONFIG.FALTAS_UMBRAL} faltas` }, icon("calendar-x", "text-danger"), h("b", { text: faltas }))
-    );
+      h("span", { class: "stat", title: `Más de ${CONFIG.FALTAS_UMBRAL} faltas` }, icon("calendar-x", "text-danger"), h("b", { text: faltas })),
+      refreshing ? h("span", { class: "stat text-body-secondary", title: "Mostrando datos guardados; actualizando…" }, h("span", { class: "spinner-border spinner-border-sm" })) : null
+    ));
   },
 
   renderTab() {
@@ -1685,7 +1885,10 @@ const Admin = {
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
       Admin.searchBox("Buscar…", draw),
-      h("span", { class: "small text-body-secondary d-none d-md-inline" }, icon("keyboard"), " Enter/↓ baja a la siguiente fila"),
+      h("button", { class: "btn btn-sm btn-outline-success", type: "button", title: "Descargar Excel con las calificaciones actuales", onclick: () => Admin.gradesTemplate() }, icon("file-earmark-spreadsheet", "me-1"), "Plantilla Excel"),
+      h("label", { class: "btn btn-sm btn-success mb-0", title: "Subir el Excel llenado" }, icon("upload", "me-1"), "Importar Excel",
+        h("input", { type: "file", accept: ".xlsx", class: "d-none", onchange: e => { const f = e.target.files[0]; e.target.value = ""; if (f) Admin.importGrades(f); } })),
+      h("span", { class: "small text-body-secondary d-none d-xl-inline" }, icon("keyboard"), " Enter/↓ baja"),
       h("div", { class: "ms-auto d-flex gap-2" }, discardBtn, saveBtn)));
 
     content.replaceChildren(...kids(
@@ -1698,6 +1901,86 @@ const Admin = {
         tbody)),
       manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
     ));
+  },
+
+  /** Excel con Cuenta, Nombre y una columna por componente manual (vacíos en amarillo). */
+  gradesTemplate() {
+    const g = Admin.group;
+    const comps = g.components.filter(c => c.tipo === "manual");
+    if (!comps.length) return UI.toast("warning", "Este grupo no tiene componentes manuales.");
+    const header = ["Cuenta", "Nombre"].concat(comps.map(c => c.nombre)).map(v => ({ v, s: "head" }));
+    const rows = g.students.map(st => [Number(st.cuenta), st.nombre].concat(comps.map(c => {
+      const it = st.items[c.id];
+      return it && it.base !== null && it.base !== undefined ? it.base : { v: "", s: "miss" };
+    })));
+    const help = [
+      [{ v: "Cómo usar esta plantilla", s: "head" }],
+      ["1. Llena las celdas amarillas (faltantes). Puedes corregir las demás."],
+      ["2. No cambies la columna Cuenta ni los títulos de los componentes."],
+      ["3. Escala: " + comps.map(c => `${c.nombre} 0–${c.maximo}`).join(" · ")],
+      ["4. En la web: Captura → Importar Excel. Las celdas vacías no borran nada."]
+    ];
+    Xlsx.download(Xlsx.write([
+      { name: g.group.label, rows: [header].concat(rows), widths: [13, 42].concat(comps.map(() => 13)), header: true },
+      { name: "Instrucciones", rows: help, widths: [90] }
+    ]), `Calificaciones_${Fmt.normalize(g.group.label).replace(/[^a-z0-9]+/g, "_")}.xlsx`);
+  },
+
+  /** Lee el Excel, empata por Cuenta y por nombre de componente, muestra resumen y guarda. */
+  async importGrades(file) {
+    const g = Admin.group;
+    let sheets;
+    try { sheets = await Xlsx.read(file); }
+    catch (error) { return UI.toast("danger", error.message); }
+    const key = v => Fmt.normalize(v).replace(/[\s_\-.]+/g, "");
+    const num = String(g.group.group || "");
+    const sheet = sheets.find(x => num && x.name.includes(num)) || sheets.find(x => !/instruc/i.test(x.name)) || sheets[0];
+    const header = (sheet.rows[0] || []).map(v => String(v ?? ""));
+    const iCuenta = header.findIndex(v => key(v) === "cuenta" || key(v).includes("cuenta"));
+    if (iCuenta === -1) return UI.toast("danger", `La hoja «${sheet.name}» no tiene la columna Cuenta.`);
+    const comps = g.components.filter(c => c.tipo === "manual");
+    const map = [], unknown = [];
+    header.forEach((v, i) => {
+      if (i === iCuenta || !v || key(v) === "nombre") return;
+      const c = comps.find(x => key(x.nombre) === key(v));
+      if (c) map.push({ i, c }); else unknown.push(v);
+    });
+    const byCuenta = {};
+    g.students.forEach(st => { byCuenta[st.cuenta] = st; });
+    const entries = [], notInGroup = [];
+    sheet.rows.slice(1).forEach(row => {
+      const cuenta = String(row[iCuenta] ?? "").replace(/\D/g, "");
+      if (!cuenta) return;
+      const st = byCuenta[cuenta];
+      if (!st) { notInGroup.push(cuenta); return; }
+      map.forEach(({ i, c }) => {
+        const raw = row[i];
+        if (raw === "" || raw === undefined || raw === null) return;
+        const val = typeof raw === "number" ? raw : Number(String(raw).replace(",", "."));
+        const cur = st.items[c.id] ? st.items[c.id].base : null;
+        if (cur !== null && cur !== undefined && Number(cur) === val) return;
+        entries.push({ cuenta, componentId: c.id, valor: String(raw).replace(",", ".") });
+      });
+    });
+    const ok = h("button", { class: "btn btn-success", type: "button", disabled: !entries.length }, icon("upload", "me-1"), `Guardar ${entries.length}`);
+    const m = UI.modal({
+      title: [icon("file-earmark-spreadsheet", "me-2"), "Importar calificaciones"],
+      body: h("div", { class: "small" },
+        h("p", {}, "Hoja ", h("b", { text: sheet.name }), ` · ${sheet.rows.length - 1} filas.`),
+        h("p", {}, "Columnas reconocidas: ", h("b", { text: map.map(x => x.c.nombre).join(", ") || "ninguna" })),
+        unknown.length ? h("p", { class: "text-warning-emphasis", text: `Se ignoran: ${unknown.join(", ")}` }) : null,
+        notInGroup.length ? h("p", { class: "text-warning-emphasis", text: `${notInGroup.length} cuenta(s) no están en el grupo: ${notInGroup.slice(0, 8).join(", ")}${notInGroup.length > 8 ? "…" : ""}` }) : null,
+        h("div", { class: "alert alert-light border mb-0" }, entries.length ? `Se guardarán ${entries.length} calificación(es) nuevas o cambiadas. Las celdas vacías no borran nada.` : "No hay cambios que guardar.")),
+      footer: [h("button", { class: "btn btn-secondary", type: "button", "data-bs-dismiss": "modal", text: "Cancelar" }), ok]
+    });
+    ok.addEventListener("click", async () => {
+      try {
+        const r = await UI.busy(ok, () => Api.call("saveGrades", { idCurso: g.group.id, entries }, "admin"));
+        UI.toast(r.errors.length ? "warning" : "success", r.message + (r.errors.length ? "\n" + r.errors.slice(0, 6).join("\n") : ""), 9000);
+        m.close();
+        Admin.loadGroup();
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+    });
   },
 
   async saveCapture(button) {
@@ -2039,7 +2322,7 @@ const Admin = {
     const comp = h("select", { class: "form-select form-select-sm", "aria-label": "Sumar a" },
       h("option", { value: "", text: comps.length ? "Sumar a…" : "Sin componentes manuales" }),
       comps.map(c => h("option", { value: c.id, selected: ev.componentId === c.id, text: `${c.nombre} (/${c.maximo})` })));
-    const note = h("input", { class: "form-control form-control-sm", maxlength: "500", value: ev.nota || "", placeholder: "Nota para el alumno (opcional)", "aria-label": "Nota" });
+    const note = h("input", { class: "form-control form-control-sm", maxlength: "500", value: ev.nota || "", placeholder: "Nota interna (el alumno no la ve)", "aria-label": "Nota interna" });
     const act = (estado, btn) => async () => {
       try {
         const r = await UI.busy(btn, () => Api.call("reviewEvidence", { id: ev.id, estado, puntos: points.value, componentId: comp.value, nota: note.value }, "admin"));
@@ -2314,15 +2597,16 @@ const Admin = {
     const reportOptions = selected => [h("option", { value: "", text: "(sin hoja)" })]
       .concat(boot.reports.map(r => h("option", { value: r.name, selected: r.name === selected, text: r.name })));
 
-    const rows = boot.groups.map(g => {
-      const label = h("input", { class: "form-control form-control-sm", value: g.label, maxlength: "60", "aria-label": "Etiqueta" });
+    const showAll = !!Admin.showAllCourses;
+    const list = boot.groups.filter(g => showAll || g.active || g.sheet);
+    const rows = list.map(g => {
       const sheet = h("select", { class: "form-select form-select-sm", "aria-label": "Hoja de reporte" }, reportOptions(g.sheet));
       const ciclo = h("input", { class: "form-control form-control-sm", value: g.ciclo, style: { width: "6rem" }, "aria-label": "Ciclo" });
       const active = h("input", { class: "form-check-input", type: "checkbox", checked: g.active, "aria-label": "Activo" });
       const save = h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Guardar" }, icon("save"));
       save.addEventListener("click", async () => {
         try {
-          const r = await UI.busy(save, () => Api.call("saveGroup", { idCurso: g.id, etiqueta: label.value, hojaReporte: sheet.value, ciclo: ciclo.value, activo: active.checked }, "admin"));
+          const r = await UI.busy(save, () => Api.call("saveGroup", { idCurso: g.id, hojaReporte: sheet.value, ciclo: ciclo.value, activo: active.checked }, "admin"));
           UI.toast("success", r.message);
           Admin.boot = await Api.call("adminBootstrap", {}, "admin");
           Admin.renderGroupSelect();
@@ -2330,7 +2614,7 @@ const Admin = {
         } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
       });
       return h("tr", {},
-        h("td", { class: "text-start", style: { minWidth: "180px" } }, label),
+        h("td", { class: "text-start fw-semibold", style: { minWidth: "160px" }, text: g.label }),
         h("td", { class: "mono small", text: g.id }),
         h("td", { style: { minWidth: "200px" } }, sheet),
         h("td", {}, ciclo),
@@ -2339,20 +2623,9 @@ const Admin = {
         h("td", {}, save));
     });
 
-    const configured = new Set(boot.groups.map(g => g.id));
-    const newCourse = h("select", { class: "form-select form-select-sm", "aria-label": "Curso para agregar" },
-      h("option", { value: "", text: "Agregar curso de la hoja Course…" }),
-      boot.courses.filter(c => !configured.has(c.id)).map(c => h("option", { value: c.id, text: `${c.name} · ${c.group} (${c.ciclo}) — ${c.id}` })));
-    const addBtn = h("button", { class: "btn btn-sm btn-primary", type: "button" }, icon("plus-lg"), " Agregar");
-    addBtn.addEventListener("click", async () => {
-      if (!newCourse.value) return;
-      try {
-        await UI.busy(addBtn, () => Api.call("saveGroup", { idCurso: newCourse.value, activo: true }, "admin"));
-        Admin.boot = await Api.call("adminBootstrap", {}, "admin");
-        Admin.renderGroupSelect();
-        Admin.renderTab();
-      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-    });
+    const hiddenCount = boot.groups.length - list.length;
+    const toggleAll = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", onclick: () => { Admin.showAllCourses = !showAll; Admin.renderTab(); } },
+      icon(showAll ? "eye-slash" : "eye", "me-1"), showAll ? "Solo grupos activos" : `Mostrar todos los cursos de Course (${hiddenCount} más)`);
 
     const createReport = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button" }, icon("file-earmark-plus", "me-1"), "Crear hoja Reporte_");
     createReport.addEventListener("click", () => {
@@ -2397,13 +2670,13 @@ const Admin = {
 
     content.replaceChildren(
       h("div", { class: "card card-soft mb-3" }, h("div", { class: "card-body" },
-        h("h2", { class: "h6", text: "Grupos de la web (hoja W_Grupos)" }),
-        h("p", { class: "small text-body-secondary mb-0", text: "Cada grupo es un ID_Curso de la hoja Course (que ya incluye el ciclo) ligado a su hoja Reporte_ de asistencia. Solo los grupos activos aparecen a los alumnos." }))),
+        h("h2", { class: "h6", text: "Grupos (hoja Course)" }),
+        h("p", { class: "small text-body-secondary mb-0", text: "Cada fila es un curso de Course. Las columnas Hoja_Reporte y Activo de Course definen su hoja de asistencia y si los alumnos lo ven." }))),
       h("div", { class: "table-wrap auto-h mb-3" }, h("table", { class: "table table-cch mb-0" },
-        h("thead", {}, h("tr", {}, ["Etiqueta", "ID_Curso", "Hoja Reporte_", "Ciclo", "Activo", "Alumnos", ""].map(t => h("th", { text: t })))),
+        h("thead", {}, h("tr", {}, ["Curso", "ID_Curso", "Hoja Reporte_", "Ciclo", "Activo", "Alumnos", ""].map(t => h("th", { text: t })))),
         h("tbody", {}, rows))),
       h("div", { class: "d-flex flex-wrap gap-2 align-items-center" },
-        h("div", { class: "d-flex gap-2", style: { minWidth: "280px", flex: "1 1 320px" } }, newCourse, addBtn),
+        toggleAll,
         createReport, diagnose,
         h("span", { class: "small text-body-secondary ms-auto", text: `API v${boot.version}` }))
     );
@@ -2504,7 +2777,17 @@ const Admin = {
     });
 
     const purge = h("input", { class: "form-check-input", type: "checkbox", id: "bk-purge", checked: true });
-    const keepCourses = h("input", { class: "form-check-input", type: "checkbox", id: "bk-keep" });
+    // Por defecto se conserva el histórico del alumno (inscripciones, comentarios, cursos)
+    const DEFAULT_WHAT = { attendance: true, reports: true, grades: true, students: false, comments: false, courses: false };
+    const what = {};
+    const parts = (info.purgeParts || []).map(pt => {
+      what[pt.key] = !!DEFAULT_WHAT[pt.key];
+      return h("div", { class: "form-check form-switch" },
+        h("input", { class: "form-check-input", type: "checkbox", id: `bk-${pt.key}`, checked: what[pt.key], onchange: e => { what[pt.key] = e.target.checked; } }),
+        h("label", { class: "form-check-label small", for: `bk-${pt.key}`, text: pt.label }));
+    });
+    const partsBox = h("div", { class: "purge-parts" }, parts);
+    purge.addEventListener("change", () => partsBox.classList.toggle("d-none", !purge.checked));
     const preview = h("div", { class: "small" });
     const selected = () => Object.keys(checks).filter(k => checks[k].checked);
 
@@ -2531,15 +2814,16 @@ const Admin = {
           body: h("div", {},
             h("p", {}, "Se generará un Excel por ciclo (", h("b", { text: cycles.join(", ") }), ") dentro de un ZIP en la carpeta ", h("b", { text: info.folder.name }), " de Drive."),
             h("div", { class: "alert alert-danger py-2 small mb-0" },
-              "Solo si el ZIP queda guardado, se borrarán de la hoja de cálculo: inscripciones (Students), asistencias (Attendance Log), Calificaciones, Roles, " +
-              (keepCourses.checked ? "" : "los cursos (Course), ") + "las hojas Reporte_ ligadas y todo lo de la web de esos grupos. " +
-              "Antes se guarda un resumen por alumno en W_Historial. Desde la web no se puede deshacer; para recuperar, usa el Excel del ZIP."))
+              h("div", { text: "Solo si el ZIP queda guardado, se borrará de esos ciclos:" }),
+              h("ul", { class: "mb-1" }, info.purgeParts.filter(pt => what[pt.key]).map(pt => h("li", { text: pt.label }))),
+              h("div", { text: "Se conserva: " + (info.purgeParts.filter(pt => !what[pt.key]).map(pt => pt.label).join(", ") || "nada") + "." }),
+              h("div", { text: "Siempre se guarda un resumen por alumno en W_Historial." })))
         });
         if (!ok) return;
         confirm = info.confirmWord;
       }
       try {
-        const r = await UI.busy(backupBtn, () => Api.call("backupCycles", { cycles, purge: purge.checked, keepCourses: keepCourses.checked, confirm }, "admin"));
+        const r = await UI.busy(backupBtn, () => Api.call("backupCycles", { cycles, purge: purge.checked, what, confirm }, "admin"));
         UI.modal({
           title: [icon("check-circle-fill", "text-success me-2"), "Respaldo listo"],
           body: h("div", {}, h("p", { text: r.message }),
@@ -2556,8 +2840,8 @@ const Admin = {
       h("div", { class: "table-wrap auto-h mb-2" }, h("table", { class: "table table-sm table-cch mb-0" },
         h("thead", {}, h("tr", {}, ["", "Ciclo", "Cursos", "Inscrip.", "Asistencias", "Reportes"].map(t => h("th", { text: t })))),
         h("tbody", {}, cycleRows))),
-      h("div", { class: "form-check form-switch" }, purge, h("label", { class: "form-check-label", for: "bk-purge", text: "Borrar esos ciclos después de respaldar" })),
-      h("div", { class: "form-check form-switch mb-2" }, keepCourses, h("label", { class: "form-check-label", for: "bk-keep", text: "Conservar los cursos en la hoja Course" })),
+      h("div", { class: "form-check form-switch" }, purge, h("label", { class: "form-check-label fw-semibold", for: "bk-purge", text: "Borrar después de respaldar:" })),
+      partsBox,
       preview,
       h("div", { class: "d-flex gap-2 justify-content-end mt-2" }, previewBtn, backupBtn)));
 

@@ -1,4 +1,4 @@
-# Dashboard CCH v6.2 · Instalación y ajustes
+# Dashboard CCH v6.3 · Instalación y ajustes
 
 ## Archivos
 
@@ -14,6 +14,15 @@
 3. Sube `index.html`, `estilo.css` y `script.js` a GitHub.
 
 La migración ya se ejecutó en tu hoja y **ya no forma parte del código**.
+
+### Course y W_Grupos ahora son una sola hoja (v6.3)
+
+Al entrar por primera vez como admin con esta versión, se hace solo:
+
+1. Se agregan a **Course** dos columnas: **Hoja_Reporte** (la hoja Reporte_ del grupo) y **Activo** (TRUE/FALSE).
+2. Se copian los datos de **W_Grupos** y esa hoja **se borra**.
+
+En **AppSheet**: Data → Course → **Regenerate schema**. Pon `Hoja_Reporte` como **Text** y `Activo` como **Yes/No**; `Ciclo_Escolar` debe quedar como **Text**.
 
 ## ✏️ Cómo ajustar (al inicio de `Codigo.gs`, busca «AJUSTA AQUÍ»)
 
@@ -45,6 +54,37 @@ En la web, pestaña **Asistencia → botón «Columnas»**:
 
 > En `Reporte_ESTADISTICA_512` la fórmula vieja de **Parcial_1** leía la columna de **Parcial_2** de Calificaciones. Al enlazar desde la web queda corregido.
 
+## Capturar calificaciones desde Excel
+
+En **Captura**:
+
+- **Plantilla Excel** descarga el grupo con Cuenta, Nombre y una columna por componente manual. Las celdas vacías salen en amarillo.
+- **Importar Excel** lee el archivo, empata por **Cuenta** y por el **título** de cada columna, y muestra un resumen antes de guardar. Las celdas vacías no borran nada.
+- Si el archivo tiene varias hojas, toma la que tenga el número del grupo en su nombre (ej. «Estadística 504»).
+
+## Respaldo por ciclo: qué se borra
+
+Cada parte tiene su interruptor. Por defecto se **conserva el histórico del alumno**:
+
+| Parte | Por defecto |
+|---|---|
+| Asistencias (Attendance Log) | se borra |
+| Hojas Reporte_ de esos grupos | se borra |
+| Calificaciones, proyectos y evidencias de la web | se borra |
+| Inscripciones (Students y Roles) | **se conserva** |
+| Comentarios | **se conserva** |
+| Cursos (Course) | **se conserva** |
+
+Siempre se guarda primero el ZIP y un resumen por alumno en W_Historial.
+
+## Lo que ve el alumno
+
+Dos pestañas: **Mi avance** (una sola tarjeta con asistencia, calificaciones por componente y su equipo con estrellas) y **Extracurriculares**. **Nunca** ve comentarios, observaciones de equipo, notas de evidencias ni promedios calculados.
+
+## Carga rápida del panel (caché)
+
+El panel guarda en este navegador lo último que viste de cada grupo. Al abrirlo, se muestra **al instante** y se actualiza en segundo plano; un pequeño indicador ↻ aparece mientras tanto. La caché se borra sola al guardar cualquier cambio y al presionar **Salir**. En una computadora compartida, desactívala en Preferencias («carga instantánea»).
+
 ## Alumnos nuevos (incluye Acta complementaria)
 
 **Asistencia → + Alumno**: cuenta, nombre (vacío = se toma de Students si ya existe) y **Estatus** (Regular, Acta complementaria…). Se agrega:
@@ -61,7 +101,7 @@ El estatus se cambia desde la ficha del alumno. La función «Buscar alumnos dup
 |---|---|---|
 | Course, Students, Attendance Log, Roles | **Sí** | AppSheet pasa lista ahí con el QR. |
 | Reporte_* | **Sí (recomendado)** | Son la asistencia oficial del grupo y te las piden. El botón **Exportar** de la web genera además un reporte con calificaciones. |
-| W_* | Sí | Todo lo de la web. |
+| W_* | Sí | Todo lo de la web (ya no existe W_Grupos: está dentro de Course). |
 | Calificaciones | Opcional | Primero enlaza las columnas del reporte (botón «Columnas») para que ya no dependan de ella. Después bórrala a mano y quítala de AppSheet. El botón «Importar de Calificaciones» de Ponderaciones solo funciona mientras exista. |
 | Proyectos | Ya se borró | Está en la web. |
 | Asesorias | Tú decides | El sistema no la usa. |
