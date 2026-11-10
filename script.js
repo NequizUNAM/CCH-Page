@@ -374,6 +374,181 @@ const Parts = {
 };
 
 /* ============================================================
+   EXPORTAR A PSI (psi.cch.unam.mx)
+   Calcula sugerencias por alumno y genera un JS que se pega en la
+   consola de la página del grupo en PSI. Empata por número de cuenta
+   (solo dígitos). No presiona "Guardar": el profesor revisa y guarda.
+   Campos PSI: c_ (avance), a_ (% asistencia), tareas_, dificultades_,
+   asistencias_, atenci1-4 + motivo1-4 (derivación), r_ (riesgo).
+   ============================================================ */
+const Psi = {
+  // Palabras en tus comentarios que sugieren situación psicoemocional
+  KEYWORDS: /ansiedad|depresi|emocion|psic|autis|internad|hospital|salud|duelo|famili|enferm|crisis|bullying|acoso|llant|estr[eé]s|tdah|discapacidad|violencia/i,
+  TAREAS: { "-1": "—", "1": "SI", "0": "NO", "4": "OCASIONAL", "5": "NO SE DEJAN" },
+  RIESGO: { "0": ["Ninguno", "text-bg-light border"], "1": ["Bajo", "text-bg-info"], "2": ["Medio", "text-bg-warning"], "3": ["Alto", "text-bg-danger"] },
+  AREAS: { 1: "Tutoría", 2: "Asesoría", 3: "Psicopedagogía", 4: "Actividad extracurricular" },
+
+  /** Faltas seguidas al final (ignora días sin lista). */
+  trailingAbsences(statuses) {
+    let n = 0;
+    for (let i = statuses.length - 1; i >= 0; i--) {
+      const k = Fmt.normalize(statuses[i]);
+      if (!k || k === "n/d") continue;
+      if (k === "falta") n++; else break;
+    }
+    return n;
+  },
+
+  suggest(s, opts) {
+    const c = s.counts || { asistencia: 0, falta: 0, justificante: 0 };
+    const total = c.asistencia + c.falta;
+    const pct = total ? Math.round(c.asistencia / total * 100) : null;
+    const streak = Psi.trailingAbsences(s.statuses || []);
+    const final = s.final;
+
+    let asis = "";
+    if (total && c.asistencia === 0) asis = "Nunca se presentó";
+    else if (total && streak >= opts.dejoN) asis = "Dejó de asistir";
+    else if (c.falta > 3) asis = "Más de tres faltas";
+    else if (total) asis = "Asiste siempre";
+
+    const avance = asis === "Nunca se presentó" ? "NP"
+      : final === null || final === undefined ? "" : String(Math.min(10, Math.max(5, Math.round(final))));
+
+    let tareas = "-1";
+    if (opts.tareas === "none") tareas = "5";
+    else if (opts.tareas) {
+      const it = s.items[opts.tareas];
+      const v = it ? it.score10 : null;
+      tareas = v === null || v === undefined ? "-1" : v >= 8 ? "1" : v >= 5 ? "4" : "0";
+    }
+
+    const psico = Psi.KEYWORDS.test((s.notas || []).join(" "));
+    const low = final !== null && final !== undefined && final < 6;
+    const dif = psico ? "Psicoemocional" : (low || tareas === "0") ? "Académico" : (total || final !== null) ? "Ninguno" : "";
+
+    let score = 0;
+    if (low) score += 2; else if (final !== null && final < 7) score += 1;
+    if (asis === "Nunca se presentó" || asis === "Dejó de asistir") score += 3;
+    else if (c.falta > 3) score += 2; else if (c.falta >= 2) score += 1;
+    if (tareas === "0") score += 1;
+    if (psico) score += 1;
+    const r = score >= 4 ? "3" : score >= 2 ? "2" : score >= 1 ? "1" : "0";
+
+    const m = {};
+    if (c.falta > 3 || asis === "Dejó de asistir" || asis === "Nunca se presentó") {
+      m[1] = `${c.falta} faltas${pct !== null ? ` (${pct}% asistencia)` : ""}; seguimiento de asistencia`;
+    }
+    if (low) {
+      const weak = opts.components
+        .filter(cp => s.items[cp.id] && s.items[cp.id].score10 !== null && cp.ponderacion > 0)
+        .sort((a, b) => s.items[a.id].score10 - s.items[b.id].score10)[0];
+      m[2] = `Promedio ${final.toFixed(1)}${weak ? `; reforzar ${weak.nombre}` : ""}`;
+    }
+    if (psico) m[3] = "Situación psicoemocional reportada por el docente";
+    if (opts.extra && final !== null && final >= 9 && (pct === null || pct >= 90)) m[4] = "Buen desempeño; invitar a actividad extracurricular";
+
+    return { cuenta: String(s.cuenta).replace(/\D/g, ""), nombre: s.nombre, c: avance, a: pct, t: tareas, d: dif, s: asis, r, m, final, faltas: c.falta };
+  },
+
+  /** Texto sugerido para «Observaciones generales» y «Acciones a realizar». */
+  groupText(rows, g) {
+    const n = rows.length;
+    const withPct = rows.filter(x => x.a !== null);
+    const avgPct = withPct.length ? Math.round(withPct.reduce((a, x) => a + x.a, 0) / withPct.length) : null;
+    const finals = rows.map(x => x.final).filter(v => v !== null && v !== undefined);
+    const avg = finals.length ? (finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1) : null;
+    const cnt = f => rows.filter(f).length;
+    const destacados = cnt(x => x.final >= 9 && (x.a === null || x.a >= 90));
+    const regulares = cnt(x => x.s === "Asiste siempre");
+    const faltas = cnt(x => x.s === "Más de tres faltas");
+    const dejo = cnt(x => x.s === "Dejó de asistir");
+    const nunca = cnt(x => x.s === "Nunca se presentó");
+    const bajos = cnt(x => x.final !== null && x.final < 6);
+    const psico = cnt(x => x.d === "Psicoemocional");
+    const alto = cnt(x => x.r === "3");
+    const weak = {};
+    rows.forEach(x => { const m = x.m[2] && x.m[2].match(/reforzar (.+)$/); if (m) weak[m[1]] = (weak[m[1]] || 0) + 1; });
+    const weakTop = Object.keys(weak).sort((a, b) => weak[b] - weak[a])[0];
+
+    const fort = [];
+    if (regulares) fort.push(`${regulares} de ${n} asisten con regularidad`);
+    if (destacados) fort.push(`${destacados} con desempeño destacado (promedio ≥ 9)`);
+    const prob = [];
+    if (faltas) prob.push(`${faltas} con más de tres faltas`);
+    if (dejo) prob.push(`${dejo} dejaron de asistir`);
+    if (nunca) prob.push(`${nunca} nunca se presentaron`);
+    if (bajos) prob.push(`${bajos} con promedio menor a 6${weakTop ? ` (principalmente en ${weakTop})` : ""}`);
+    if (psico) prob.push(`${psico} con situación psicoemocional reportada`);
+
+    const obs = `Grupo de ${n} alumnos.` +
+      (avgPct !== null ? ` Asistencia promedio ${avgPct}%.` : "") +
+      (avg !== null ? ` Promedio actual del grupo ${avg}.` : "") +
+      (fort.length ? ` Fortalezas: ${fort.join("; ")}.` : "") +
+      (prob.length ? ` Problemáticas: ${prob.join("; ")}.` : " Sin problemáticas relevantes.") +
+      (alto ? ` ${alto} alumno(s) en riesgo alto.` : "");
+
+    const acc = [];
+    if (faltas + dejo + nunca) acc.push(`Tutoría y seguimiento de asistencia a ${faltas + dejo + nunca} alumno(s); contactar a quienes dejaron de asistir.`);
+    if (bajos) acc.push(`Asesoría académica a ${bajos} alumno(s)${weakTop ? `, reforzando ${weakTop}` : ""}.`);
+    if (psico) acc.push(`Canalizar a psicopedagogía a ${psico} alumno(s).`);
+    acc.push("Continuar con evaluación continua y retroalimentación oportuna.");
+    return { obs, acc: acc.join(" ") };
+  },
+
+  /** JS para pegar en la consola de PSI. */
+  script(rows, meta) {
+    const data = {};
+    rows.forEach(x => { data[x.cuenta] = { c: x.c, a: x.a, t: x.t, d: x.d, s: x.s, r: x.r, m: x.m }; });
+    return `// Dashboard CCH → PSI · ${meta.label} · grupo ${meta.grupo} · ${meta.periodo} · ${new Date().toLocaleString("es-MX")}
+// Pega en la consola (F12) de la página del grupo en psi.cch.unam.mx. NO guarda: revisa y presiona "Guardar".
+(() => {
+  const DATA = ${JSON.stringify(data)};
+  const dig = v => String(v || "").replace(/\\D/g, "");
+  const set = (name, v) => {
+    const el = document.querySelector('[name="' + name + '"]');
+    if (!el || v === undefined || v === null || v === "") return;
+    el.value = String(v);
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const enPSI = [...document.querySelectorAll('select[name^="c_"]')].map(s => dig(s.name));
+  if (!enPSI.length) { console.warn("No encontré el formulario de PSI en esta página."); return; }
+  const G = ${JSON.stringify(meta.header || {})};
+  if (G.fecha) set("fecha", G.fecha);
+  if (G.tipo !== undefined) set("tipo", G.tipo);
+  if (G.obs) set("observaciones", G.obs);
+  if (G.acc) set("acciones", G.acc);
+  let llenados = 0; const sinDatos = [];
+  enPSI.forEach(c => {
+    const d = DATA[c];
+    if (!d) { sinDatos.push(c); return; }
+    set("c_" + c, d.c); set("a_" + c, d.a); set("tareas_" + c, d.t);
+    set("dificultades_" + c, d.d); set("asistencias_" + c, d.s); set("r_" + c, d.r);
+    [1, 2, 3, 4].forEach(k => {
+      const cb = document.getElementById("atenci" + k + "_" + c);
+      const mo = document.getElementById("motivo" + k + "_" + c);
+      if (!cb || !mo) return;
+      const motivo = d.m && d.m[k];
+      cb.checked = !!motivo; mo.disabled = !motivo; mo.value = motivo || "";
+    });
+    llenados++;
+  });
+  const fuera = Object.keys(DATA).filter(c => !enPSI.includes(c));
+  const msg = "Dashboard CCH: " + llenados + " de " + enPSI.length + " alumnos llenados." +
+    (sinDatos.length ? " Sin datos: " + sinDatos.join(", ") + "." : "") +
+    (fuera.length ? " No están en PSI: " + fuera.join(", ") + "." : "") + " Revisa y presiona Guardar.";
+  console.log(msg);
+  const bar = document.createElement("div");
+  bar.textContent = msg;
+  bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#198754;color:#fff;padding:10px 16px;font:600 14px Arial;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.2)";
+  bar.onclick = () => bar.remove();
+  document.body.appendChild(bar);
+})();
+`;
+  }
+};
+
+/* ============================================================
    APLICACIÓN: vistas, sesión, preferencias
    ============================================================ */
 const App = {
@@ -761,17 +936,18 @@ const Student = {
 
   renderEvidence() {
     const data = Student.data;
+    const typeIcon = { Extracurricular: "trophy", Evento: "calendar-event", Proyecto: "kanban", Actividad: "activity", Otro: "three-dots" };
     const courseSelect = h("select", { class: "form-select", id: "ev-course", required: true },
       data.courses.map((c, i) => h("option", { value: c.idCurso, selected: i === Student.courseIndex, text: c.label })));
     const type = h("select", { class: "form-select", id: "ev-type" }, data.evidenceTypes.map(t => h("option", { value: t, text: t })));
-    const title = h("input", { class: "form-control", id: "ev-title", required: true, maxlength: "120", placeholder: "Ej. Asistí a la Feria de Matemáticas" });
+    const title = h("input", { class: "form-control", id: "ev-title", required: true, maxlength: "120", placeholder: "Ej. Feria de Matemáticas, torneo, taller…" });
     const desc = h("textarea", { class: "form-control", id: "ev-desc", rows: "2", maxlength: "1000", placeholder: "¿Qué hiciste? (opcional)" });
     const file = h("input", { class: "form-control", type: "file", id: "ev-file", accept: "image/*,application/pdf" });
-    const link = h("input", { class: "form-control", type: "url", id: "ev-link", placeholder: "https://… (opcional si subes archivo)" });
-    const submit = h("button", { class: "btn btn-primary", type: "submit" }, icon("cloud-arrow-up", "me-1"), "Enviar evidencia");
+    const link = h("input", { class: "form-control", type: "url", id: "ev-link", placeholder: "https://… (opcional)" });
+    const submit = h("button", { class: "btn btn-primary px-4", type: "submit" }, icon("send", "me-1"), "Enviar");
 
     const form = h("form", {
-      class: "card card-soft mb-3",
+      class: "card card-soft ev-form mb-4",
       onsubmit: async e => {
         e.preventDefault();
         if (!data.courses.length) return UI.toast("warning", "No tienes grupos activos.");
@@ -779,7 +955,7 @@ const Student = {
           await UI.busy(submit, async () => {
             const payload = { idCurso: courseSelect.value, tipo: type.value, titulo: title.value, descripcion: desc.value, link: link.value.trim() };
             if (file.files[0]) payload.file = await Student.readFile(file.files[0], data.maxFileMb);
-            if (!payload.file && !payload.link) throw new Error("Adjunta un archivo o escribe un enlace.");
+            if (!payload.file && !payload.link) throw new Error("Adjunta una foto/PDF o escribe un enlace.");
             const r = await Api.call("uploadEvidence", payload, "student");
             UI.toast("success", r.message);
           });
@@ -790,33 +966,34 @@ const Student = {
         }
       }
     },
+      h("div", { class: "card-header ev-form-header" }, icon("trophy", "me-2"), h("span", { class: "fw-semibold", text: "Registrar actividad extracurricular" })),
       h("div", { class: "card-body" },
-        h("h2", { class: "h6", text: "Nueva evidencia" }),
-        h("p", { class: "small text-body-secondary", text: "Sube una foto o PDF de tu participación en eventos o proyectos. Tu profesor decide si te suma puntos y a qué examen." }),
-        h("div", { class: "row g-2" },
-          h("div", { class: "col-md-6" }, h("label", { class: "form-label small", for: "ev-course", text: "Grupo" }), courseSelect),
-          h("div", { class: "col-md-6" }, h("label", { class: "form-label small", for: "ev-type", text: "Tipo" }), type),
-          h("div", { class: "col-12" }, h("label", { class: "form-label small", for: "ev-title", text: "Título" }), title),
-          h("div", { class: "col-12" }, h("label", { class: "form-label small", for: "ev-desc", text: "Descripción" }), desc),
-          h("div", { class: "col-md-6" }, h("label", { class: "form-label small", for: "ev-file", text: `Archivo (imagen o PDF, máx. ${data.maxFileMb} MB)` }), file),
-          h("div", { class: "col-md-6" }, h("label", { class: "form-label small", for: "ev-link", text: "o enlace" }), link)
-        ),
-        h("div", { class: "text-end mt-3" }, submit))
-    );
+        h("div", { class: "row g-3" },
+          h("div", { class: "col-md-6" }, h("label", { class: "form-label small fw-semibold", for: "ev-course", text: "Grupo" }), courseSelect),
+          h("div", { class: "col-md-6" }, h("label", { class: "form-label small fw-semibold", for: "ev-type", text: "Tipo" }), type),
+          h("div", { class: "col-12" }, h("label", { class: "form-label small fw-semibold", for: "ev-title", text: "Actividad" }), title),
+          h("div", { class: "col-12" }, h("label", { class: "form-label small fw-semibold", for: "ev-desc", text: "Descripción" }), desc),
+          h("div", { class: "col-md-6" }, h("label", { class: "form-label small fw-semibold", for: "ev-file" }, icon("image", "me-1"), `Foto o PDF (máx. ${data.maxFileMb} MB)`), file),
+          h("div", { class: "col-md-6" }, h("label", { class: "form-label small fw-semibold", for: "ev-link" }, icon("link-45deg", "me-1"), "o enlace"), link))),
+      h("div", { class: "card-footer bg-transparent border-0 text-end pt-0 pb-3 px-3" }, submit));
 
-    const badge = { Pendiente: "text-bg-secondary", Aplicada: "text-bg-success", Rechazada: "text-bg-danger" };
+    const state = { Pendiente: ["warning", "hourglass-split", "En revisión"], Aplicada: ["success", "check-circle-fill", "Puntos aplicados"], Rechazada: ["danger", "x-circle-fill", "No aplica"] };
     const list = data.evidences.length
-      ? h("div", { class: "vstack gap-2" }, data.evidences.map(ev => h("div", { class: "card card-soft" }, h("div", { class: "card-body py-2" },
-          h("div", { class: "d-flex justify-content-between align-items-start gap-2" },
-            h("div", {}, h("div", { class: "fw-semibold", text: ev.titulo }),
-              h("div", { class: "small text-body-secondary", text: `${ev.tipo} · ${ev.grupo} · ${Fmt.date(ev.enviado)}` })),
-            h("span", { class: `badge ${badge[ev.estado] || "text-bg-secondary"}`, text: ev.estado })),
-          ev.estado === "Aplicada" ? h("div", { class: "small mt-1 text-success-emphasis" }, icon("stars", "me-1"), `+${Fmt.num(ev.puntos)} punto(s) en ${ev.componente || "un examen"} · ${Fmt.date(ev.aplicado)}`) : null,
-          ev.nota ? h("div", { class: "small mt-1" }, icon("chat-left-text", "me-1"), ev.nota) : null
-        ))))
-      : UI.empty("cloud", "Aún no has enviado evidencias.");
+      ? h("div", { class: "row g-3" }, data.evidences.map(ev => {
+          const [color, ic, label] = state[ev.estado] || state.Pendiente;
+          return h("div", { class: "col-12 col-md-6 col-xl-4" }, h("div", { class: `card card-soft ev-card h-100 border-start border-4 border-${color}` },
+            h("div", { class: "card-body" },
+              h("div", { class: "d-flex justify-content-between align-items-start gap-2 mb-2" },
+                h("span", { class: "ev-type" }, icon(typeIcon[ev.tipo] || "star", "me-1"), ev.tipo),
+                h("span", { class: `badge text-bg-${color}` }, icon(ic, "me-1"), label)),
+              h("h3", { class: "h6 mb-1", text: ev.titulo }),
+              h("div", { class: "small text-body-secondary", text: `${ev.grupo} · ${Fmt.date(ev.enviado)}` }),
+              ev.estado === "Aplicada" ? h("div", { class: "ev-points mt-3" }, h("span", { class: "fs-4 fw-bold", text: `+${Fmt.num(ev.puntos)}` }), h("span", { class: "small ms-2", text: `en ${ev.componente || "un examen"}` })) : null,
+              ev.nota ? h("div", { class: "small mt-2 p-2 rounded bg-body-tertiary" }, icon("chat-left-text", "me-1"), ev.nota) : null)));
+        }))
+      : UI.empty("trophy", "Aún no registras actividades.");
 
-    return h("div", {}, form, h("h2", { class: "h6 mb-2", text: "Mis evidencias" }), list);
+    return h("div", {}, form, h("h2", { class: "h6 text-uppercase text-body-secondary mb-3", text: "Mis actividades" }), list);
   },
 
   /** Lee un archivo a base64; reduce fotos grandes para que suban rápido desde el celular. */
@@ -1008,6 +1185,10 @@ const Admin = {
       wrap.append(badges);
     }
     if (s.comments) wrap.append(h("span", { class: "badge text-bg-warning", title: `${s.comments} comentario(s)` }, icon("chat-left-text"), ` ${s.comments}`));
+    if (s.status) {
+      const label = ((Admin.group && Admin.group.statuses) || []).find(x => x.value === s.status);
+      wrap.append(h("span", { class: "badge status-badge", title: label ? label.label : s.status, text: s.status }));
+    }
 
     const td = h("td", { class: "text-start name-cell" }, wrap);
     if (same.length) td.classList.add("has-same");
@@ -1065,16 +1246,25 @@ const Admin = {
     draw();
 
     const th = (text, visible, cls = "") => h("th", { class: `${cls} ${visible === false ? "col-hidden" : ""}`, title: visible === false ? "Oculto para alumnos" : null, text });
+    // Columna enlazada → encabezado clicable que lleva a su componente o proyecto
+    const linkTh = (text, visible) => {
+      const link = (g.columns || []).find(l => Fmt.normalize(l.columna) === Fmt.normalize(text));
+      if (!link) return th(text, visible);
+      return h("th", { class: `col-linked ${visible === false ? "col-hidden" : ""}`, title: `Enlazada a ${link.label} · clic para abrir` },
+        h("button", { type: "button", class: "th-link", onclick: () => Admin.goToLink(link) }, icon("link-45deg", "me-1"), text));
+    };
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
       Admin.searchBox("Buscar cuenta o nombre…", draw),
       h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Descargar reporte (Excel/CSV)", onclick: () => Admin.exportGroup() }, icon("download", "me-1"), "Exportar"),
+      h("button", { class: "btn btn-sm btn-success", type: "button", title: "Llenar el formulario de PSI", onclick: () => Admin.psiModal() }, icon("send-check", "me-1"), "Exportar a PSI"),
       h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
+      h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas"),
       h("div", { class: "ms-auto d-flex flex-column gap-1 align-items-end" }, Parts.legend(), Admin.linksLegend())));
 
     content.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch att-table" },
       h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start"), th("F", true), th("J", true),
-        dateCols.map(x => th(x.d.label, x.d.visible)), otherCols.map(x => th(x.o.label, x.o.visible)))),
+        dateCols.map(x => th(x.d.label, x.d.visible)), otherCols.map(x => linkTh(x.o.label, x.o.visible)))),
       tbody)));
   },
 
@@ -1101,23 +1291,207 @@ const Admin = {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   },
 
+  psiModal() {
+    const g = Admin.group;
+    const manual = g.components.filter(c => c.tipo === "manual");
+    const auto = manual.find(c => /tarea|teams|activ|sello|ejercicio/i.test(c.nombre));
+    const opts = { tareas: auto ? auto.id : "none", extra: false, dejoN: 3, components: g.components };
+
+    const tareasSel = h("select", { class: "form-select form-select-sm", id: "psi-tareas" },
+      manual.map(c => h("option", { value: c.id, selected: opts.tareas === c.id, text: c.nombre })),
+      h("option", { value: "none", selected: opts.tareas === "none", text: "No se dejan tareas" }));
+    const extra = h("input", { class: "form-check-input", type: "checkbox", id: "psi-extra" });
+    const pad = n => String(n).padStart(2, "0");
+    const now = new Date();
+    const fecha = h("input", { type: "date", class: "form-control form-control-sm", id: "psi-fecha", value: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` });
+    const tipo = h("select", { class: "form-select form-select-sm", id: "psi-tipo" }, h("option", { value: "0", text: "Parcial" }), h("option", { value: "1", text: "Final" }));
+    const obsTxt = h("textarea", { class: "form-control form-control-sm", rows: "3", id: "psi-obs" });
+    const accTxt = h("textarea", { class: "form-control form-control-sm", rows: "3", id: "psi-acc" });
+    let edited = false;
+    [obsTxt, accTxt].forEach(t => t.addEventListener("input", () => { edited = true; refreshCode(); }));
+    [fecha, tipo].forEach(t => t.addEventListener("change", () => refreshCode()));
+    let lastRows = [];
+    const refreshCode = () => {
+      code.value = Psi.script(lastRows, {
+        label: g.group.label, grupo: g.psi ? g.psi.grupo : "", periodo: g.psi ? g.psi.periodo : g.group.ciclo,
+        header: { fecha: fecha.value, tipo: tipo.value, obs: obsTxt.value.trim(), acc: accTxt.value.trim() }
+      });
+    };
+    const body = h("div");
+    const code = h("textarea", { class: "form-control mono small", rows: "6", readonly: true, "aria-label": "Código JS" });
+
+    const draw = () => {
+      opts.tareas = tareasSel.value;
+      opts.extra = extra.checked;
+      const rows = g.students.map(st => Psi.suggest(st, opts));
+      lastRows = rows;
+      if (!edited) {
+        const t = Psi.groupText(rows, g);
+        obsTxt.value = t.obs;
+        accTxt.value = t.acc;
+      }
+      refreshCode();
+
+      const count = k => rows.filter(x => x.r === k).length;
+      body.replaceChildren(
+        h("div", { class: "d-flex flex-wrap gap-2 mb-2" }, ["3", "2", "1", "0"].map(k => h("span", { class: `badge ${Psi.RIESGO[k][1]}`, text: `Riesgo ${Psi.RIESGO[k][0]}: ${count(k)}` }))),
+        h("div", { class: "table-wrap auto-h", style: { maxHeight: "48vh" } }, h("table", { class: "table table-sm table-cch mb-0" },
+          h("thead", {}, h("tr", {}, ["Cuenta", "Nombre", "Avance", "% Asist.", "Tareas", "Dificultades", "Asistencias", "Riesgo", "Derivación"].map((t, i) => h("th", { class: i === 1 || i === 8 ? "text-start" : "", text: t })))),
+          h("tbody", {}, rows.map(x => h("tr", {},
+            h("td", { class: "mono", text: x.cuenta }),
+            h("td", { class: "text-start name-cell", title: x.nombre, text: x.nombre }),
+            h("td", { class: x.c === "NP" || Number(x.c) < 6 ? "text-danger fw-bold" : "fw-semibold", text: x.c || "—" }),
+            h("td", { text: x.a === null ? "—" : `${x.a}%` }),
+            h("td", { text: Psi.TAREAS[x.t] }),
+            h("td", { text: x.d || "—" }),
+            h("td", { class: x.s && x.s !== "Asiste siempre" ? "text-danger" : "", text: x.s || "—" }),
+            h("td", {}, h("span", { class: `badge ${Psi.RIESGO[x.r][1]}`, text: Psi.RIESGO[x.r][0] })),
+            h("td", { class: "text-start" }, Object.keys(x.m).length
+              ? Object.keys(x.m).map(k => h("span", { class: "badge text-bg-light border me-1", title: x.m[k], text: Psi.AREAS[k] }))
+              : h("span", { class: "text-body-secondary", text: "—" }))))))));
+    };
+    tareasSel.addEventListener("change", draw);
+    extra.addEventListener("change", draw);
+    draw();
+
+    const copy = h("button", { class: "btn btn-success", type: "button" }, icon("clipboard", "me-1"), "Copiar JS");
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code.value); }
+      catch (e) { code.select(); document.execCommand("copy"); }
+      UI.toast("success", "JS copiado. Pégalo en la consola de PSI.");
+    });
+    const download = h("button", { class: "btn btn-outline-secondary", type: "button" }, icon("download", "me-1"), ".js");
+    download.addEventListener("click", () => {
+      const url = URL.createObjectURL(new Blob([code.value], { type: "text/javascript" }));
+      const a = h("a", { href: url }); a.download = `psi_${(g.psi && g.psi.grupo) || "grupo"}_${new Date().toISOString().slice(0, 10)}.js`;
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    });
+
+    UI.modal({
+      title: [icon("send-check", "me-2"), `Exportar a PSI · ${g.group.label}`],
+      size: "modal-xl",
+      body: h("div", {},
+        h("div", { class: "row g-2 align-items-end mb-3" },
+          h("div", { class: "col-12 col-md-4" }, h("div", { class: "small text-body-secondary", text: "Grupo PSI · periodo" }), h("div", { class: "fw-semibold mono", text: `${g.psi ? g.psi.grupo : "—"} · ${g.psi ? g.psi.periodo : g.group.ciclo}` })),
+          h("div", { class: "col-12 col-md-4" }, h("label", { class: "form-label small mb-1", for: "psi-tareas", text: "«Entrega tareas» según" }), tareasSel),
+          h("div", { class: "col-12 col-md-4" }, h("div", { class: "form-check" }, extra, h("label", { class: "form-check-label small", for: "psi-extra", text: "Sugerir actividad extracurricular a destacados (≥ 9)" })))),
+        h("div", { class: "row g-2 mb-3" },
+          h("div", { class: "col-6 col-md-3" }, h("label", { class: "form-label small mb-1", for: "psi-fecha", text: "Fecha de registro" }), fecha),
+          h("div", { class: "col-6 col-md-3" }, h("label", { class: "form-label small mb-1", for: "psi-tipo", text: "Tipo de registro" }), tipo),
+          h("div", { class: "col-12 col-md-6" }, h("label", { class: "form-label small mb-1", for: "psi-obs", text: "Observaciones generales (editable)" }), obsTxt),
+          h("div", { class: "col-12" }, h("label", { class: "form-label small mb-1", for: "psi-acc", text: "Acciones a realizar (editable)" }), accTxt)),
+        body,
+        h("details", { class: "mt-3" }, h("summary", { class: "small text-body-secondary", text: "Ver código y reglas" }),
+          h("ul", { class: "small mt-2" },
+            h("li", { text: "Avance: promedio actual redondeado (5–10); NP si nunca se presentó." }),
+            h("li", { text: "Asistencias: >3 faltas → «Más de tres faltas»; 3 faltas seguidas al final → «Dejó de asistir»; 0 asistencias → «Nunca se presentó»." }),
+            h("li", { text: "Tareas: ≥ 8 SI · 5–7.9 OCASIONALMENTE · < 5 NO." }),
+            h("li", { text: "Dificultades: Psicoemocional si tus comentarios lo mencionan; Académico si promedio < 6 o no entrega tareas." }),
+            h("li", { text: "Riesgo: suma de promedio, faltas, tareas y comentarios → Ninguno / Bajo / Medio / Alto." }),
+            h("li", { text: "Derivación: Tutoría (faltas), Asesoría (promedio < 6, con el rubro más bajo), Psicopedagogía (comentarios)." })),
+          code),
+        h("ol", { class: "small text-body-secondary mt-3 mb-0" },
+          h("li", {}, "Abre en PSI la captura del grupo ", h("b", { text: g.psi ? g.psi.grupo : "" }), "."),
+          h("li", { text: "Presiona F12 → pestaña Consola (si Chrome lo pide, escribe «allow pasting»)." }),
+          h("li", { text: "Pega el JS, presiona Enter, revisa y ajusta lo que quieras, y presiona Guardar." }))),
+      footer: [download, copy]
+    });
+  },
+
+  /** Lleva al componente (Captura) o al proyecto enlazado y lo resalta. */
+  goToLink(link) {
+    if (link.tipo === "proyecto") {
+      Admin.focus = { project: link.ref };
+      Prefs.set("admTab", "proyectos");
+    } else {
+      Admin.focus = { comp: link.tipo === "componente" ? link.ref : "final" };
+      Prefs.set("admTab", "captura");
+    }
+    Admin.renderTab();
+    setTimeout(() => {
+      const target = Admin.focus && (Admin.focus.project
+        ? document.querySelector(`[data-project="${Admin.focus.project}"]`)
+        : document.querySelector(`th[data-comp="${Admin.focus.comp}"]`));
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        target.classList.add("flash");
+        setTimeout(() => target.classList.remove("flash"), 2200);
+      }
+      Admin.focus = null;
+    }, 120);
+  },
+
+  async columnsModal() {
+    const g = Admin.group;
+    const body = h("div");
+    UI.loading(body);
+    const save = h("button", { class: "btn btn-primary", type: "button", disabled: true }, icon("save", "me-1"), "Guardar y actualizar reporte");
+    const m = UI.modal({ title: [icon("layout-three-columns", "me-2"), `Columnas · ${g.group.label}`], body, size: "modal-lg", footer: [save] });
+    let info;
+    try { info = await Api.call("columnsInfo", { idCurso: g.group.id }, "admin"); }
+    catch (error) { if (error.code !== "AUTH") body.replaceChildren(UI.empty("exclamation-octagon", error.message)); return; }
+
+    const key = l => l ? `${l.tipo}|${l.ref || ""}` : "";
+    const rows = info.columns.map(c => {
+      const state = { name: c.name, visible: c.visible, link: c.link || c.suggested || null };
+      const sw = h("input", { class: "form-check-input", type: "checkbox", role: "switch", checked: c.visible, "aria-label": `Visible ${c.name}`, onchange: e => { state.visible = e.target.checked; } });
+      const sel = h("select", { class: "form-select form-select-sm", "aria-label": `Enlace de ${c.name}`, onchange: e => {
+        const o = info.options.find(x => key(x) === e.target.value);
+        state.link = o ? { tipo: o.tipo, ref: o.ref } : null;
+      } },
+        h("option", { value: "", text: "— Sin enlace (se queda como está en la hoja) —" }),
+        info.options.map(o => h("option", { value: key(o), selected: key(o) === key(state.link), text: o.label })));
+      return { state, node: h("tr", {},
+        h("td", { class: "text-start fw-semibold", text: c.name }),
+        h("td", {}, h("div", { class: "form-check form-switch d-flex justify-content-center mb-0" }, sw)),
+        h("td", { class: "text-start", style: { minWidth: "240px" } }, sel,
+          !c.link && c.suggested ? h("div", { class: "small text-success mt-1" }, icon("magic", "me-1"), "Sugerido; se aplica al guardar") : null)) };
+    });
+
+    const dates = info.dates.map(d => ({ key: d.key, visible: d.visible }));
+    const dateChips = h("div", { class: "d-flex flex-wrap gap-1" }, info.dates.map((d, i) => {
+      const b = h("button", { type: "button", class: `btn btn-sm ${d.visible ? "btn-outline-primary" : "btn-outline-secondary opacity-50"}`, title: d.visible ? "Visible (clic para ocultar)" : "Oculta (clic para mostrar)", text: d.label });
+      b.addEventListener("click", () => { dates[i].visible = !dates[i].visible; b.className = `btn btn-sm ${dates[i].visible ? "btn-outline-primary" : "btn-outline-secondary opacity-50"}`; });
+      return b;
+    }));
+
+    body.replaceChildren(
+      h("p", { class: "small text-body-secondary" }, "Hoja ", h("b", { text: info.sheetName }), ". «Visible» = lo ven los alumnos (fila 1 de la hoja). Al enlazar, la columna se llena sola con los datos de la web cada vez que capturas o calificas."),
+      rows.length ? h("div", { class: "table-wrap auto-h mb-3" }, h("table", { class: "table table-sm table-cch mb-0" },
+        h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Columna" }), h("th", { text: "Visible" }), h("th", { class: "text-start", text: "Se llena con" }))),
+        h("tbody", {}, rows.map(r => r.node)))) : h("p", { class: "small text-body-secondary", text: "Este reporte solo tiene fechas." }),
+      h("div", { class: "small fw-semibold mb-1", text: "Fechas (clic para mostrar/ocultar)" }), dateChips);
+
+    save.disabled = false;
+    save.addEventListener("click", async () => {
+      try {
+        const r = await UI.busy(save, () => Api.call("saveColumns", { idCurso: g.group.id, columns: rows.map(x => x.state), dates }, "admin"));
+        UI.toast("success", r.message, 7000);
+        m.close();
+        Admin.loadGroup();
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+    });
+  },
+
   addStudentModal() {
     const g = Admin.group;
     const cuenta = h("input", { class: "form-control mono", id: "ns-cuenta", inputmode: "numeric", maxlength: "10" });
-    const nombre = h("input", { class: "form-control", id: "ns-nombre", maxlength: "80", placeholder: "APELLIDOS NOMBRE" });
+    const nombre = h("input", { class: "form-control", id: "ns-nombre", maxlength: "80", placeholder: "Vacío = se toma de Students si ya existe" });
     const email = h("input", { class: "form-control", id: "ns-email", type: "email", placeholder: "opcional" });
+    const status = h("select", { class: "form-select", id: "ns-status" }, (g.statuses || []).map(x => h("option", { value: x.value, text: x.label })));
     const ok = h("button", { class: "btn btn-primary", type: "button" }, icon("person-plus", "me-1"), "Inscribir");
     const m = UI.modal({
       title: `Inscribir en ${g.group.label}`,
       body: h("div", { class: "vstack gap-2" },
         h("div", {}, h("label", { class: "form-label small", for: "ns-cuenta", text: "Número de cuenta" }), cuenta),
         h("div", {}, h("label", { class: "form-label small", for: "ns-nombre", text: "Nombre" }), nombre),
-        h("div", {}, h("label", { class: "form-label small", for: "ns-email", text: "Correo" }), email)),
+        h("div", {}, h("label", { class: "form-label small", for: "ns-email", text: "Correo" }), email),
+        h("div", {}, h("label", { class: "form-label small", for: "ns-status", text: "Estatus" }), status)),
       footer: [h("button", { class: "btn btn-secondary", type: "button", "data-bs-dismiss": "modal", text: "Cancelar" }), ok]
     });
     ok.addEventListener("click", async () => {
       try {
-        const r = await UI.busy(ok, () => Api.call("addStudent", { idCurso: g.group.id, cuenta: cuenta.value, nombre: nombre.value, email: email.value }, "admin"));
+        const r = await UI.busy(ok, () => Api.call("addStudent", { idCurso: g.group.id, cuenta: cuenta.value, nombre: nombre.value, email: email.value, status: status.value }, "admin"));
         UI.toast("success", r.message); m.close(); Admin.loadGroup();
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
@@ -1318,9 +1692,9 @@ const Admin = {
       h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch" },
         h("thead", {}, h("tr", {},
           h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start", text: "Nombre" }),
-          comps.map(c => h("th", { title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
+          comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
             c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo === "manual" ? ` · /${c.maximo}` : " · auto"}` }))),
-          h("th", { text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }))),
+          h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }))),
         tbody)),
       manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
     ));
@@ -1442,8 +1816,14 @@ const Admin = {
     const g = Admin.group;
     const projectComps = g.components.filter(c => c.tipo === "proyectos");
 
-    $("adm-toolbar").replaceChildren(h("div", { class: "d-flex gap-2" },
-      h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.editProject(null) }, icon("plus-lg", "me-1"), "Nuevo proyecto")));
+    const view = Prefs.get("projView") === "tabla" ? "tabla" : "tarjetas";
+    const viewBtn = (v, iconName, label) => h("button", {
+      class: `btn btn-sm ${view === v ? "btn-dark" : "btn-outline-secondary"}`, type: "button", "aria-pressed": String(view === v),
+      onclick: () => { Prefs.set("projView", v); Admin.renderTab(); }
+    }, icon(iconName, "me-1"), label);
+    $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap gap-2" },
+      h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.editProject(null) }, icon("plus-lg", "me-1"), "Nuevo proyecto"),
+      h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"))));
 
     if (!g.projects.length) {
       content.replaceChildren(UI.empty("star", "Aún no hay proyectos en este grupo. Crea uno y abre el registro para que los alumnos den de alta su equipo."));
@@ -1458,7 +1838,7 @@ const Admin = {
       const inTeam = new Set(p.teams.flatMap(t => t.members.map(m => m.cuenta)));
       const without = g.students.filter(s => !inTeam.has(s.cuenta));
 
-      return h("div", { class: "card card-soft" },
+      return h("div", { class: "card card-soft", dataset: { project: p.id } },
         h("div", { class: "card-header d-flex flex-wrap align-items-center gap-2 bg-transparent" },
           h("h2", { class: "h6 mb-0 me-2", text: p.nombre }),
           h("span", { class: `badge ${p.abierto ? "text-bg-success" : "text-bg-secondary"}` }, icon(p.abierto ? "unlock" : "lock"), p.abierto ? " Registro abierto" : " Registro cerrado"),
@@ -1477,7 +1857,7 @@ const Admin = {
         h("div", { class: "card-body" },
           h("div", { class: "mb-3" }, p.rubros.map(r => h("span", { class: "chip", text: r }))),
           p.teams.length
-            ? h("div", { class: "row g-3" }, p.teams.map(t => h("div", { class: "col-12 col-md-6 col-xl-4" }, Admin.teamCard(p, t))))
+            ? (view === "tabla" ? Admin.teamsTable(p) : h("div", { class: "row g-3" }, p.teams.map(t => h("div", { class: "col-12 col-md-6 col-xl-4" }, Admin.teamCard(p, t)))))
             : h("p", { class: "text-body-secondary small", text: "Sin equipos registrados." }),
           without.length ? h("details", { class: "mt-3" },
             h("summary", { class: "small text-body-secondary", text: `${without.length} alumno(s) sin equipo` }),
@@ -1486,7 +1866,35 @@ const Admin = {
     })));
   },
 
-  teamCard(project, team) {
+  /** Vista en tabla: una fila por equipo; «Editar» abre la tarjeta en un modal. */
+  teamsTable(project) {
+    const max = 5 * project.rubros.length;
+    return h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-sm table-hover table-cch mb-0" },
+      h("thead", {}, h("tr", {},
+        h("th", { class: "text-start", text: "Equipo" }), h("th", { class: "text-start", text: "Integrantes" }),
+        project.rubros.map(r => h("th", { title: r, text: r.length > 14 ? r.slice(0, 13) + "…" : r })),
+        h("th", { text: "★" }), h("th", { text: "Calif." }), h("th", { class: "text-start", text: "Observaciones" }), h("th", { text: "" }))),
+      h("tbody", {}, project.teams.map(t => {
+        const total = project.rubros.reduce((sum, r) => sum + (Number(t.stars[r]) || 0), 0);
+        return h("tr", {},
+          h("td", { class: "text-start fw-semibold", text: t.nombre }),
+          h("td", { class: "text-start small", style: { whiteSpace: "normal", minWidth: "180px", maxWidth: "260px" }, text: t.members.map(m => (m.nombre || m.cuenta).split(" ").slice(0, 2).join(" ")).join(", ") }),
+          project.rubros.map(r => h("td", { text: t.stars[r] ? "★".repeat(t.stars[r]) : "—", class: "stars-text" })),
+          h("td", { class: "small text-body-secondary", text: `${total}/${max}` }),
+          h("td", {}, t.calificacion === null ? h("span", { class: "badge text-bg-light border", text: "—" }) : h("span", { class: `badge ${t.calificacion < CONFIG.RISK_THRESHOLD ? "text-bg-danger" : "text-bg-success"}`, text: Fmt.grade(t.calificacion) })),
+          h("td", { class: "text-start small text-truncate", style: { maxWidth: "220px" }, title: t.observaciones, text: t.observaciones || "" }),
+          h("td", {}, h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Editar", onclick: () => Admin.teamModal(project, t) }, icon("pencil-square"), h("span", { class: "visually-hidden", text: "Editar" }))));
+      }))));
+  },
+
+  teamModal(project, team) {
+    let modal;
+    const card = Admin.teamCard(project, team, () => modal && modal.close());
+    modal = UI.modal({ title: [icon("people", "me-2"), `${team.nombre} · ${project.nombre}`], body: card });
+  },
+
+  /** Tarjeta editable de un equipo. onSaved: se llama tras guardar (p. ej. cerrar el modal). */
+  teamCard(project, team, onSaved) {
     const stars = Object.assign({}, team.stars);
     const obs = h("textarea", { class: "form-control form-control-sm", rows: "2", placeholder: "Observaciones (las ve el equipo)", maxlength: "1000" });
     obs.value = team.observaciones || "";
@@ -1504,11 +1912,12 @@ const Admin = {
       try {
         const r = await UI.busy(save, () => Api.call("saveTeamEval", { teamId: team.id, stars, observaciones: obs.value }, "admin"));
         UI.toast("success", r.message);
+        if (onSaved) onSaved();
         Admin.loadGroup();
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
 
-    return h("div", { class: "card h-100" }, h("div", { class: "card-body p-3" },
+    return h("div", { class: "card card-soft h-100" }, h("div", { class: "card-body p-3" },
       h("div", { class: "d-flex justify-content-between align-items-start mb-2" },
         h("div", {}, h("div", { class: "fw-semibold", text: team.nombre }),
           h("div", { class: "small text-body-secondary", text: team.calificacion === null ? "Sin calificar" : `Guardada: ${Fmt.grade(team.calificacion)}` })),
@@ -1610,57 +2019,94 @@ const Admin = {
     estado.addEventListener("change", load);
     onlyGroup.addEventListener("change", load);
 
+    const view = Prefs.get("evView") === "tabla" ? "tabla" : "tarjetas";
+    const viewBtn = (v, iconName, label) => h("button", {
+      class: `btn btn-sm ${view === v ? "btn-dark" : "btn-outline-secondary"}`, type: "button", "aria-pressed": String(view === v),
+      onclick: () => { Prefs.set("evView", v); Admin.drawEvidence(content); viewBtns.querySelectorAll("button").forEach(b => { const on = b.dataset.v === Prefs.get("evView"); b.className = `btn btn-sm ${on ? "btn-dark" : "btn-outline-secondary"}`; }); },
+      dataset: { v }
+    }, icon(iconName, "me-1"), label);
+    const viewBtns = h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"));
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-3" }, estado,
-      h("div", { class: "form-check mb-0" }, onlyGroup, h("label", { class: "form-check-label small", for: "ev-only-group", text: "Solo el grupo seleccionado" }))));
+      h("div", { class: "form-check mb-0" }, onlyGroup, h("label", { class: "form-check-label small", for: "ev-only-group", text: "Solo el grupo seleccionado" })),
+      viewBtns));
     await load();
   },
 
+  /** Formulario de revisión de una evidencia (se usa en tarjeta y en modal). */
+  evidenceReview(ev, onDone) {
+    const comps = Admin.evidence.componentsByCourse[ev.idCurso] || [];
+    const points = h("input", { class: "form-control form-control-sm", type: "number", min: "0", step: "0.1", value: ev.puntos ?? "", placeholder: "Puntos", "aria-label": "Puntos" });
+    const comp = h("select", { class: "form-select form-select-sm", "aria-label": "Sumar a" },
+      h("option", { value: "", text: comps.length ? "Sumar a…" : "Sin componentes manuales" }),
+      comps.map(c => h("option", { value: c.id, selected: ev.componentId === c.id, text: `${c.nombre} (/${c.maximo})` })));
+    const note = h("input", { class: "form-control form-control-sm", maxlength: "500", value: ev.nota || "", placeholder: "Nota para el alumno (opcional)", "aria-label": "Nota" });
+    const act = (estado, btn) => async () => {
+      try {
+        const r = await UI.busy(btn, () => Api.call("reviewEvidence", { id: ev.id, estado, puntos: points.value, componentId: comp.value, nota: note.value }, "admin"));
+        UI.toast("success", r.message);
+        if (onDone) onDone();
+        Admin.tabEvidence($("adm-content"));
+        if (Admin.group && ev.idCurso === Admin.group.group.id) Admin.group = await Api.call("groupData", { idCurso: ev.idCurso }, "admin");
+      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+    };
+    const apply = h("button", { class: "btn btn-sm btn-success", type: "button" }, icon("check2", "me-1"), "Aplicar");
+    const reject = h("button", { class: "btn btn-sm btn-outline-danger", type: "button" }, "Rechazar");
+    const pending = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button" }, "Pendiente");
+    apply.addEventListener("click", act("Aplicada", apply));
+    reject.addEventListener("click", act("Rechazada", reject));
+    pending.addEventListener("click", act("Pendiente", pending));
+    return h("div", {},
+      h("div", { class: "row g-2" }, h("div", { class: "col-4" }, points), h("div", { class: "col-8" }, comp), h("div", { class: "col-12" }, note)),
+      h("div", { class: "d-flex justify-content-end gap-2 mt-2" }, ev.estado !== "Pendiente" ? pending : null, reject, apply));
+  },
+
   drawEvidence(content) {
-    const { items, componentsByCourse } = Admin.evidence;
+    const { items } = Admin.evidence;
     if (!items.length) { content.replaceChildren(UI.empty("inbox", "No hay evidencias con ese filtro.")); return; }
-    const badge = { Pendiente: "text-bg-secondary", Aplicada: "text-bg-success", Rechazada: "text-bg-danger" };
+    const badge = { Pendiente: "text-bg-warning", Aplicada: "text-bg-success", Rechazada: "text-bg-danger" };
+    const who = ev => h("a", { href: "#", class: "link-body-emphasis", onclick: e => { e.preventDefault(); Admin.openProfile(ev.cuenta); } }, `${ev.cuenta} · ${ev.nombre}`);
+    const fileBtn = ev => ev.url ? h("a", { class: "btn btn-sm btn-outline-primary", href: ev.url, target: "_blank", rel: "noopener noreferrer", title: ev.archivo || "Abrir" }, icon("box-arrow-up-right")) : null;
 
-    content.replaceChildren(h("div", { class: "row g-3" }, items.map(ev => {
-      const comps = componentsByCourse[ev.idCurso] || [];
-      const points = h("input", { class: "form-control form-control-sm", type: "number", min: "0", step: "0.1", value: ev.puntos ?? "", placeholder: "Puntos", "aria-label": "Puntos" });
-      const comp = h("select", { class: "form-select form-select-sm", "aria-label": "Sumar a" },
-        h("option", { value: "", text: comps.length ? "Sumar a…" : "Sin componentes manuales" }),
-        comps.map(c => h("option", { value: c.id, selected: ev.componentId === c.id, text: `${c.nombre} (/${c.maximo})` })));
-      const note = h("input", { class: "form-control form-control-sm", maxlength: "500", value: ev.nota || "", placeholder: "Nota para el alumno (opcional)", "aria-label": "Nota" });
+    if (Prefs.get("evView") === "tabla") {
+      content.replaceChildren(h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-sm table-hover table-cch mb-0" },
+        h("thead", {}, h("tr", {}, ["Alumno", "Grupo", "Tipo", "Actividad", "Enviada", "Estado", "Puntos", ""].map((t, i) => h("th", { class: i < 4 ? "text-start" : "", text: t })))),
+        h("tbody", {}, items.map(ev => h("tr", {},
+          h("td", { class: "text-start small" }, who(ev)),
+          h("td", { class: "text-start small", text: ev.grupo }),
+          h("td", { class: "text-start small", text: ev.tipo }),
+          h("td", { class: "text-start small text-truncate", style: { maxWidth: "260px" }, title: ev.descripcion || ev.titulo, text: ev.titulo }),
+          h("td", { class: "small", text: Fmt.date(ev.enviado) }),
+          h("td", {}, h("span", { class: `badge ${badge[ev.estado]}`, text: ev.estado })),
+          h("td", { class: "small", text: ev.estado === "Aplicada" ? `+${Fmt.num(ev.puntos)}` : "—" }),
+          h("td", { class: "text-nowrap" }, fileBtn(ev), " ",
+            h("button", {
+              class: "btn btn-sm btn-primary", type: "button", title: "Revisar",
+              onclick: () => {
+                let m;
+                m = UI.modal({
+                  title: [icon("clipboard-check", "me-2"), ev.titulo],
+                  body: h("div", {},
+                    h("div", { class: "small text-body-secondary mb-2" }, who(ev), ` · ${ev.grupo} · ${ev.tipo} · ${Fmt.date(ev.enviado)}`),
+                    ev.descripcion ? h("p", { class: "small", text: ev.descripcion }) : null,
+                    ev.url ? h("a", { class: "btn btn-sm btn-outline-primary mb-3", href: ev.url, target: "_blank", rel: "noopener noreferrer" }, icon("box-arrow-up-right", "me-1"), ev.archivo || "Abrir archivo") : null,
+                    Admin.evidenceReview(ev, () => m && m.close()))
+                });
+              }
+            }, icon("pencil-square")))))))));
+      return;
+    }
 
-      const act = (estado, btn) => async () => {
-        try {
-          const r = await UI.busy(btn, () => Api.call("reviewEvidence", { id: ev.id, estado, puntos: points.value, componentId: comp.value, nota: note.value }, "admin"));
-          UI.toast("success", r.message);
-          ev.estado = estado;
-          Admin.tabEvidence($("adm-content"));
-          if (Admin.group && ev.idCurso === Admin.group.group.id) Admin.group = await Api.call("groupData", { idCurso: ev.idCurso }, "admin");
-        } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-      };
-      const apply = h("button", { class: "btn btn-sm btn-success", type: "button" }, icon("check2", "me-1"), "Aplicar");
-      const reject = h("button", { class: "btn btn-sm btn-outline-danger", type: "button" }, "Rechazar");
-      const pending = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button" }, "Pendiente");
-      apply.addEventListener("click", act("Aplicada", apply));
-      reject.addEventListener("click", act("Rechazada", reject));
-      pending.addEventListener("click", act("Pendiente", pending));
-
-      return h("div", { class: "col-12 col-lg-6" }, h("div", { class: "card card-soft h-100" }, h("div", { class: "card-body" },
+    content.replaceChildren(h("div", { class: "row g-3" }, items.map(ev => h("div", { class: "col-12 col-lg-6 col-xxl-4" },
+      h("div", { class: `card card-soft h-100 border-start border-4 border-${badge[ev.estado].replace("text-bg-", "")}` }, h("div", { class: "card-body" },
         h("div", { class: "d-flex justify-content-between gap-2" },
           h("div", {},
             h("div", { class: "fw-semibold", text: ev.titulo }),
-            h("div", { class: "small text-body-secondary" },
-              h("a", { href: "#", class: "link-body-emphasis", onclick: e => { e.preventDefault(); Admin.openProfile(ev.cuenta); } }, `${ev.cuenta} · ${ev.nombre}`),
-              ` · ${ev.grupo} · ${ev.tipo} · ${Fmt.date(ev.enviado)}`)),
-          h("span", { class: `badge align-self-start ${badge[ev.estado]}`, text: ev.estado })),
+            h("div", { class: "small text-body-secondary" }, who(ev), ` · ${ev.grupo}`),
+            h("div", { class: "small text-body-secondary", text: `${ev.tipo} · ${Fmt.date(ev.enviado)}` })),
+          h("div", { class: "d-flex flex-column align-items-end gap-1" }, h("span", { class: `badge ${badge[ev.estado]}`, text: ev.estado }), fileBtn(ev))),
         ev.descripcion ? h("p", { class: "small mt-2 mb-2", text: ev.descripcion }) : null,
-        ev.url ? h("a", { class: "btn btn-sm btn-outline-primary my-2", href: ev.url, target: "_blank", rel: "noopener noreferrer" }, icon("box-arrow-up-right", "me-1"), ev.archivo || "Abrir") : null,
-        h("div", { class: "row g-2 mt-1" },
-          h("div", { class: "col-4" }, points),
-          h("div", { class: "col-8" }, comp),
-          h("div", { class: "col-12" }, note)),
-        h("div", { class: "d-flex justify-content-end gap-2 mt-2" }, ev.estado !== "Pendiente" ? pending : null, reject, apply)
-      )));
-    })));
+        h("hr", { class: "my-2" }),
+        Admin.evidenceReview(ev)))))));
   },
 
   /* ---------------- Pestaña: Alumnos ---------------- */
@@ -1704,34 +2150,118 @@ const Admin = {
     } catch (error) { if (error.code !== "AUTH") body.replaceChildren(UI.empty("exclamation-octagon", error.message)); }
   },
 
-  /** Ficha completa: resumen, asistencia, calificaciones, comentarios, equipos/evidencias e historial. */
+  /**
+   * Ficha en UNA sola vista:
+   *   arriba  → una card de resumen por grupo (clic = cambia el detalle);
+   *             por defecto el grupo que tienes abierto en la tabla
+   *   abajo   → detalle del grupo elegido (asistencia, calificaciones, proyectos)
+   *             + comentarios, evidencias, inscripciones e historial
+   */
   drawProfile(body, p) {
     UI.disposePopovers(body);
     const groups = p.groups || [];
+    const current = Admin.group && groups.find(gr => gr.idCurso === Admin.group.group.id);
+    let selected = (current || groups[0] || {}).idCurso;
 
-    // ---- Comentarios ----
-    const commentsBox = h("div");
-    const commentBadge = h("span", { class: "badge rounded-pill text-bg-warning ms-1", text: p.comments.length });
-    const drawComments = list => {
-      commentBadge.textContent = list.length;
-      commentsBox.replaceChildren(...(list.length ? list.map(c => h("div", { class: `comment-item ${c.origen === "Web" ? "web" : ""}` },
-        h("div", { class: "d-flex justify-content-between gap-2 small text-body-secondary" },
-          h("span", {}, c.curso, c.fecha ? ` · ${Fmt.date(c.fecha)}` : ""),
-          c.id ? h("button", {
-            class: "btn btn-link btn-sm text-danger p-0", type: "button", title: "Borrar comentario",
-            onclick: async () => {
-              if (!(await UI.confirm("¿Borrar este comentario?", { okText: "Borrar", danger: true }))) return Admin.openProfile(p.cuenta);
-              try { await Api.call("deleteComment", { id: c.id }, "admin"); Admin.openProfile(p.cuenta); }
-              catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-            }
-          }, icon("trash")) : null),
-        h("div", { style: { whiteSpace: "pre-line" }, text: c.texto }))) : [UI.empty("chat-left", "Sin comentarios.")]));
+    const section = (title, iconName, ...children) => h("section", { class: "profile-section" },
+      h("h3", { class: "profile-title" }, icon(iconName, "me-1"), title), ...children);
+
+    // ---------- Cards de grupos ----------
+    const cardsRow = h("div", { class: "row g-3 mb-3" });
+    const detail = h("div");
+    const drawCards = () => cardsRow.replaceChildren(...groups.map(gr => {
+      const c = gr.attendance ? gr.attendance.counts : null;
+      const pct = c ? Parts.pct(c) : null;
+      const faltas = h("span", { class: "px-2 rounded", text: c ? c.falta : "—" });
+      if (c) Parts.applyFaltas(faltas, c.falta);
+      const active = gr.idCurso === selected;
+      return h("div", { class: `col-12 ${groups.length > 1 ? "col-md-6" : ""}` },
+        h("button", {
+          type: "button", class: `group-card w-100 text-start ${active ? "active" : ""}`, "aria-pressed": String(active),
+          onclick: () => { selected = gr.idCurso; drawCards(); drawDetail(); }
+        },
+          h("div", { class: "d-flex justify-content-between align-items-start gap-2" },
+            h("div", {}, h("div", { class: "fw-semibold", text: gr.label }), h("div", { class: "small text-body-secondary", text: gr.ciclo })),
+            active ? h("span", { class: "badge text-bg-dark", text: "viendo" }) : null),
+          h("div", { class: "group-stats" },
+            h("div", {}, h("b", { class: gr.final !== null && gr.final < CONFIG.RISK_THRESHOLD ? "text-danger" : "", text: Fmt.grade(gr.final) }), h("small", { text: "promedio" })),
+            h("div", {}, h("b", { text: pct === null ? "—" : `${pct}%` }), h("small", { text: "asistencia" })),
+            h("div", {}, h("b", {}, faltas), h("small", { text: "faltas" })),
+            h("div", {}, h("b", { text: c ? c.justificante : "—" }), h("small", { text: "justif." })))));
+    }));
+
+    // ---------- Detalle del grupo elegido ----------
+    const drawDetail = () => {
+      UI.disposePopovers(detail);
+      const gr = groups.find(x => x.idCurso === selected);
+      if (!gr) { detail.replaceChildren(); return; }
+
+      const gradesTable = gr.components.length
+        ? h("table", { class: "table table-sm table-cch mb-0" },
+            h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calif." }))),
+            h("tbody", {}, gr.components.map(cp => h("tr", {},
+              h("td", { class: "text-start", text: cp.nombre }), h("td", { class: "text-body-secondary", text: `${Fmt.num(cp.ponderacion)}%` }),
+              h("td", {}, Parts.gradeWithBonus(gr.items[cp.id], cp)))),
+              h("tr", { class: "fw-bold" }, h("td", { class: "text-start", text: "Promedio actual" }), h("td", {}), h("td", { text: Fmt.grade(gr.final) }))))
+        : h("p", { class: "small text-body-secondary mb-0", text: "Sin ponderaciones." });
+
+      const projects = gr.projects.length ? gr.projects.map(pj => h("div", { class: "mini-card" },
+        h("div", { class: "d-flex justify-content-between" }, h("b", { text: pj.nombre }),
+          pj.team && pj.team.calificacion !== null ? h("span", { class: "badge text-bg-success", text: Fmt.grade(pj.team.calificacion) }) : h("span", { class: "badge text-bg-light border", text: pj.team ? "por calificar" : "sin equipo" })),
+        pj.team ? h("div", { class: "small text-body-secondary", text: `${pj.team.nombre}: ${pj.team.members.map(m => (m.nombre || m.cuenta).split(" ").slice(0, 2).join(" ")).join(", ")}` }) : null,
+        pj.team && pj.team.stars ? h("div", { class: "mt-1" }, pj.rubros.map(r => h("div", { class: "rubric-row small" }, h("span", { text: r }), Parts.starsReadonly(pj.team.stars[r] || 0)))) : null))
+        : [h("p", { class: "small text-body-secondary mb-0", text: "Sin proyectos." })];
+
+      const remove = h("button", {
+        class: "btn btn-sm btn-outline-danger", type: "button",
+        onclick: async () => {
+          if (!(await UI.confirm(`¿Dar de baja a ${p.cuenta} de ${gr.label}? Se quita de Students y de la hoja Reporte_ (Attendance Log se conserva).`, { okText: "Dar de baja", danger: true }))) return Admin.openProfile(p.cuenta);
+          try {
+            UI.toast("success", (await Api.call("removeStudent", { idCurso: gr.idCurso, cuenta: p.cuenta }, "admin")).message);
+            bootstrap.Modal.getOrCreateInstance($("modal-generic")).hide();
+            Admin.loadGroup();
+          } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+        }
+      }, icon("person-dash", "me-1"), "Dar de baja");
+
+      const statusSel = h("select", { class: "form-select form-select-sm w-auto", "aria-label": "Estatus en este grupo" },
+        (p.statuses || []).map(x => h("option", { value: x.value, selected: (gr.status || "") === x.value, text: x.label })));
+      statusSel.addEventListener("change", async () => {
+        try {
+          UI.toast("success", (await Api.call("setStudentStatus", { idCurso: gr.idCurso, cuenta: p.cuenta, status: statusSel.value }, "admin")).message);
+          gr.status = statusSel.value;
+          if (Admin.group && Admin.group.group.id === gr.idCurso) Admin.loadGroup();
+        } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+      });
+      detail.replaceChildren(
+        h("div", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" },
+          h("div", { class: "fw-semibold me-auto" }, icon("journal-text", "me-1"), gr.label), statusSel, remove),
+        section("Asistencia", "calendar-check",
+          gr.attendance && gr.attendance.dates.length ? Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta) : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros." })),
+        h("div", { class: "row g-3" },
+          h("div", { class: "col-12 col-lg-6" }, section("Calificaciones", "bar-chart", gradesTable)),
+          h("div", { class: "col-12 col-lg-6" }, section("Proyectos", "people", ...projects))));
     };
+
+    // ---------- Comentarios ----------
+    const commentsBox = h("div");
+    const drawComments = list => commentsBox.replaceChildren(...(list.length ? list.map(c => h("div", { class: `comment-item ${c.origen === "Web" ? "web" : ""}` },
+      h("div", { class: "d-flex justify-content-between gap-2 small text-body-secondary" },
+        h("span", {}, c.curso, c.fecha ? ` · ${Fmt.date(c.fecha)}` : ""),
+        c.id ? h("button", {
+          class: "btn btn-link btn-sm text-danger p-0", type: "button", title: "Borrar comentario",
+          onclick: async () => {
+            if (!(await UI.confirm("¿Borrar este comentario?", { okText: "Borrar", danger: true }))) return Admin.openProfile(p.cuenta);
+            try { await Api.call("deleteComment", { id: c.id }, "admin"); Admin.openProfile(p.cuenta); }
+            catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+          }
+        }, icon("trash")) : null),
+      h("div", { style: { whiteSpace: "pre-line" }, text: c.texto }))) : [h("p", { class: "small text-body-secondary mb-2", text: "Sin comentarios." })]));
     drawComments(p.comments);
     const text = h("textarea", { class: "form-control form-control-sm", rows: "2", placeholder: "Nuevo comentario privado", maxlength: "2000", "aria-label": "Nuevo comentario" });
     const course = h("select", { class: "form-select form-select-sm", "aria-label": "Grupo del comentario" },
       h("option", { value: "", text: "General" }),
-      p.enrollments.filter(e => e.idCurso).map(e => h("option", { value: e.idCurso, text: `${e.curso} ${e.grupo} (${e.ciclo})` })));
+      p.enrollments.filter(e => e.idCurso).map(e => h("option", { value: e.idCurso, selected: e.idCurso === selected, text: `${e.curso} ${e.grupo} (${e.ciclo})` })));
     const add = h("button", { class: "btn btn-sm btn-primary", type: "button" }, icon("plus-lg", "me-1"), "Agregar");
     add.addEventListener("click", async () => {
       try {
@@ -1741,106 +2271,41 @@ const Admin = {
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
 
-    // ---- Resumen ----
-    const removeBtn = gr => h("button", {
-      class: "btn btn-sm btn-outline-danger", type: "button", title: "Dar de baja de este grupo",
-      onclick: async () => {
-        if (!(await UI.confirm(`¿Dar de baja a ${p.cuenta} de ${gr.label}? Se quita de Students y de la hoja Reporte_ (Attendance Log se conserva).`, { okText: "Dar de baja", danger: true }))) return Admin.openProfile(p.cuenta);
-        try {
-          UI.toast("success", (await Api.call("removeStudent", { idCurso: gr.idCurso, cuenta: p.cuenta }, "admin")).message);
-          bootstrap.Modal.getOrCreateInstance($("modal-generic")).hide();
-          Admin.loadGroup();
-        } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-      }
-    }, icon("person-dash"));
-
-    const summary = h("div", { class: "row g-3" },
-      groups.length ? groups.map(gr => {
-        const c = gr.attendance ? gr.attendance.counts : null;
-        const pct = c ? Parts.pct(c) : null;
-        const faltas = h("div", { class: "rounded px-2", text: c ? c.falta : "—" });
-        if (c) Parts.applyFaltas(faltas, c.falta);
-        return h("div", { class: "col-12 col-md-6 col-lg-4" }, h("div", { class: "card h-100" }, h("div", { class: "card-body" },
-          h("div", { class: "d-flex justify-content-between align-items-start" },
-            h("div", {}, h("div", { class: "fw-semibold", text: gr.label }), h("div", { class: "small text-body-secondary", text: gr.ciclo })),
-            removeBtn(gr)),
-          h("div", { class: "d-flex gap-3 mt-3 text-center" },
-            h("div", {}, h("div", { class: `fs-4 fw-bold ${gr.final !== null && gr.final < CONFIG.RISK_THRESHOLD ? "text-danger" : ""}`, text: Fmt.grade(gr.final) }), h("div", { class: "small text-body-secondary", text: "promedio" })),
-            h("div", {}, h("div", { class: "fs-4 fw-bold", text: pct === null ? "—" : `${pct}%` }), h("div", { class: "small text-body-secondary", text: "asistencia" })),
-            h("div", {}, h("div", { class: "fs-4 fw-bold" }, faltas), h("div", { class: "small text-body-secondary", text: "faltas" })),
-            h("div", {}, h("div", { class: "fs-4 fw-bold", text: c ? c.justificante : "—" }), h("div", { class: "small text-body-secondary", text: "justif." }))))));
-      }) : h("div", { class: "col-12" }, UI.empty("collection", "Sin grupos activos.")),
-      h("div", { class: "col-12" },
-        h("h3", { class: "h6 mt-2", text: `Inscripciones (${p.enrollments.length})` }),
-        h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))));
-
-    // ---- Asistencia ----
-    const attendance = h("div", { class: "vstack gap-3" }, groups.length ? groups.map(gr => h("div", {},
-      h("div", { class: "fw-semibold mb-1", text: gr.label }),
-      gr.attendance && gr.attendance.dates.length ? Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta) : h("p", { class: "small text-body-secondary", text: "Sin registros." }))) : UI.empty("calendar-x", "Sin asistencia."),
-      Parts.legend());
-
-    // ---- Calificaciones ----
-    const grades = h("div", { class: "row g-3" }, groups.map(gr => h("div", { class: "col-12 col-lg-6" }, h("div", { class: "card h-100" }, h("div", { class: "card-body" },
-      h("div", { class: "d-flex justify-content-between mb-2" }, h("span", { class: "fw-semibold", text: gr.label }), h("span", { class: "badge text-bg-dark fs-6", text: Fmt.grade(gr.final) })),
-      gr.components.length ? h("table", { class: "table table-sm mb-0" },
-        h("tbody", {}, gr.components.map(cp => h("tr", {},
-          h("td", { text: cp.nombre }), h("td", { class: "text-body-secondary small", text: `${Fmt.num(cp.ponderacion)}%` }),
-          h("td", { class: "text-end" }, Parts.gradeWithBonus(gr.items[cp.id], cp)))))) : h("p", { class: "small text-body-secondary mb-0", text: "Sin ponderaciones." }),
-      gr.legacy && gr.legacy.length ? h("div", { class: "small text-body-secondary mt-2", text: gr.legacy.filter(x => x.value).map(x => `${x.label}: ${x.value}`).join(" · ") }) : null)))));
-
-    // ---- Equipos y evidencias ----
     const badge = { Pendiente: "text-bg-secondary", Aplicada: "text-bg-success", Rechazada: "text-bg-danger" };
-    const extra = h("div", { class: "row g-3" },
-      h("div", { class: "col-12 col-lg-6" }, h("h3", { class: "h6", text: "Equipos" }),
-        groups.flatMap(gr => gr.projects.map(pj => h("div", { class: "border rounded p-2 mb-2 small" },
-          h("div", { class: "d-flex justify-content-between" }, h("b", { text: pj.nombre }), pj.team && pj.team.calificacion !== null ? h("span", { class: "badge text-bg-success", text: Fmt.grade(pj.team.calificacion) }) : null),
-          pj.team ? h("div", {}, h("div", { text: `${pj.team.nombre}: ${pj.team.members.map(m => m.nombre || m.cuenta).join(", ")}` }),
-            pj.team.stars ? h("div", { class: "mt-1" }, pj.rubros.map(r => h("div", { class: "rubric-row" }, h("span", { text: r }), Parts.starsReadonly(pj.team.stars[r] || 0)))) : null)
-            : h("div", { class: "text-body-secondary", text: "Sin equipo" })))).concat(groups.some(gr => gr.projects.length) ? [] : [h("p", { class: "small text-body-secondary", text: "Sin proyectos." })])),
-      h("div", { class: "col-12 col-lg-6" }, h("h3", { class: "h6", text: "Evidencias" }),
-        p.evidences.length ? p.evidences.map(e => h("div", { class: "border rounded p-2 mb-2 small d-flex justify-content-between gap-2" },
-          h("div", {}, h("b", { text: e.titulo }), h("div", { class: "text-body-secondary", text: `${e.tipo} · ${e.grupo} · ${Fmt.date(e.enviado)}` }),
-            e.estado === "Aplicada" ? h("div", { class: "text-success-emphasis", text: `+${Fmt.num(e.puntos)} en ${e.componente}` }) : null),
-          h("span", { class: `badge align-self-start ${badge[e.estado]}`, text: e.estado }))) : h("p", { class: "small text-body-secondary", text: "Sin evidencias." })));
+    const evidences = p.evidences.length ? p.evidences.map(e => h("div", { class: "mini-card d-flex justify-content-between gap-2" },
+      h("div", { class: "small" }, h("b", { text: e.titulo }), h("div", { class: "text-body-secondary", text: `${e.tipo} · ${Fmt.date(e.enviado)}` }),
+        e.estado === "Aplicada" ? h("div", { class: "text-success-emphasis", text: `+${Fmt.num(e.puntos)} en ${e.componente}` }) : null),
+      h("span", { class: `badge align-self-start ${badge[e.estado]}`, text: e.estado }))) : [h("p", { class: "small text-body-secondary mb-0", text: "Sin evidencias." })];
 
-    // ---- Historial ----
-    const history = p.history && p.history.length ? h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-sm table-cch mb-0" },
-      h("thead", {}, h("tr", {}, ["Curso", "Grupo", "Ciclo", "Final", "Faltas", "Comentarios"].map(t => h("th", { text: t })))),
-      h("tbody", {}, p.history.map(x => h("tr", {},
-        h("td", { class: "text-start", text: x.curso }), h("td", { text: x.grupo }), h("td", { text: x.ciclo }),
-        h("td", { text: Fmt.grade(x.final) }), h("td", { text: x.faltas ?? "—" }),
-        h("td", { class: "text-start small", style: { whiteSpace: "normal", minWidth: "220px" }, text: x.comentarios || "" })))))) : null;
+    const history = p.history && p.history.length
+      ? section("Ciclos anteriores", "clock-history", ...p.history.map(x => h("div", { class: "mini-card small" },
+          h("div", { class: "d-flex justify-content-between" }, h("b", { text: `${x.curso} ${x.grupo}` }), h("span", { class: "text-body-secondary", text: x.ciclo })),
+          h("div", { class: "text-body-secondary", text: `Final ${Fmt.grade(x.final)} · ${x.faltas ?? "—"} faltas` }),
+          x.comentarios ? h("div", { class: "mt-1", text: x.comentarios }) : null)))
+      : null;
 
-    // ---- Pestañas ----
-    const panes = [
-      { id: "res", label: "Resumen", iconName: "speedometer2", node: summary },
-      { id: "asi", label: "Asistencia", iconName: "calendar-check", node: attendance },
-      { id: "cal", label: "Calificaciones", iconName: "bar-chart", node: grades },
-      { id: "com", label: "Comentarios", iconName: "chat-left-text", node: h("div", {}, commentsBox, h("div", { class: "row g-2 mt-1" }, h("div", { class: "col-12" }, text), h("div", { class: "col-8" }, course), h("div", { class: "col-4 text-end" }, add))), extra: commentBadge },
-      { id: "eq", label: "Equipos y evidencias", iconName: "people", node: extra },
-      history ? { id: "his", label: "Historial", iconName: "clock-history", node: history } : null
-    ].filter(Boolean);
+    drawCards();
+    drawDetail();
 
-    const nav = h("ul", { class: "nav nav-pills profile-tabs mb-3 tab-scroll" });
-    const content = h("div");
-    const show = id => {
-      nav.querySelectorAll(".nav-link").forEach(b => b.classList.toggle("active", b.dataset.pane === id));
-      content.replaceChildren(panes.find(x => x.id === id).node);
-    };
-    panes.forEach(x => nav.append(h("li", { class: "nav-item" }, h("button", { class: "nav-link", type: "button", dataset: { pane: x.id }, onclick: () => show(x.id) }, icon(x.iconName, "me-1"), x.label, x.extra || null))));
-    show(Admin.profilePane && panes.some(x => x.id === Admin.profilePane) ? Admin.profilePane : "res");
-    nav.addEventListener("click", e => { const b = e.target.closest("[data-pane]"); if (b) Admin.profilePane = b.dataset.pane; });
-
-    body.replaceChildren(
-      h("div", { class: "d-flex flex-wrap align-items-center gap-2 mb-3 pb-2 border-bottom" },
+    body.replaceChildren(...kids(
+      h("div", { class: "d-flex flex-wrap align-items-center gap-2 mb-3" },
+        h("div", { class: "profile-avatar", "aria-hidden": "true", text: (p.nombres[0] || "?").trim().charAt(0) }),
         h("div", { class: "me-auto" },
-          h("div", { class: "fs-5 fw-semibold", text: p.nombres.join(" / ") || "(sin nombre)" }),
-          h("div", { class: "small text-body-secondary", text: p.correos.join(", ") || "sin correo" })),
+          h("div", { class: "fs-5 fw-semibold lh-sm", text: p.nombres.join(" / ") || "(sin nombre)" }),
+          h("div", { class: "small text-body-secondary" }, h("span", { class: "mono", text: p.cuenta }), ` · ${p.correos.join(", ") || "sin correo"}`)),
         groups.length > 1 ? h("span", { class: "badge rel-same" }, icon("people-fill"), ` ${groups.length} grupos este ciclo`) : null,
-        p.history && p.history.length ? h("span", { class: "badge rel-prev" }, icon("clock-history"), ` ${p.history.length} ciclo(s) anterior(es)`) : null,
+        p.history && p.history.length ? h("span", { class: "badge rel-prev" }, icon("clock-history"), ` ${p.history.length} ciclo(s) antes`) : null,
         p.nombres.length > 1 ? h("span", { class: "badge text-bg-warning", text: "nombres distintos" }) : null),
-      nav, content);
+      groups.length ? cardsRow : h("div", { class: "alert alert-light border small", text: "No está en ningún grupo activo." }),
+      detail,
+      h("div", { class: "row g-3 mt-1" },
+        h("div", { class: "col-12 col-lg-6" }, section(`Comentarios (${p.comments.length})`, "chat-left-text", commentsBox,
+          h("div", { class: "row g-2" }, h("div", { class: "col-12" }, text), h("div", { class: "col-8" }, course), h("div", { class: "col-4 text-end" }, add)))),
+        h("div", { class: "col-12 col-lg-6" },
+          section("Evidencias", "cloud-arrow-up", ...evidences),
+          section("Inscripciones", "diagram-3", h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))),
+          history))
+    ));
   },
 
   /* ---------------- Pestaña: Grupos ---------------- */
@@ -2160,24 +2625,22 @@ const Admin = {
       h("p", { class: "small text-body-secondary", text: "Crea las hojas de la plantilla Attendance Log (Course, Students, Attendance Log, Calificaciones, Roles), las hojas W_ de la web y las carpetas (Students_Images, Course_Images, Material_Archivos…) junto a la hoja, solo si faltan. Las que ya existen no se modifican." }),
       setupBtn, setupOut));
 
-    const migrateBtn = h("button", { class: "btn btn-sm btn-warning", type: "button" }, icon("magic", "me-1"), "Migrar y homologar");
-    const migrateOut = h("pre", { class: "small mb-0 mt-2 d-none", style: { whiteSpace: "pre-wrap" } });
-    migrateBtn.addEventListener("click", async () => {
-      if (!(await UI.confirm("Se hará un respaldo ZIP completo y luego: estados A/F/J, ciclos 2027-1, importar calificaciones, comentarios y proyectos de AppSheet, diseño homogéneo y borrar las hojas de MIGRATION.DELETE_SHEETS. Se puede repetir sin duplicar.", { okText: "Migrar" }))) return Admin.tabMaintenance(content);
-      try {
-        UI.toast("info", "Migrando… puede tardar 1–3 minutos.", 8000);
-        const r = await Api.call("migrate", {}, "admin");
-        UI.modal({ title: [icon("check-circle-fill", "text-success me-2"), "Migración terminada"], body: h("pre", { class: "small mb-0", style: { whiteSpace: "pre-wrap" }, text: r.log.join("\n") }), size: "modal-lg" });
-        Admin.boot = null; await Admin.loadBoot(); Prefs.set("admTab", "mantenimiento"); Admin.renderTab();
-      } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
-    });
-    const migrateCard = h("div", { class: "card card-soft border-warning" }, h("div", { class: "card-body" },
-      h("h2", { class: "h6" }, icon("magic", "me-1"), "Migrar y homologar"),
-      h("p", { class: "small text-body-secondary", text: "Una sola vez después de instalar (se puede repetir). Respalda todo en ZIP antes de cambiar." }),
-      migrateBtn, migrateOut));
+    const en = info.enrollment || { sinCurso: 0, inexistente: [], totalInexistente: 0, gruposVacios: [], ids: [] };
+    const enrollCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
+      h("h2", { class: "h6" }, icon("person-check", "me-1"), "Alumnos agregados a mano"),
+      h("p", { class: "small text-body-secondary", text: "En Students, la columna Course debe tener exactamente uno de estos ID_Curso:" }),
+      h("div", { class: "d-flex flex-wrap gap-1 mb-2" }, en.ids.map(x => h("button", {
+        class: "badge rel-same border-0", type: "button", title: `Copiar ${x.id}`,
+        onclick: async () => { try { await navigator.clipboard.writeText(x.id); UI.toast("success", `Copiado: ${x.id}`); } catch (e) { UI.toast("info", x.id); } }
+      }, icon("clipboard", "me-1"), `${x.label}: `, h("span", { class: "mono", text: x.id })))),
+      h("ul", { class: "small mb-0" },
+        h("li", {}, h("b", { text: en.sinCurso }), " con Course vacío (aún sin ligar)"),
+        h("li", { class: en.totalInexistente ? "text-danger" : "" }, h("b", { text: en.totalInexistente }), " con un Course que no existe",
+          en.inexistente.length ? h("div", { class: "mt-1" }, en.inexistente.slice(0, 10).map(x => h("div", { class: "mono", text: `${x.cuenta} → «${x.course}»` }))) : null),
+        en.gruposVacios.length ? h("li", { class: "text-warning-emphasis" }, "Grupos activos sin alumnos: ", en.gruposVacios.map(x => x.label).join(", ")) : null)));
 
     content.replaceChildren(h("div", { class: "row g-3" },
-      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, migrateCard, cycleCard, backupsCard, structureCard),
+      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard),
       h("div", { class: "col-12 col-xl-7 vstack gap-3" }, backupCard, dangerCard)));
   }
 };

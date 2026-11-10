@@ -8,9 +8,7 @@
  * ✏️ Lo que puedes ajustar está marcado con "AJUSTA AQUÍ":
  *    - Estados de asistencia (USE_RETARDO)
  *    - Columnas de las hojas (BASE_SHEETS, REPORT_COLUMNS)
- *    - Migración (MIGRATION: ciclos, estados, hojas a borrar)
- *
- * PRIMERA VEZ: ejecuta la función  migrarTodo  (▶ Ejecutar en el editor)
+ *    - Estatus de alumno (STUDENT_STATUSES) y tipos de evidencia
  *
  * CONTRASEÑA DE ADMIN: Configuración del proyecto ⚙️ →
  *   Propiedades de la secuencia de comandos → CCH_ADMIN_PASSWORD
@@ -27,7 +25,7 @@
  * ============================================================
  */
 
-const API_VERSION = "6.0.0";
+const API_VERSION = "6.2.0";
 const REPORT_PREFIX = "Reporte_";
 
 const SHEETS = {
@@ -47,6 +45,8 @@ const WEB = {
   TEAM_EVALS:  { name: "W_EvalEquipos",    headers: ["ID_Equipo", "ID_Proyecto", "Estrellas", "Calificacion", "Observaciones", "Actualizado"] },
   EVIDENCE:    { name: "W_Evidencias",     headers: ["ID", "Cuenta", "ID_Curso", "Tipo", "Titulo", "Descripcion", "Archivo_URL", "Archivo_Nombre", "Enviado", "Estado", "Puntos", "ID_Componente", "Aplicado", "Nota"] },
   COMMENTS:    { name: "W_Comentarios",    headers: ["ID", "Cuenta", "ID_Curso", "Texto", "Fecha"] },
+  // Enlace de columnas del Reporte_ con un componente, proyecto o promedio
+  COLUMNS:     { name: "W_Columnas",       headers: ["ID_Curso", "Columna", "Tipo", "Ref"] },
   LINKS:       { name: "W_Enlaces",        headers: ["ID", "Titulo", "URL", "ID_Curso", "Orden", "Activo"] },
   // Resumen de cada alumno de los ciclos que se respaldaron y borraron
   HISTORY:     { name: "W_Historial",      headers: ["Cuenta", "Nombre", "ID_Curso", "Curso", "Grupo", "Ciclo", "Asistencias", "Faltas", "Final", "Comentarios", "Respaldo", "Fecha"], text: ["Ciclo"] }
@@ -83,20 +83,16 @@ const REPORT_COLUMNS = ["Cuenta", "Nombre"];
 const REPORT_NAME_HEADERS = ["Nombre", "First Name"];
 
 // ============================================================
-// ✏️ AJUSTA AQUÍ · MIGRACIÓN (función migrarTodo)
+// ✏️ AJUSTA AQUÍ · ESTATUS DEL ALUMNO (columna Status de Students)
+// value = lo que se escribe en la hoja; label = lo que ves en la web
 // ============================================================
-const MIGRATION = {
-  // Ciclos escritos sin semestre en Course → ciclo correcto
-  CICLO_MAP: { "2026": "2027-1" },
-  // Estados viejos en las hojas Reporte_ → estado nuevo
-  STATUS_MAP: { "retardo": "Asistencia", "justificada": "Justificante", "justificado": "Justificante" },
-  // Hojas que se BORRAN al final (después del respaldo ZIP). Deja [] para no borrar ninguna.
-  // "Calificaciones" y "Proyectos" ya se importan a las hojas W_*.
-  DELETE_SHEETS: ["Proyectos"],
-  // true = en las hojas Reporte_ se borran columnas que no sean fecha ni de REPORT_COLUMNS
-  // (Parcial_1, Sellos, SIAE…; ahora esas calificaciones viven en la web)
-  CLEAN_REPORT_COLUMNS: false
-};
+const STUDENT_STATUSES = [
+  { value: "", label: "Regular" },
+  { value: "Acta", label: "Acta complementaria" },
+  { value: "Reprobado", label: "Reprobado" },
+  { value: "Alerta", label: "Alerta" },
+  { value: "Baja", label: "Baja" }
+];
 
 /** Carpetas de la plantilla (junto a la hoja de cálculo). Se crean si faltan. */
 const DRIVE_FOLDERS = [
@@ -135,7 +131,8 @@ const LEGACY_GRADE_COLUMNS = {
   "Parcial_2": "Parcial 2",
   "Parcial_3": "Parcial 3",
   "Sellos": "Sellos",
-  "Proyecto_Final": "Proyecto Final"
+  "Proyecto_Final": "Proyecto Final",
+  "Puntos Adicionales": "Puntos Adicionales"
 };
 
 const SETTINGS = {
@@ -145,10 +142,8 @@ const SETTINGS = {
 
   // ---- Ciclos y respaldos ----
   CURRENT_CYCLE_KEY: "CCH_CICLO_ACTUAL",        // opcional; si no existe se calcula por fecha
-  LEGACY_IMPORTED_KEY: "CCH_LEGADO_IMPORTADO",   // la migración ya copió comentarios viejos
   BACKUP_PREFIX: "Respaldo_CCH_",
   CLEAN_PREFIX: "Limpieza_CCH_",
-  MIGRATION_PREFIX: "Migracion_CCH_",
   PURGE_CONFIRM_WORD: "BORRAR",
   CLEAR_ALL_WORD: "BORRAR TODO",
 
@@ -163,7 +158,7 @@ const SETTINGS = {
   MAX_TEAM_SIZE: 8,
   MAX_FILE_MB: 8,
   ALLOWED_MIME: /^(image\/(png|jpe?g|webp|heic|heif)|application\/pdf)$/i,
-  EVIDENCE_TYPES: ["Evento", "Proyecto", "Actividad", "Otro"],
+  EVIDENCE_TYPES: ["Extracurricular", "Evento", "Proyecto", "Actividad", "Otro"],
 
   // ---- Asistencia (v4) ----
   ATTENDANCE_TOLERANCE_MINUTES: 15,
@@ -218,7 +213,7 @@ const VISIBILITY_FILL_COLORS = {
 
 // "Buscar alumnos duplicados" escribe en estas columnas de Students (por nombre)
 const DUPLICATES = {
-  STATUS_HEADER: "Status",
+  STATUS_HEADER: "Duplicado",   // columna propia; "Status" queda para tus estatus
   COURSES_HEADER: "Materias Cursadas"
 };
 
@@ -243,6 +238,17 @@ const NO_DATE_COLUMNS_MESSAGE =
 // Se arma al momento de cada petición (no al cargar el archivo): así no
 // importa en qué orden cargue Apps Script los archivos .gs.
 function routes_() {
+  // Tras guardar, reescribe las columnas enlazadas del Reporte_ del grupo
+  const synced = (fn, idOf) => (p, ctx) => {
+    const result = fn(p, ctx) || {};
+    const id = idOf(p, result);
+    if (id) result.message = (result.message || "") + afterGradesChange_(id);
+    return result;
+  };
+  const byParam = p => cleanText_(p.idCurso);
+  const byResult = (p, r) => r.idCurso;
+  const bySheet = p => (Object.values(groupsMap_()).find(g => g.sheet === p.sheetName) || {}).id;
+
   return {
   // ---- Público ----
   ping:               { auth: "public",  fn: () => ({ message: "WebApp activo ✅", version: API_VERSION }) },
@@ -259,16 +265,16 @@ function routes_() {
   adminBootstrap:     { auth: "admin", fn: adminBootstrap_ },
   saveGroup:          { auth: "admin", fn: saveGroup_, lock: true },
   groupData:          { auth: "admin", fn: groupData_ },
-  saveComponents:     { auth: "admin", fn: saveComponents_, lock: true },
-  importLegacyGrades: { auth: "admin", fn: importLegacyGrades_, lock: true },
-  saveGrades:         { auth: "admin", fn: saveGrades_, lock: true },
-  saveProject:        { auth: "admin", fn: saveProject_, lock: true },
-  deleteProject:      { auth: "admin", fn: deleteProject_, lock: true },
-  adminSaveTeam:      { auth: "admin", fn: adminSaveTeam_, lock: true },
-  deleteTeam:         { auth: "admin", fn: deleteTeam_, lock: true },
-  saveTeamEval:       { auth: "admin", fn: saveTeamEval_, lock: true },
+  saveComponents:     { auth: "admin", fn: synced(saveComponents_, byParam), lock: true },
+  importLegacyGrades: { auth: "admin", fn: synced(importLegacyGrades_, byParam), lock: true },
+  saveGrades:         { auth: "admin", fn: synced(saveGrades_, byParam), lock: true },
+  saveProject:        { auth: "admin", fn: synced(saveProject_, byParam), lock: true },
+  deleteProject:      { auth: "admin", fn: synced(deleteProject_, byResult), lock: true },
+  adminSaveTeam:      { auth: "admin", fn: synced(adminSaveTeam_, byResult), lock: true },
+  deleteTeam:         { auth: "admin", fn: synced(deleteTeam_, byResult), lock: true },
+  saveTeamEval:       { auth: "admin", fn: synced(saveTeamEval_, byResult), lock: true },
   listEvidence:       { auth: "admin", fn: listEvidence_ },
-  reviewEvidence:     { auth: "admin", fn: reviewEvidence_, lock: true },
+  reviewEvidence:     { auth: "admin", fn: synced(reviewEvidence_, byResult), lock: true },
   searchStudents:     { auth: "admin", fn: searchStudents_ },
   studentProfile:     { auth: "admin", fn: studentProfile_ },
   addComment:         { auth: "admin", fn: addComment_, lock: true },
@@ -276,11 +282,11 @@ function routes_() {
   getReports:         { auth: "admin", fn: () => ({ reports: getReportSheets_() }) },
   createReportSheet:  { auth: "admin", fn: p => createReportSheet(p.reportName) },
   // syncAllData ya usa su propio candado
-  syncAttendance:     { auth: "admin", fn: p => syncAllData(p.sheetName) },
+  syncAttendance:     { auth: "admin", fn: synced(p => syncAllData(p.sheetName), bySheet) },
   diagnose:           { auth: "admin", fn: p => diagnoseAttendance_(p.sheetName) },
 
   // ---- Pase de lista ----
-  saveRollCall:       { auth: "admin", fn: saveRollCall_, lock: true },
+  saveRollCall:       { auth: "admin", fn: synced(saveRollCall_, byParam), lock: true },
 
   // ---- Mantenimiento ----
   maintenanceInfo:    { auth: "admin", fn: maintenanceInfo_ },
@@ -289,13 +295,17 @@ function routes_() {
   backupPreview:      { auth: "admin", fn: backupPreview_ },
   backupCycles:       { auth: "admin", fn: backupCycles_, lock: true },
   clearTable:         { auth: "admin", fn: clearTable_, lock: true },
-  migrate:            { auth: "admin", fn: () => migrarTodo_(), lock: true },
 
   // ---- Enlaces y altas ----
   saveLinks:          { auth: "admin", fn: saveLinks_, lock: true },
   createGroup:        { auth: "admin", fn: createGroup_, lock: true },
-  addStudent:         { auth: "admin", fn: addStudent_, lock: true },
-  removeStudent:      { auth: "admin", fn: removeStudent_, lock: true }
+  addStudent:         { auth: "admin", fn: synced(addStudent_, byParam), lock: true },
+  removeStudent:      { auth: "admin", fn: removeStudent_, lock: true },
+  setStudentStatus:   { auth: "admin", fn: setStudentStatus_, lock: true },
+
+  // ---- Columnas del reporte ----
+  columnsInfo:        { auth: "admin", fn: p => columnsInfo_(p.idCurso) },
+  saveColumns:        { auth: "admin", fn: saveColumns_, lock: true }
   };
 }
 
@@ -727,7 +737,7 @@ function studentRecords_() {
   const headers = (data[0] || []).map(cleanText_);
   const col = name => findColumn_(headers, name);
   const iCuenta = col("Cuenta"), iFirst = col("First Name"), iLast = col("Last Name"),
-        iEmail = col("Email"), iCourse = col("Course");
+        iEmail = col("Email"), iCourse = col("Course"), iStatus = col("Status");
 
   const records = [];
   data.slice(1).forEach(row => {
@@ -737,7 +747,8 @@ function studentRecords_() {
       cuenta,
       nombre: [iFirst !== -1 ? row[iFirst] : "", iLast !== -1 ? row[iLast] : ""].map(cleanText_).filter(Boolean).join(" "),
       email: iEmail !== -1 ? cleanText_(row[iEmail]) : "",
-      course: iCourse !== -1 ? cleanText_(row[iCourse]) : ""
+      course: iCourse !== -1 ? cleanText_(row[iCourse]) : "",
+      status: iStatus !== -1 ? cleanText_(row[iStatus]) : ""
     });
   });
 
@@ -2346,6 +2357,15 @@ function importLegacyGrades_(params) {
   const iCurso = findColumn_(headers, "ID_Curso");
   const iCuenta = findColumn_(headers, "Cuenta");
 
+  // "Puntos Adicionales" con datos → componente manual con 0% (no altera el promedio)
+  const iPuntos = findColumn_(headers, "Puntos Adicionales");
+  const hasPuntos = iPuntos !== -1 && data.slice(1).some(r => cleanText_(r[iCurso]) === idCurso && toNumberOrNull_(r[iPuntos]) !== null);
+  if (hasPuntos && !components.some(c => normalizeKey_(c.nombre) === normalizeKey_("Puntos Adicionales"))) {
+    saveComponents_({ idCurso, components: components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo }))
+      .concat([{ nombre: "Puntos Adicionales", tipo: "manual", ponderacion: 0, maximo: 10 }]) });
+    components = componentsFor_(idCurso);
+  }
+
   const mapping = [];
   Object.keys(LEGACY_GRADE_COLUMNS).forEach(column => {
     const colIndex = findColumn_(headers, column);
@@ -2629,13 +2649,14 @@ function saveProject_(params) {
 function deleteProject_(params) {
   const id = cleanText_(params.projectId);
   if (!id) throw new Error("Falta el proyecto.");
+  const idCurso = cleanText_((Db.read(WEB.PROJECTS).rows.find(r => cleanText_(r.ID) === id) || {}).ID_Curso);
 
   const teamIds = new Set(Db.read(WEB.TEAMS).rows.filter(r => cleanText_(r.ID_Proyecto) === id).map(r => cleanText_(r.ID_Equipo)));
   Db.writeAll(WEB.PROJECTS, Db.read(WEB.PROJECTS).rows.filter(r => cleanText_(r.ID) !== id));
   Db.writeAll(WEB.TEAMS, Db.read(WEB.TEAMS).rows.filter(r => cleanText_(r.ID_Proyecto) !== id));
   Db.writeAll(WEB.TEAM_EVALS, Db.read(WEB.TEAM_EVALS).rows.filter(r => !teamIds.has(cleanText_(r.ID_Equipo))));
 
-  return { message: "Proyecto eliminado junto con sus equipos y evaluaciones." };
+  return { idCurso, message: "Proyecto eliminado junto con sus equipos y evaluaciones." };
 }
 
 // ---------- Registro de equipos ----------
@@ -2697,6 +2718,7 @@ function registerTeamCore_(opts) {
   const names = studentNames_();
   return {
     teamId,
+    idCurso: project.idCurso,
     members: cuentas.map(c => ({ cuenta: c, nombre: names[c] || "" })),
     message: `Equipo "${nombre}" registrado con ${cuentas.length} integrante(s) ✅`
   };
@@ -2730,9 +2752,10 @@ function adminSaveTeam_(params) {
 function deleteTeam_(params) {
   const id = cleanText_(params.teamId);
   if (!id) throw new Error("Falta el equipo.");
+  const idCurso = cleanText_((Db.read(WEB.TEAMS).rows.find(r => cleanText_(r.ID_Equipo) === id) || {}).ID_Curso);
   Db.writeAll(WEB.TEAMS, Db.read(WEB.TEAMS).rows.filter(r => cleanText_(r.ID_Equipo) !== id));
   Db.writeAll(WEB.TEAM_EVALS, Db.read(WEB.TEAM_EVALS).rows.filter(r => cleanText_(r.ID_Equipo) !== id));
-  return { message: "Equipo eliminado." };
+  return { idCurso, message: "Equipo eliminado." };
 }
 
 // ---------- Evaluación con estrellas ----------
@@ -2762,6 +2785,7 @@ function saveTeamEval_(params) {
 
   return {
     calificacion,
+    idCurso: team.idCurso,
     message: `«${team.nombre}»: ${calificacion} — aplicada a ${team.members.length} integrante(s) ✅`
   };
 }
@@ -2941,7 +2965,7 @@ function reviewEvidence_(params) {
   }
 
   Db.update(WEB.EVIDENCE, row);
-  return { message: estado === "Aplicada" ? "Puntos aplicados ✅ El alumno ya lo ve en su calificación." : `Evidencia marcada como ${estado}.` };
+  return { idCurso: evidence.idCurso, message: estado === "Aplicada" ? "Puntos aplicados ✅ El alumno ya lo ve en su calificación." : `Evidencia marcada como ${estado}.` };
 }
 
 
@@ -3101,11 +3125,16 @@ function groupData_(params) {
   const names = studentNames_();
   const commentCounts = commentCounts_();
   const links = studentLinks_(idCurso, result.group.ciclo);
+  const statusOf = {};
+  studentRecords_().forEach(r => { if (r.course === idCurso && r.status) statusOf[r.cuenta] = r.status; });
 
   const att = result.attendance;
 
   return {
     group: result.group,
+    statuses: STUDENT_STATUSES,
+    columns: columnLinksFor_(idCurso),
+    psi: { grupo: String(result.group.group || "").padStart(4, "0"), periodo: result.group.ciclo },
     currentCycle: currentCycle_(),
     components: result.components,
     attendance: att ? {
@@ -3119,6 +3148,9 @@ function groupData_(params) {
         statuses: row ? row.statuses : [],
         others: row ? row.others : [],
         comments: commentCounts[s.cuenta] || 0,
+        status: statusOf[s.cuenta] || "",
+        // Textos de comentarios (de este grupo o generales) para las sugerencias PSI. Solo admin.
+        notas: commentsFor_(s.cuenta).filter(c => !c.idCurso || c.idCurso === idCurso).map(c => c.texto),
         links: links[s.cuenta] || []
       });
     }),
@@ -3242,7 +3274,7 @@ function studentProfile_(params) {
       counts = att && att.rows[cuenta] ? att.rows[cuenta].counts : null;
     }
     enrollments.push({
-      idCurso: r.course, curso: c.name || r.course || "(sin curso)", grupo: c.group || "",
+      idCurso: r.course, curso: c.name || r.course || "(sin curso)", grupo: c.group || "", status: r.status,
       ciclo: (g && g.ciclo) || c.ciclo || "", activo: !!(g && g.active), counts
     });
   });
@@ -3252,7 +3284,10 @@ function studentProfile_(params) {
     nombres: Array.from(new Set(records.map(r => r.nombre).filter(Boolean))),
     correos: Array.from(new Set(records.map(r => r.email).filter(Boolean))),
     enrollments,
-    groups: studentCourseIds_(cuenta).map(id => buildStudentCourse_(id, cuenta, { admin: true })),
+    groups: studentCourseIds_(cuenta).map(id => Object.assign(buildStudentCourse_(id, cuenta, { admin: true }), {
+      status: (records.find(r => r.course === id) || {}).status || ""
+    })),
+    statuses: STUDENT_STATUSES,
     comments: commentsFor_(cuenta),
     history: historyMap_()[cuenta] || [],
     evidences: evidenceForStudent_(cuenta),
@@ -3264,30 +3299,11 @@ function studentProfile_(params) {
 
 // ---------- Comentarios ----------
 
-/** Comentarios de la hoja Calificaciones (AppSheet) + W_Comentarios. */
+/** Comentarios (W_Comentarios). */
 function allComments_() {
   if (Db._cache.__comments) return Db._cache.__comments;
   const courses = courseMap_();
   const list = [];
-
-  const imported = PropertiesService.getScriptProperties().getProperty(SETTINGS.LEGACY_IMPORTED_KEY);
-  const legacy = imported ? null : SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.LEGACY_GRADES);
-  if (legacy && legacy.getLastRow() > 1) {
-    const data = legacy.getDataRange().getDisplayValues();
-    const headers = data[0].map(cleanText_);
-    const iCuenta = findColumn_(headers, "Cuenta");
-    const iCurso = findColumn_(headers, "ID_Curso");
-    const iText = findColumn_(headers, "Comentarios");
-    if (iCuenta !== -1 && iText !== -1) {
-      data.slice(1).forEach(row => {
-        const cuenta = limpiarCuenta_(row[iCuenta]);
-        const texto = cleanText_(row[iText]);
-        if (!cuenta || !texto) return;
-        const idCurso = iCurso !== -1 ? cleanText_(row[iCurso]) : "";
-        list.push({ id: "", origen: "AppSheet", cuenta, idCurso, curso: courseLabel_(courses, idCurso), texto, fecha: "" });
-      });
-    }
-  }
 
   Db.read(WEB.COMMENTS).rows.forEach(r => {
     const cuenta = limpiarCuenta_(r.Cuenta);
@@ -3403,8 +3419,9 @@ function addStudent_(params) {
   const data = students.getDataRange().getValues();
   const iId = findColumn_(data[0].map(cleanText_), "ID");
   const nextId = data.slice(1).reduce((max, r) => Math.max(max, Number(r[iId]) || 0), 0) + 1;
+  const status = STUDENT_STATUSES.some(x => x.value === cleanText_(params.status)) ? cleanText_(params.status) : "";
   appendByHeaders_(students, {
-    ID: nextId, Cuenta: cuenta, "First Name": nombre, Email: cleanText_(params.email), Course: idCurso
+    ID: nextId, Cuenta: cuenta, "First Name": nombre, Email: cleanText_(params.email), Course: idCurso, Status: status
   });
 
   if (group.sheet) {
@@ -3420,7 +3437,33 @@ function addStudent_(params) {
       }
     }
   }
-  return { message: `${nombre} inscrito en ${group.label}.` };
+  return { message: `${nombre} inscrito en ${group.label}${status ? ` (${status})` : ""}.` };
+}
+
+/** Cambia el Status (Acta, Reprobado…) de la inscripción del alumno en ese grupo. */
+function setStudentStatus_(params) {
+  const idCurso = cleanText_(params.idCurso);
+  const cuenta = limpiarCuenta_(params.cuenta);
+  const status = cleanText_(params.status);
+  if (!STUDENT_STATUSES.some(x => x.value === status)) throw new Error("Estatus inválido.");
+
+  const sheet = requireSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEETS.STUDENTS);
+  const values = sheet.getDataRange().getValues();
+  const h = values[0].map(cleanText_);
+  const iC = findColumn_(h, "Cuenta"), iCourse = findColumn_(h, "Course");
+  let iS = findColumn_(h, "Status");
+  if (iS === -1) { iS = h.length; sheet.getRange(1, iS + 1).setValue("Status"); }
+
+  let changed = 0;
+  values.forEach((r, i) => {
+    if (i && limpiarCuenta_(r[iC]) === cuenta && cleanText_(r[iCourse]) === idCurso) {
+      sheet.getRange(i + 1, iS + 1).setValue(status);
+      changed++;
+    }
+  });
+  if (!changed) throw new Error("Ese alumno no está inscrito en Students para este grupo (agrégalo con «+ Alumno»).");
+  const label = (STUDENT_STATUSES.find(x => x.value === status) || {}).label || status;
+  return { message: `Estatus: ${label}.` };
 }
 
 /** Da de baja a un alumno del grupo: quita su fila de Students y del Reporte_. */
@@ -3602,6 +3645,7 @@ function maintenanceInfo_() {
 
   const folder = spreadsheetFolder_();
   return {
+    enrollment: enrollmentIssues_(),
     current: currentCycle_(),
     currentAuto: !PropertiesService.getScriptProperties().getProperty(SETTINGS.CURRENT_CYCLE_KEY),
     cycles: cyclesSummary_(),
@@ -3619,7 +3663,7 @@ function listBackups_(folder) {
   while (files.hasNext()) {
     const file = files.next();
     const name = file.getName();
-    if (![SETTINGS.BACKUP_PREFIX, SETTINGS.CLEAN_PREFIX, SETTINGS.MIGRATION_PREFIX].some(p => name.startsWith(p))) continue;
+    if (![SETTINGS.BACKUP_PREFIX, SETTINGS.CLEAN_PREFIX].some(p => name.startsWith(p))) continue;
     list.push({ name, url: file.getUrl(), download: downloadUrl_(file.getId()), date: toIso_(file.getDateCreated()), size: file.getSize() });
   }
   return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
@@ -3924,6 +3968,32 @@ function clearTable_(params) {
   return { file, message: `Se respaldaron y borraron ${total} registro(s). Respaldo: ${file.name}` };
 }
 
+/**
+ * Revisión de alumnos agregados a mano en Students:
+ *   - Course vacío (aún no ligados a un curso)
+ *   - Course que no existe en la hoja Course (ID mal escrito)
+ *   - Cursos activos sin alumnos ligados
+ */
+function enrollmentIssues_() {
+  const courses = courseMap_();
+  const groups = groupsMap_();
+  let sinCurso = 0;
+  const inexistente = [];
+  const porCurso = {};
+  studentRecords_().forEach(r => {
+    if (!r.course) { sinCurso++; return; }
+    if (!courses[r.course]) inexistente.push({ cuenta: r.cuenta, nombre: r.nombre, course: r.course });
+    porCurso[r.course] = (porCurso[r.course] || 0) + 1;
+  });
+  return {
+    sinCurso,
+    inexistente: inexistente.slice(0, 50),
+    totalInexistente: inexistente.length,
+    gruposVacios: Object.values(groups).filter(g => g.active && !porCurso[g.id]).map(g => ({ id: g.id, label: g.label })),
+    ids: Object.values(groups).filter(g => g.active).map(g => ({ id: g.id, label: g.label }))
+  };
+}
+
 
 // ============================================================
 // ENLACES PARA ALUMNOS (W_Enlaces)
@@ -3961,6 +4031,181 @@ function saveLinks_(params) {
   });
   Db.writeAll(WEB.LINKS, rows);
   return { links: allLinks_(), message: "Enlaces guardados ✅" };
+}
+
+
+// ============================================================
+// COLUMNAS DEL REPORTE (Parcial_1, Sellos, Ejercicio Clase, Calificación…)
+//
+// Cada columna que NO es fecha puede enlazarse con:
+//   componente → su calificación capturada (con puntos extra), en su escala
+//   proyecto   → la calificación del equipo del alumno en ese proyecto
+//   final      → promedio actual (sobre lo evaluado)
+//   estricta   → final con lo pendiente en 0
+// El enlace vive en W_Columnas. Cada vez que cambias algo en la web
+// (captura, estrellas, evidencias, pase de lista…) se reescribe la
+// columna en la hoja Reporte_ (reemplaza fórmulas viejas como VLOOKUP).
+//
+// Visibilidad: fila 1 del Reporte_ ("Visible" / "Oculto"); se edita
+// desde la web (botón «Columnas») o directo en la hoja.
+// ============================================================
+
+const COLUMN_LINK_TYPES = ["componente", "proyecto", "final", "estricta"];
+
+function savedColumnLinks_(idCurso) {
+  return Db.read(WEB.COLUMNS).rows
+    .filter(r => cleanText_(r.ID_Curso) === idCurso && COLUMN_LINK_TYPES.includes(cleanText_(r.Tipo)))
+    .map(r => ({ columna: cleanText_(r.Columna), tipo: cleanText_(r.Tipo), ref: cleanText_(r.Ref) }));
+}
+
+/** Enlaces con etiqueta (para el encabezado clicable de la tabla). */
+function columnLinksFor_(idCurso) {
+  const comps = {};
+  componentsFor_(idCurso).forEach(c => { comps[c.id] = c.nombre; });
+  const projects = {};
+  projectsFor_(idCurso).forEach(p => { projects[p.id] = p.nombre; });
+  return savedColumnLinks_(idCurso).map(l => Object.assign(l, {
+    label: l.tipo === "componente" ? comps[l.ref] || "(componente borrado)"
+      : l.tipo === "proyecto" ? projects[l.ref] || "(proyecto borrado)"
+      : l.tipo === "final" ? "Promedio actual" : "Final estricta"
+  }));
+}
+
+/** Sugerencia por nombre de columna (no se guarda hasta que presionas Guardar). */
+function suggestColumnLink_(name, comps, projects) {
+  const key = normalizeKey_(name).replace(/[\s_\-.]+/g, "");
+  const comp = comps.find(c => normalizeKey_(c.nombre).replace(/[\s_\-.]+/g, "") === key);
+  if (comp) return { tipo: "componente", ref: comp.id };
+  if (/^(calificacion|calificacionfinal|promedio|final)$/.test(key)) return { tipo: "final", ref: "" };
+  if (/ejercicio|proyecto/.test(key) && projects.length === 1) return { tipo: "proyecto", ref: projects[0].id };
+  if (/proyecto/.test(key)) {
+    const pc = comps.find(c => c.tipo === "proyectos");
+    if (pc) return { tipo: "componente", ref: pc.id };
+  }
+  return null;
+}
+
+function columnsInfo_(idCurso) {
+  idCurso = cleanText_(idCurso);
+  const group = requireGroup_(idCurso);
+  const att = reportAttendance_(group.sheet);
+  if (!att) throw new Error("Este grupo no tiene hoja Reporte_ ligada.");
+
+  const comps = componentsFor_(idCurso);
+  const projects = projectsFor_(idCurso);
+  const saved = {};
+  savedColumnLinks_(idCurso).forEach(l => { saved[normalizeKey_(l.columna)] = l; });
+
+  return {
+    sheetName: att.sheetName,
+    columns: att.others.map(o => {
+      const link = saved[normalizeKey_(o.label)] || null;
+      return { name: o.label, visible: o.visible, link, suggested: link ? null : suggestColumnLink_(o.label, comps, projects) };
+    }),
+    dates: att.dates.map(d => ({ key: d.key, label: d.label, visible: d.visible })),
+    options: comps.map(c => ({ tipo: "componente", ref: c.id, label: `Componente · ${c.nombre}` }))
+      .concat(projects.map(p => ({ tipo: "proyecto", ref: p.id, label: `Proyecto · ${p.nombre}` })))
+      .concat([{ tipo: "final", ref: "", label: "Promedio actual" }, { tipo: "estricta", ref: "", label: "Final estricta" }])
+  };
+}
+
+/**
+ * params: { idCurso, columns: [{ name, visible, link: {tipo, ref} | null }], dates: [{ key, visible }] }
+ */
+function saveColumns_(params) {
+  const idCurso = cleanText_(params.idCurso);
+  const group = requireGroup_(idCurso);
+  const sheet = group.sheet && SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+  if (!sheet) throw new Error("Este grupo no tiene hoja Reporte_ ligada.");
+
+  // 1. Visibilidad (fila 1)
+  const width = sheet.getLastColumn();
+  const headers = sheet.getRange(2, 1, 1, width).getValues()[0];
+  const clean = headers.map(cleanText_);
+  const row1 = sheet.getRange(1, 1, 1, width).getValues()[0].map(normalizeVisibilityValue_);
+  (params.columns || []).forEach(c => {
+    const i = findColumn_(clean, c.name);
+    if (i !== -1) row1[i] = c.visible ? "Visible" : "Oculto";
+  });
+  const tz = getSpreadsheetTz_();
+  const dateIndex = {};
+  detectDateColumns_(headers, findColumn_(clean, "Cuenta"), tz).forEach(d => { dateIndex[d.key] = d.index; });
+  (params.dates || []).forEach(d => {
+    if (dateIndex[d.key] !== undefined) row1[dateIndex[d.key]] = d.visible ? "Visible" : "Oculto";
+  });
+  sheet.getRange(1, 1, 1, width).setValues([row1]);
+
+  // 2. Enlaces
+  const others = Db.read(WEB.COLUMNS).rows.filter(r => cleanText_(r.ID_Curso) !== idCurso);
+  const links = (params.columns || [])
+    .filter(c => c.link && COLUMN_LINK_TYPES.includes(cleanText_(c.link.tipo)) && findColumn_(clean, c.name) !== -1)
+    .map(c => ({ ID_Curso: idCurso, Columna: cleanText_(c.name), Tipo: cleanText_(c.link.tipo), Ref: cleanText_(c.link.ref) }));
+  Db.writeAll(WEB.COLUMNS, others.concat(links));
+
+  delete Db._cache["__rep_" + group.sheet];
+  const written = syncReportColumns_(idCurso);
+  return { message: `Columnas guardadas. ${written} columna(s) del reporte actualizadas con datos de la web ✅` };
+}
+
+/** Escribe en la hoja Reporte_ los valores de las columnas enlazadas. Devuelve cuántas columnas escribió. */
+function syncReportColumns_(idCurso) {
+  const links = savedColumnLinks_(idCurso);
+  if (!links.length) return 0;
+  const group = requireGroup_(idCurso);
+  const sheet = group.sheet && SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+  if (!sheet || sheet.getLastRow() < 3) return 0;
+
+  delete Db._cache["__rep_" + group.sheet];
+  const computed = computeCourse_(idCurso);
+  const byCuenta = {};
+  computed.students.forEach(s => { byCuenta[s.cuenta] = s; });
+  const projects = {};
+  computed.projects.list.forEach(p => { projects[p.id] = p; });
+
+  const report = readReport_(sheet);
+  const count = sheet.getLastRow() - 2;
+  const round = v => (v === null || v === undefined || !isFinite(v)) ? "" : Math.round(v * 100) / 100;
+
+  const valueFor = (link, cuenta) => {
+    const s = byCuenta[cuenta];
+    if (!s) return "";
+    if (link.tipo === "componente") return round(s.items[link.ref] ? s.items[link.ref].raw : null);
+    if (link.tipo === "final") return round(s.final);
+    if (link.tipo === "estricta") return round(s.finalStrict);
+    // proyecto
+    const project = projects[link.ref];
+    if (!project) return "";
+    const team = computed.projects.teams.find(t => t.projectId === project.id && t.members.includes(cuenta));
+    if (team) return round(team.calificacion);
+    return computed.projects.evaluated.has(project.id) && !project.abierto ? 0 : "";
+  };
+
+  let written = 0;
+  links.forEach(link => {
+    const col = findColumn_(report.headers, link.columna);
+    if (col === -1) return;
+    const values = [];
+    for (let r = 2; r < count + 2; r++) {
+      values.push([valueFor(link, limpiarCuenta_((report.data[r] || [])[report.accountIndex]))]);
+    }
+    sheet.getRange(3, col + 1, count, 1).setValues(values);
+    written++;
+  });
+
+  delete Db._cache["__rep_" + group.sheet];
+  return written;
+}
+
+/** Se llama después de cada cambio de calificaciones/asistencia; nunca rompe la operación principal. */
+function afterGradesChange_(idCurso) {
+  if (!idCurso) return "";
+  try {
+    Db.clearCache();
+    const n = syncReportColumns_(idCurso);
+    return n ? ` Reporte actualizado (${n} columna(s)).` : "";
+  } catch (error) {
+    return ` (No se pudo actualizar el reporte: ${error.message})`;
+  }
 }
 
 
@@ -4046,277 +4291,6 @@ function formatReportSheet_(sheet) {
     rules.push(rule(status, data, STATUS_FILL[status], STATUS_FONT[status]));
   });
   sheet.setConditionalFormatRules(rules);
-}
-
-// ============================================================
-// MIGRACIÓN ÚNICA
-//
-// Cómo ejecutarla: en el editor de Apps Script elige la función
-// "migrarTodo" y presiona ▶ Ejecutar (o el botón "Migrar y homologar"
-// en la pestaña Mantenimiento de la web). Se puede correr varias veces.
-//
-//  1. Respaldo ZIP de TODA la hoja (Excel) junto a la hoja de cálculo
-//  2. Crea hojas y carpetas que falten
-//  3. Ciclos de Course: "2025_2" → "2025-2" y MIGRATION.CICLO_MAP
-//  4. Reportes: Retardo → Asistencia, Justificada → Justificante,
-//     "First Name" → "Nombre" y (opcional) columnas que sobran
-//  5. Calificaciones (AppSheet) → W_Calificaciones
-//  6. Comentarios (AppSheet) → W_Comentarios
-//  7. Hoja Proyectos (AppSheet) → W_Proyectos / W_Equipos / W_EvalEquipos
-//  8. Enlace inicial "Aula Digital"
-//  9. Diseño homologado en todas las hojas
-// 10. Borra MIGRATION.DELETE_SHEETS
-// ============================================================
-
-function migrarTodo() {
-  const result = withScriptLock_(() => migrarTodo_());
-  Logger.log(result.log.join("\n"));
-  try {
-    SpreadsheetApp.getUi().alert("✅ Migración terminada", result.log.join("\n"), SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (e) { /* ejecutada desde la web o sin interfaz */ }
-  return result;
-}
-
-function migrarTodo_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const log = [];
-
-  // 1. Respaldo completo
-  const all = spreadsheet.getSheets().map(sh => ({ name: sh.getName(), matrix: sheetMatrix_(sh) }));
-  const file = saveZip_(`${SETTINGS.MIGRATION_PREFIX}${stamp_()}.zip`, [exportXlsx_(`${SETTINGS.MIGRATION_PREFIX}antes`, all)]);
-  log.push(`1. Respaldo completo: ${file.name}`);
-
-  // 2. Estructura
-  const setup = setupWeb_({ folders: true });
-  log.push(`2. Hojas creadas: ${setup.created.join(", ") || "ninguna"} · carpetas: ${setup.folders.length} · grupos ligados: ${setup.linked.length}`);
-  if (setup.missingColumns.length) {
-    log.push(`   ⚠️ Columnas faltantes: ${setup.missingColumns.map(m => `${m.sheet} (${m.columns.join(", ")})`).join("; ")}`);
-  }
-
-  // 3. Ciclos
-  const cycles = migrateCourseCycles_();
-  Db.clearCache();
-  log.push(`3. Ciclos corregidos en Course: ${cycles.changed} · grupos actualizados: ${cycles.groups}`);
-
-  // 4. Reportes
-  let statusChanges = 0, removedColumns = 0, reports = 0;
-  getReportSheets_().forEach(r => {
-    const result = migrateReportSheet_(spreadsheet.getSheetByName(r.name));
-    statusChanges += result.statuses;
-    removedColumns += result.removedColumns;
-    reports++;
-  });
-  Db.clearCache();
-  log.push(`4. Reportes revisados: ${reports} · estados convertidos: ${statusChanges} · columnas quitadas: ${removedColumns}`);
-
-  // 5. Calificaciones
-  let grades = 0;
-  if (spreadsheet.getSheetByName(SHEETS.LEGACY_GRADES)) {
-    Object.keys(groupsMap_()).forEach(id => {
-      try { grades += importLegacyGrades_({ idCurso: id }).imported; } catch (e) { log.push(`   ⚠️ ${id}: ${e.message}`); }
-      Db.clearCache();
-    });
-  }
-  log.push(`5. Calificaciones importadas: ${grades}`);
-
-  // 6. Comentarios
-  log.push(`6. Comentarios importados: ${migrateLegacyComments_()}`);
-
-  // 7. Proyectos
-  const projects = migrateLegacyProjects_();
-  log.push(`7. Proyectos de AppSheet: ${projects.projects} proyecto(s), ${projects.teams} equipo(s)`);
-
-  // 8. Enlaces
-  if (!Db.read(WEB.LINKS).rows.length) {
-    Db.append(WEB.LINKS, [{ ID: shortId_(), Titulo: "Aula Digital", URL: "https://nequizunam.github.io/CCH-Docs/", ID_Curso: "", Orden: 1, Activo: true }]);
-    log.push("8. Enlace «Aula Digital» agregado");
-  } else {
-    log.push("8. Enlaces: sin cambios");
-  }
-
-  // 10 (antes del diseño para no formatear hojas que se borran)
-  const deleted = [];
-  MIGRATION.DELETE_SHEETS.forEach(name => {
-    const sheet = spreadsheet.getSheetByName(name);
-    if (!sheet || isReportSheetName_(name)) return;
-    spreadsheet.deleteSheet(sheet);
-    deleted.push(name);
-  });
-
-  // 9. Diseño
-  Db.clearCache();
-  spreadsheet.getSheets().forEach(sheet => {
-    if (isReportSheetName_(sheet.getName())) formatReportSheet_(sheet);
-    else if (sheet.getLastColumn() > 0) formatTableSheet_(sheet);
-  });
-  log.push(`9. Diseño aplicado a ${spreadsheet.getSheets().length} hojas`);
-  log.push(`10. Hojas borradas: ${deleted.join(", ") || "ninguna"}`);
-
-  return { log, file, message: "Migración terminada ✅" };
-}
-
-/** Course.Ciclo_Escolar normalizado (texto "2027-1") y W_Grupos alineado. */
-function migrateCourseCycles_() {
-  const sheet = requireSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEETS.COURSE);
-  const result = { changed: 0, groups: 0 };
-  if (sheet.getLastRow() < 2) return result;
-
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(cleanText_);
-  const col = findColumn_(headers, "Ciclo_Escolar");
-  if (col === -1) return result;
-
-  const range = sheet.getRange(2, col + 1, sheet.getLastRow() - 1, 1);
-  const values = range.getDisplayValues().map(([v]) => {
-    const raw = cleanText_(v);
-    const mapped = MIGRATION.CICLO_MAP[raw] || normalizeCiclo_(raw);
-    if (mapped !== raw) result.changed++;
-    return [mapped];
-  });
-  range.setNumberFormat("@").setValues(values);
-  Db.clearCache();
-
-  // W_Grupos toma el ciclo corregido del curso
-  const courses = courseMap_();
-  const table = Db.read(WEB.GROUPS);
-  const rows = table.rows.map(r => {
-    const copy = Object.assign({}, r);
-    const fromCourse = courses[cleanText_(r.ID_Curso)] ? courses[cleanText_(r.ID_Curso)].ciclo : "";
-    const current = normalizeCiclo_(r.Ciclo);
-    const mapped = MIGRATION.CICLO_MAP[current] || current;
-    const next = /^\d{4}-[12]$/.test(mapped) ? mapped : fromCourse;
-    if (next && next !== cleanText_(r.Ciclo)) { copy.Ciclo = next; result.groups++; }
-    return copy;
-  });
-  if (result.groups) Db.writeAll(WEB.GROUPS, rows);
-  return result;
-}
-
-/** Estados viejos → nuevos, "First Name" → "Nombre", columnas sobrantes (opcional). */
-function migrateReportSheet_(sheet) {
-  const out = { statuses: 0, removedColumns: 0 };
-  if (!sheet || sheet.getLastRow() < 2) return out;
-  const tz = getSpreadsheetTz_();
-
-  const headerRange = sheet.getRange(2, 1, 1, sheet.getLastColumn());
-  const headers = headerRange.getValues()[0];
-  const clean = headers.map(cleanText_);
-  const iFirst = findColumn_(clean, "First Name");
-  if (iFirst !== -1 && findColumn_(clean, "Nombre") === -1) sheet.getRange(2, iFirst + 1).setValue("Nombre");
-
-  const accountIndex = findColumn_(clean, "Cuenta");
-  const dates = detectDateColumns_(headers, accountIndex, tz);
-
-  if (sheet.getLastRow() >= 3) {
-    groupContiguous_(dates.map(d => d.index)).forEach(group => {
-      const range = sheet.getRange(3, group[0] + 1, sheet.getLastRow() - 2, group.length);
-      const values = range.getValues();
-      const formulas = range.getFormulas();
-      let changed = 0;
-      values.forEach((row, r) => row.forEach((v, c) => {
-        if (formulas[r][c]) return;
-        const target = MIGRATION.STATUS_MAP[normalizeKey_(v)];
-        if (target && target !== v && !(USE_RETARDO && normalizeKey_(v) === "retardo")) {
-          values[r][c] = target;
-          changed++;
-        }
-      }));
-      if (changed) {
-        range.setValues(values);
-        out.statuses += changed;
-      }
-    });
-  }
-
-  if (MIGRATION.CLEAN_REPORT_COLUMNS) {
-    const keep = new Set(REPORT_COLUMNS.concat(REPORT_NAME_HEADERS).map(normalizeKey_));
-    const dateSet = new Set(dates.map(d => d.index));
-    const remove = [];
-    clean.forEach((h, i) => { if (!dateSet.has(i) && !keep.has(normalizeKey_(h))) remove.push(i); });
-    groupContiguous_(remove).reverse().forEach(g => sheet.deleteColumns(g[0] + 1, g.length));
-    out.removedColumns = remove.length;
-  }
-  return out;
-}
-
-/** Copia los comentarios de la hoja Calificaciones a W_Comentarios (una sola vez). */
-function migrateLegacyComments_() {
-  const props = PropertiesService.getScriptProperties();
-  if (props.getProperty(SETTINGS.LEGACY_IMPORTED_KEY)) return 0;
-
-  delete Db._cache.__comments;
-  const existing = new Set(Db.read(WEB.COMMENTS).rows.map(r => `${limpiarCuenta_(r.Cuenta)}|${cleanText_(r.Texto)}`));
-  const rows = allComments_()
-    .filter(c => c.origen === "AppSheet" && !existing.has(`${c.cuenta}|${c.texto}`))
-    .map(c => ({ ID: shortId_(), Cuenta: c.cuenta, ID_Curso: c.idCurso, Texto: c.texto, Fecha: "" }));
-
-  if (rows.length) Db.append(WEB.COMMENTS, rows);
-  props.setProperty(SETTINGS.LEGACY_IMPORTED_KEY, "1");
-  delete Db._cache.__comments;
-  return rows.length;
-}
-
-/**
- * Hoja "Proyectos" (Número de Cuenta | Equipo | Grupo | rubros… | Observaciones | …)
- * → un proyecto "Proyecto (AppSheet)" por grupo con sus equipos y estrellas.
- */
-function migrateLegacyProjects_() {
-  const out = { projects: 0, teams: 0 };
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Proyectos");
-  if (!sheet || sheet.getLastRow() < 2) return out;
-
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0].map(cleanText_);
-  const iCuenta = headers.findIndex(h => normalizeKey_(h).includes("cuenta"));
-  const iEquipo = findColumn_(headers, "Equipo");
-  const iGrupo = findColumn_(headers, "Grupo");
-  const iObs = findColumn_(headers, "Observaciones");
-  if (iCuenta === -1 || iEquipo === -1 || iGrupo === -1) return out;
-  const rubricIdx = [];
-  for (let i = iGrupo + 1; i < (iObs === -1 ? headers.length : iObs); i++) if (headers[i]) rubricIdx.push(i);
-  const rubros = rubricIdx.map(i => headers[i]);
-
-  // Grupo (número) → ID_Curso activo
-  const byNumber = {};
-  Object.values(groupsMap_()).forEach(g => { if (g.active && g.group) byNumber[String(g.group)] = g.id; });
-
-  const existing = new Set(Db.read(WEB.PROJECTS).rows
-    .filter(r => cleanText_(r.Nombre) === "Proyecto (AppSheet)").map(r => cleanText_(r.ID_Curso)));
-
-  const groups = {};
-  values.slice(1).forEach(r => {
-    const idCurso = byNumber[cleanText_(r[iGrupo])];
-    const cuenta = limpiarCuenta_(r[iCuenta]);
-    const equipo = cleanText_(r[iEquipo]);
-    if (!idCurso || !cuenta || !equipo || existing.has(idCurso)) return;
-    const teams = groups[idCurso] || (groups[idCurso] = {});
-    const team = teams[equipo] || (teams[equipo] = { members: [], stars: {}, obs: iObs !== -1 ? cleanText_(r[iObs]) : "" });
-    if (!team.members.includes(cuenta)) team.members.push(cuenta);
-    rubricIdx.forEach((c, k) => { team.stars[rubros[k]] = Math.max(0, Math.min(5, Math.round(Number(r[c]) || 0))); });
-  });
-
-  const projectRows = [], teamRows = [], evalRows = [];
-  const now = new Date();
-  Object.keys(groups).forEach(idCurso => {
-    const comp = componentsFor_(idCurso).find(c => c.tipo === "proyectos");
-    const projectId = shortId_();
-    projectRows.push({ ID: projectId, ID_Curso: idCurso, Nombre: "Proyecto (AppSheet)", Rubros: rubros, ID_Componente: comp ? comp.id : "", Registro_Abierto: false, Creado: now });
-    out.projects++;
-    Object.keys(groups[idCurso]).forEach(nombre => {
-      const t = groups[idCurso][nombre];
-      const teamId = shortId_();
-      t.members.forEach(cuenta => teamRows.push({ ID_Equipo: teamId, ID_Proyecto: projectId, ID_Curso: idCurso, Nombre_Equipo: nombre, Cuenta: cuenta, Registrado: now, Registrado_Por: "migración" }));
-      const grade = round_(rubros.reduce((s, r) => s + (t.stars[r] || 0), 0) / (5 * rubros.length) * 10, 2);
-      evalRows.push({ ID_Equipo: teamId, ID_Proyecto: projectId, Estrellas: t.stars, Calificacion: grade, Observaciones: t.obs, Actualizado: now });
-      out.teams++;
-    });
-  });
-
-  if (projectRows.length) {
-    Db.append(WEB.PROJECTS, projectRows);
-    Db.append(WEB.TEAMS, teamRows);
-    Db.append(WEB.TEAM_EVALS, evalRows);
-  }
-  return out;
 }
 
 
