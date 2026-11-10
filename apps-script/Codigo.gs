@@ -426,6 +426,7 @@ function setupWeb_(options) {
 
   ensureCourseWebColumns_();
   upgradeIntegerLinks_();
+  pairAllComponentColumns_();
 
   // Hojas Reporte_ que ningún curso tiene ligadas → se ligan al curso detectado (si no tiene hoja)
   const courses = courseMap_();
@@ -2288,15 +2289,20 @@ function saveComponents_(params) {
     };
   });
 
+  const before = componentsFor_(idCurso);
   const others = Db.read(WEB.COMPONENTS).rows.filter(r => cleanText_(r.ID_Curso) !== idCurso);
   Db.writeAll(WEB.COMPONENTS, others.concat(newRows));
+
+  // Componente ⇄ columna del reporte: borrar, renombrar o crear la columna enlazada
+  let notes = [];
+  try { notes = pairComponentColumns_(idCurso, before); } catch (e) { notes = [`(No se pudo ajustar el reporte: ${e.message})`]; }
 
   const total = newRows.reduce((sum, r) => sum + r.Ponderacion, 0);
   return {
     components: componentsFor_(idCurso),
-    message: total === 100
+    message: (total === 100
       ? "Ponderaciones guardadas ✅"
-      : `Guardado. Ojo: las ponderaciones suman ${total}% (se normalizan al calcular).`
+      : `Guardado. Ojo: las ponderaciones suman ${total}% (se normalizan al calcular).`) + (notes.length ? " " + notes.join(" ") : "")
   };
 }
 
@@ -2478,6 +2484,8 @@ function computeCourse_(idCurso, onlyCuenta) {
       items,
       final: evaluatedWeight ? round_(weighted / evaluatedWeight, 1) : null,
       finalStrict: totalWeight ? round_(weighted / totalWeight, 1) : null,
+      // Calificación entera: suma exacta de % SIN redondear antes (7.96 → 7, no 8)
+      entero: totalWeight ? truncGrade_(weighted / totalWeight) : null,
       evaluatedWeight,
       counts: att ? att.counts : null
     };
@@ -3036,6 +3044,7 @@ function studentData_(params, ctx) {
     const c = buildStudentCourse_(id, cuenta);
     delete c.final;
     delete c.finalStrict;
+    delete c.entero;
     c.projects.forEach(p => { if (p.team) delete p.team.observaciones; });
     return c;
   });
@@ -4194,7 +4203,7 @@ function syncReportColumns_(idCurso) {
     if (link.tipo === "componente") return round(s.items[link.ref] ? s.items[link.ref].raw : null);
     if (link.tipo === "final") return round(s.final);
     if (link.tipo === "estricta") return round(s.finalStrict);
-    if (link.tipo === "entero") { const v = truncGrade_(s.finalStrict); return v === null ? "" : v; }
+    if (link.tipo === "entero") return s.entero === null || s.entero === undefined ? "" : s.entero;
     // proyecto
     const project = projects[link.ref];
     if (!project) return "";
@@ -4278,7 +4287,104 @@ function columnLetter_(n) {
   return s;
 }
 
-/** Agrega una columna (no fecha) al final del reporte. */
+// ---------- Componente ⇄ columna (siempre enlazados) ----------
+
+const colKey_ = t => normalizeKey_(t).replace(/[\s_\-.]+/g, "");
+
+/**
+ * Deja cada componente con su columna en el Reporte_ y viceversa:
+ *  - componente borrado  → se borra su columna enlazada
+ *  - componente renombrado → se renombra el encabezado
+ *  - componente sin columna → se enlaza la columna del mismo nombre
+ *    (Parcial 1 = Parcial_1; Proyectos = Proyecto_Final) o se crea al final.
+ * before = componentes antes del cambio (null = solo emparejar).
+ * Devuelve notas para el mensaje.
+ */
+function pairComponentColumns_(idCurso, before) {
+  const group = requireGroup_(idCurso);
+  const sheet = group.sheet && SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+  if (!sheet || sheet.getLastColumn() < 2) return [];
+  const notes = [];
+  const after = componentsFor_(idCurso);
+  const afterIds = new Set(after.map(c => c.id));
+  const all = Db.read(WEB.COLUMNS).rows.map(r => Object.assign({}, r));
+  const mine = l => cleanText_(l.ID_Curso) === idCurso;
+  const compLink = id => all.find(l => mine(l) && cleanText_(l.Tipo) === "componente" && cleanText_(l.Ref) === id);
+  const headersNow = () => sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0].map(cleanText_);
+
+  // 1. Componentes borrados → borrar su columna (de derecha a izquierda)
+  const removed = (before || []).filter(c => !afterIds.has(c.id));
+  const gone = [];
+  removed.forEach(c => {
+    const l = compLink(c.id);
+    if (!l) return;
+    all.splice(all.indexOf(l), 1);
+    gone.push(cleanText_(l.Columna));
+  });
+  if (gone.length) {
+    const h = headersNow();
+    gone.map(n => findColumn_(h, n)).filter(i => i > 1).sort((a, b) => b - a).forEach(i => sheet.deleteColumn(i + 1));
+    notes.push(`Columnas borradas del reporte: ${gone.join(", ")}.`);
+  }
+
+  // 2. Renombrados y 3. sin columna
+  let h = headersNow();
+  const info = otherColumnIndexes_(sheet);
+  const linkedCols = new Set(all.filter(mine).map(l => colKey_(l.Columna)));
+  const created = [];
+  after.forEach(c => {
+    const l = compLink(c.id);
+    const old = (before || []).find(b => b.id === c.id);
+    if (l) {
+      if (old && colKey_(old.nombre) !== colKey_(c.nombre) && findColumn_(h, c.nombre) === -1) {
+        const i = findColumn_(h, l.Columna);
+        if (i !== -1) { sheet.getRange(2, i + 1).setValue(c.nombre); h[i] = c.nombre; }
+        l.Columna = c.nombre;
+      }
+      return;
+    }
+    const free = info.out.filter(i => !linkedCols.has(colKey_(h[i])));
+    let i = free.find(k => colKey_(h[k]) === colKey_(c.nombre));
+    if (i === undefined && c.tipo === "proyectos") i = free.find(k => /proyecto|ejercicio/.test(colKey_(h[k])));
+    if (i === undefined) {
+      i = sheet.getLastColumn();
+      sheet.getRange(1, i + 1).setValue("Visible");
+      sheet.getRange(2, i + 1).setValue(c.nombre);
+      h[i] = c.nombre;
+      created.push(c.nombre);
+    }
+    linkedCols.add(colKey_(h[i]));
+    all.push({ ID_Curso: idCurso, Columna: h[i], Tipo: "componente", Ref: c.id });
+  });
+  if (created.length) notes.push(`Columnas nuevas en el reporte: ${created.join(", ")}.`);
+
+  // Emparejado inicial: Calificación/SIAE y demás sugerencias que no son componente
+  if (!before) {
+    const projects = projectsFor_(idCurso);
+    info.out.forEach(i => {
+      if (linkedCols.has(colKey_(h[i]))) return;
+      const sug = suggestColumnLink_(h[i], after, projects);
+      if (sug && sug.tipo !== "componente") all.push({ ID_Curso: idCurso, Columna: h[i], Tipo: sug.tipo, Ref: sug.ref || "" });
+    });
+  }
+
+  Db.writeAll(WEB.COLUMNS, all);
+  delete Db._cache["__rep_" + group.sheet];
+  return notes;
+}
+
+/** Una sola vez: empareja componentes y columnas de todos los grupos ya configurados. */
+function pairAllComponentColumns_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty("CCH_PAIRED_V641")) return;
+  Object.keys(courseMap_()).forEach(id => {
+    if (!componentsFor_(id).length) return;
+    try { Db.clearCache(); pairComponentColumns_(id, null); syncReportColumns_(id); } catch (e) { /* grupo sin hoja */ }
+  });
+  props.setProperty("CCH_PAIRED_V641", new Date().toISOString());
+}
+
+/** Agrega una columna (no fecha) al final del reporte y, por defecto, su componente (0 %). */
 function addReportColumn_(params) {
   const { group, sheet } = reportSheetFor_(params.idCurso);
   const name = cleanText_(params.name).slice(0, 40);
@@ -4290,7 +4396,20 @@ function addReportColumn_(params) {
   sheet.getRange(1, col).setValue("Visible");
   sheet.getRange(2, col).setValue(name);
   delete Db._cache["__rep_" + group.sheet];
-  return { message: `Columna «${name}» agregada a ${group.sheet}.` };
+  if (params.component === false) return { message: `Columna «${name}» agregada a ${group.sheet}.` };
+
+  // Su componente en la ponderación (manual, 0 %), enlazado a la columna
+  const idCurso = cleanText_(params.idCurso);
+  let comp = componentsFor_(idCurso).find(c => colKey_(c.nombre) === colKey_(name));
+  const taken = comp && savedColumnLinks_(idCurso).some(l => l.tipo === "componente" && l.ref === comp.id);
+  if (!comp || taken) {
+    const all = Db.read(WEB.COMPONENTS).rows;
+    const order = all.filter(r => cleanText_(r.ID_Curso) === idCurso).length + 1;
+    comp = { id: shortId_(), nombre: taken ? `${name} (columna)` : name };
+    Db.append(WEB.COMPONENTS, [{ ID: comp.id, ID_Curso: idCurso, Nombre: comp.nombre, Tipo: "manual", Ponderacion: 0, Maximo: 10, Orden: order }]);
+  }
+  Db.append(WEB.COLUMNS, [{ ID_Curso: idCurso, Columna: name, Tipo: "componente", Ref: comp.id }]);
+  return { message: `Columna «${name}» agregada a ${group.sheet} y a la ponderación con 0 % (ajústala en Ponderación).`, link: { tipo: "componente", ref: comp.id, label: `Componente · ${comp.nombre}` } };
 }
 
 /**
@@ -4304,19 +4423,31 @@ function deleteReportColumn_(params) {
   const col = info.out.find(i => normalizeKey_(info.clean[i]) === normalizeKey_(name));
   if (col === undefined) throw new Error("Solo se pueden borrar columnas que no sean Cuenta, Nombre ni fechas.");
 
+  const idCurso0 = cleanText_(params.idCurso);
+  const link = savedColumnLinks_(idCurso0).find(l => l.tipo === "componente" && normalizeKey_(l.columna) === normalizeKey_(name));
+  const comp = link && componentsFor_(idCurso0).find(c => c.id === link.ref);
+  const compNote = comp ? ` También se quitará su componente «${comp.nombre}» (${comp.ponderacion} %) de la ponderación.` : "";
+
   let filled = 0;
   if (sheet.getLastRow() >= 3) {
     const range = sheet.getRange(3, col + 1, sheet.getLastRow() - 2, 1);
     const values = range.getValues(), formulas = range.getFormulas();
     values.forEach((r, i) => { if (cleanText_(r[0]) !== "" || formulas[i][0]) filled++; });
   }
-  if (filled && !params.force) return { needsConfirm: true, filled, message: `«${name}» tiene ${filled} dato(s).` };
+  if (filled && !params.force) return { needsConfirm: true, filled, message: `«${name}» tiene ${filled} dato(s).${compNote}` };
 
   sheet.deleteColumn(col + 1);
   const idCurso = cleanText_(params.idCurso);
   Db.writeAll(WEB.COLUMNS, Db.read(WEB.COLUMNS).rows.filter(r => !(cleanText_(r.ID_Curso) === idCurso && normalizeKey_(r.Columna) === normalizeKey_(name))));
   delete Db._cache["__rep_" + group.sheet];
-  return { message: `Columna «${name}» borrada de ${group.sheet}${filled ? ` (tenía ${filled} dato(s))` : ""}.` };
+  let extra = "";
+  if (comp) {
+    Db.writeAll(WEB.COMPONENTS, Db.read(WEB.COMPONENTS).rows.filter(r => !(cleanText_(r.ID_Curso) === idCurso && cleanText_(r.ID) === comp.id)));
+    const total = componentsFor_(idCurso).reduce((s, c) => s + c.ponderacion, 0);
+    extra = ` También se quitó «${comp.nombre}» de la ponderación: ahora suma ${total} %${total === 100 ? "" : ", ajústala para llegar a 100 %"}.`;
+    try { syncReportColumns_(idCurso); } catch (e) { /* nada */ }
+  }
+  return { message: `Columna «${name}» borrada de ${group.sheet}${filled ? ` (tenía ${filled} dato(s))` : ""}.${extra}`, componentRemoved: !!comp };
 }
 
 /** Calificación y SIAE enlazadas como "final" (decimales) pasan a "entero". Una sola vez, sin costo. */

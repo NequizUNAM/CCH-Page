@@ -103,8 +103,6 @@ const icon = (name, cls = "") => h("i", { class: `bi bi-${name} ${cls}`.trim(), 
 
 const Fmt = {
   grade(n) { return n === null || n === undefined ? "—" : Number(n).toFixed(1); },
-  /** Entero sin redondear (trunca): 7.96 → 7. */
-  int(n) { return n === null || n === undefined || !isFinite(n) ? "" : String(Math.floor(Number(n) + 1e-9)); },
   num(n) { return n === null || n === undefined ? "—" : String(Math.round(n * 100) / 100); },
   date(iso) {
     if (!iso) return "";
@@ -1278,12 +1276,11 @@ const Admin = {
   renderGroupSelect() {
     const groups = Admin.boot.groups;
     const saved = Prefs.get("admGroup");
-    const current = groups.find(g => g.id === saved) || groups.find(g => g.active) || groups[0];
-    const active = groups.filter(g => g.active), inactive = groups.filter(g => !g.active);
-    $("adm-group").replaceChildren(
-      active.length ? h("optgroup", { label: "Activos" }, active.map(g => h("option", { value: g.id, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` }))) : null,
-      inactive.length ? h("optgroup", { label: "Inactivos" }, inactive.map(g => h("option", { value: g.id, text: `${g.label} (${g.ciclo})` }))) : null
-    );
+    // Solo grupos activos (se activan en la pestaña Grupos). Si no hay ninguno, se muestran todos.
+    const active = groups.filter(g => g.active);
+    const shown = active.length ? active : groups;
+    const current = shown.find(g => g.id === saved) || shown[0];
+    $("adm-group").replaceChildren(...shown.map(g => h("option", { value: g.id, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` })));
     if (current) $("adm-group").value = current.id;
   },
 
@@ -1495,7 +1492,7 @@ const Admin = {
       const c = s.counts || { asistencia: 0, falta: 0, justificante: 0 };
       const pct = Parts.pct(c);
       return [s.cuenta, s.nombre].concat(dates.map((d, i) => s.statuses[i] || ""), [c.asistencia, c.falta, c.justificante, pct === null ? "" : pct],
-        comps.map(cp => { const it = s.items[cp.id]; return it && it.score10 !== null ? it.score10 : ""; }), [s.final ?? "", s.finalStrict ?? "", Fmt.int(s.finalStrict)]);
+        comps.map(cp => { const it = s.items[cp.id]; return it && it.score10 !== null ? it.score10 : ""; }), [s.final ?? "", s.finalStrict ?? "", s.entero ?? ""]);
     });
     const esc = v => { const t = String(v ?? ""); return /[",;\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
     const csv = "\ufeff" + [header].concat(rows).map(r => r.map(esc).join(",")).join("\r\n");
@@ -1678,7 +1675,7 @@ const Admin = {
         rows.splice(rows.indexOf(row), 1);
         changedSheet = true;
         drawRows();
-        UI.toast("success", r.message);
+        UI.toast("success", r.message, r.componentRemoved ? 9000 : 4000);
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     };
 
@@ -1703,8 +1700,9 @@ const Admin = {
       const name = newName.value.trim();
       if (!name) return newName.focus();
       try {
-        const r = await UI.busy(addBtn, () => Api.call("addReportColumn", { idCurso: g.group.id, name }, "admin"));
-        rows.push(makeRow({ name, visible: true, link: null, suggested: null }));
+        const r = await UI.busy(addBtn, () => Api.call("addReportColumn", { idCurso: g.group.id, name, component: withComp.checked }, "admin"));
+        if (r.link) info.options.unshift({ tipo: r.link.tipo, ref: r.link.ref, label: r.link.label });
+        rows.push(makeRow({ name, visible: true, link: r.link ? { tipo: r.link.tipo, ref: r.link.ref } : null, suggested: null }));
         changedSheet = true;
         newName.value = "";
         drawRows();
@@ -1712,6 +1710,7 @@ const Admin = {
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
     newName.addEventListener("keydown", e => { if (e.key === "Enter") addBtn.click(); });
+    const withComp = h("input", { class: "form-check-input", type: "checkbox", id: "col-with-comp", checked: true });
 
     const dates = info.dates.map(d => ({ key: d.key, visible: d.visible }));
     const dateChips = h("div", { class: "d-flex flex-wrap gap-1" }, info.dates.map((d, i) => {
@@ -1722,12 +1721,14 @@ const Admin = {
 
     body.replaceChildren(
       h("p", { class: "small text-body-secondary" }, "Hoja ", h("b", { text: info.sheetName }), ". «Visible» = lo ven los alumnos (fila 1 de la hoja). Al enlazar, la columna se llena sola con los datos de la web. ",
-        "↑ ↓ cambian el orden en la hoja al guardar; 🗑 borra la columna de la hoja al momento (si tiene datos te pregunta antes)."),
+        "↑ ↓ cambian el orden en la hoja al guardar; 🗑 borra la columna de la hoja al momento (si tiene datos te pregunta antes) y, si es de un componente, también lo quita de la ponderación."),
       notice,
       h("div", { class: "table-wrap auto-h mb-2" }, h("table", { class: "table table-sm table-cch mb-0" },
         h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Columna" }), h("th", { text: "Visible" }), h("th", { class: "text-start", text: "Se llena con" }), h("th", { text: "Orden / borrar" }))),
         tbody)),
-      h("div", { class: "input-group input-group-sm mb-3", style: { maxWidth: "420px" } }, newName, addBtn),
+      h("div", { class: "d-flex flex-wrap align-items-center gap-3 mb-3" },
+        h("div", { class: "input-group input-group-sm", style: { maxWidth: "420px" } }, newName, addBtn),
+        h("div", { class: "form-check small mb-0" }, withComp, h("label", { class: "form-check-label", for: "col-with-comp", text: "Crear también su componente en Ponderación (0 %)" }))),
       h("div", { class: "small fw-semibold mb-1", text: "Fechas (clic para mostrar/ocultar; las nuevas siempre salen visibles)" }), dateChips);
 
     $("modal-generic").addEventListener("hidden.bs.modal", () => { if (changedSheet && !saved) Admin.loadGroup(); }, { once: true });
@@ -1953,7 +1954,7 @@ const Admin = {
           return h("tr", {}, cuenta, Admin.nameCell(s), cells,
             h("td", { class: `final-cell ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
             h("td", { class: "text-body-secondary", text: Fmt.grade(s.finalStrict) }),
-            h("td", { class: "fw-semibold", text: Fmt.int(s.finalStrict) }));
+            h("td", { class: "fw-semibold", text: s.entero ?? "" }));
         }));
       // Los popovers de bonos se crean dentro de gradeWithBonus
     };
@@ -2097,11 +2098,18 @@ const Admin = {
       sumText.textContent = `${Fmt.num(sum)}%`;
       sumBar.style.width = `${Math.min(sum, 100)}%`;
       const exact = Math.abs(sum - 100) < 0.001;
+      const ids = new Set(draft.map(c => c.id).filter(Boolean));
+      const gone = (g.columns || []).filter(l => l.tipo === "componente" && !ids.has(l.ref)).map(l => l.columna);
+      const fresh = draft.filter(c => !c.id && c.nombre.trim()).map(c => c.nombre.trim());
+      pairNote.replaceChildren(
+        gone.length ? h("div", { class: "alert alert-warning py-1 px-2 mb-1 small" }, icon("exclamation-triangle", "me-1"), `Al guardar se borrarán del reporte las columnas: ${gone.join(", ")} (con sus datos).`) : null,
+        fresh.length ? h("div", { class: "alert alert-info py-1 px-2 mb-1 small" }, icon("plus-lg", "me-1"), `Al guardar se crea su columna en el reporte: ${fresh.join(", ")}.`) : null);
       sumBar.className = `progress-bar ${exact ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
       sumHint.textContent = exact ? "" : `Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`;
       saveBtn.disabled = !exact;
     };
     const sumHint = h("span", { class: "small text-danger fw-semibold ms-2" });
+    const pairNote = h("div", { class: "mt-2" });
     const saveBtn = h("button", { class: "btn btn-primary", type: "button", title: "Las ponderaciones deben sumar 100 %" }, icon("save", "me-1"), "Guardar ponderaciones");
 
     const draw = () => {
@@ -2111,7 +2119,7 @@ const Admin = {
           `En Captura se escribe de 0 a ${c.maximo}. `,
           h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
         return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
-          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; } }), scaleNote),
+          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; updateSum(); } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
             onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; draw(); }
@@ -2170,9 +2178,11 @@ const Admin = {
           "«Manual» = lo capturas tú en Captura. ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
-          "«Calificación entera» suma lo obtenido y quita los decimales (no redondea).")
+          "«Calificación entera» suma lo obtenido y quita los decimales (no redondea). ",
+          "Cada componente tiene su columna en el reporte: si quitas uno se borra su columna, y si agregas uno se crea.")
       )),
       list,
+      pairNote,
       h("div", { class: "d-flex flex-wrap gap-2 mt-3" },
         h("button", { class: "btn btn-outline-primary btn-sm", type: "button", onclick: () => { draft.push({ nombre: "", tipo: "manual", ponderacion: 0, maximo: 10 }); draw(); } }, icon("plus-lg", "me-1"), "Agregar componente"),
         templateBtn,

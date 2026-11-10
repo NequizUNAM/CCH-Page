@@ -100,6 +100,22 @@ Dos pestañas: **Mi avance** (una sola tarjeta con asistencia, calificaciones po
 
 Por defecto se ven **60 alumnos** antes de que la tabla haga scroll. Se cambia en ⚙️ Preferencias → «Alumnos visibles por tabla» (15, 30, 60, 100 o Todos).
 
+## Componente ⇄ columna (siempre enlazados)
+
+Cada componente de la ponderación tiene su columna en el Reporte_ y viceversa:
+
+| Haces… | Pasa… |
+|---|---|
+| Agregas un componente en Ponderación | Se crea su columna al final del reporte (Visible) |
+| Quitas un componente | Se borra su columna del reporte (antes de guardar ves un aviso) |
+| Renombras un componente | Se renombra el encabezado |
+| Agregas una columna en «Columnas» | Se crea su componente con 0 % (puedes desmarcarlo para columnas a mano, como Puntos Adicionales) |
+| Borras una columna enlazada | Se quita también su componente; ajusta la ponderación para volver a 100 % |
+
+La primera vez que entras como admin con esta versión se enlazan solas las columnas existentes: Parcial_1 ↔ Parcial 1, Sellos ↔ Sellos, Proyecto_Final o Ejercicio Clase ↔ Proyectos, y Calificación/SIAE ↔ Calificación entera. Con eso desaparecen los #REF!.
+
+En Asistencia solo aparecen los grupos **activos**; los demás se activan en la pestaña Grupos.
+
 ## Ponderaciones: solo porcentaje
 
 Cada componente lleva solo su **%** y entre todos deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. Ejemplo: Parcial 1 al 40 % con 8 aporta 3.2 puntos.
