@@ -281,12 +281,15 @@ function routes_() {
 
   // ---- Mantenimiento ----
   maintenanceInfo:    { auth: "admin", fn: maintenanceInfo_ },
-  setupStructure:     { auth: "admin", fn: () => setupWeb_({ folders: true }), lock: true },
+  setupStructure:     { auth: "admin", fn: () => setupWeb_({ folders: true, exams: true }), lock: true },
   setCurrentCycle:    { auth: "admin", fn: setCurrentCycle_, lock: true },
   backupPreview:      { auth: "admin", fn: backupPreview_ },
   backupCycles:       { auth: "admin", fn: backupCycles_, lock: true },
   clearTable:         { auth: "admin", fn: clearTable_, lock: true },
   factoryReset:       { auth: "admin", fn: factoryReset_, lock: true },
+  examLinks:          { auth: "public", fn: examLinks_ },
+  examAdmin:          { auth: "admin", fn: examAdmin_ },
+  examSetOpen:        { auth: "admin", fn: examSetOpen_, lock: true },
 
   // ---- Enlaces y altas ----
   saveLinks:          { auth: "admin", fn: saveLinks_, lock: true },
@@ -431,6 +434,7 @@ function setupWeb_(options) {
   const linked = [];
 
   ensureCourseWebColumns_();
+  base.missingColumns = ensureBaseSheets_().missingColumns;   // Course ya tiene Hoja_Reporte y Activo
   upgradeIntegerLinks_();
   pairAllComponentColumns_();
   try { ensureDemoOnFirstInstall_(); } catch (e) { console.error(e); }
@@ -450,7 +454,34 @@ function setupWeb_(options) {
     linked.push({ ID_Curso: match.courseId, Hoja_Reporte: report.name });
   });
 
-  return { sheets, linked, created: base.created, missingColumns: base.missingColumns, folders };
+  // Hojas de los exámenes en línea (solo si se pide: «Verificar / crear» o instalarTodo)
+  const created = base.created.slice();
+  if (opts.exams && typeof Examenes !== "undefined") {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const names = [];
+    Object.keys(Examenes.MATERIAS).forEach(m => names.push(Examenes.MATERIAS[m].res, Examenes.MATERIAS[m].cfg));
+    const missing = names.filter(n => !ss.getSheetByName(n));
+    Examenes.crearTablas();
+    created.push(...missing.filter(n => ss.getSheetByName(n)));
+  }
+
+  return { sheets, linked, created, missingColumns: base.missingColumns, folders };
+}
+
+/**
+ * ▶ EJECUTA ESTA FUNCIÓN desde el editor (botón Ejecutar) para crear TODO lo que falte
+ * en la hoja de cálculo: Course, Students, Attendance Log, Roles, las hojas W_ de la web,
+ * las carpetas y las 4 hojas de los exámenes. No borra ni cambia lo que ya existe.
+ */
+function instalarTodo() {
+  const r = withScriptLock_(() => setupWeb_({ folders: true, exams: true }));
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const msg = `Hoja: ${ss.getName()} (${ss.getId()})\n` +
+    `Hojas creadas: ${r.created.length ? r.created.join(", ") : "ninguna (ya existían)"}\n` +
+    `Carpetas creadas: ${r.folders.length ? r.folders.join(", ") : "ninguna"}` +
+    (r.missingColumns.length ? `\nColumnas faltantes (agrégalas a mano): ${r.missingColumns.map(x => x.sheet + ": " + x.columns.join(", ")).join(" · ")}` : "");
+  Logger.log(msg);
+  return msg;
 }
 
 
@@ -3656,6 +3687,7 @@ function maintenanceInfo_() {
     cycles: cyclesSummary_(),
     tables,
     folder: { name: folder.getName(), url: folder.getUrl() },
+    spreadsheet: { name: spreadsheet.getName(), id: spreadsheet.getId(), url: spreadsheet.getUrl() },
     backups: listBackups_(folder),
     confirmWord: SETTINGS.PURGE_CONFIRM_WORD,
     purgeParts: Object.keys(PURGE_PARTS).map(k => ({ key: k, label: PURGE_PARTS[k].label })),
@@ -4486,7 +4518,7 @@ function upgradeIntegerLinks_() {
 // - Si no existe la propiedad CCH_ADMIN_PASSWORD, la contraseña es la
 //   de fábrica (SETTINGS.FACTORY_PASSWORD) y el panel lo avisa.
 // - La primera vez (hoja sin cursos) se crea un grupo DEMO.
-// - «Restaurar a fábrica»: respaldo ZIP completo → borra W_* y Reporte_*,
+// - «Restaurar a fábrica»: respaldo ZIP completo → borra W_* y Reporte_*, reinicia exámenes,
 //   vacía Course/Students/Attendance Log/Roles, borra las propiedades
 //   CCH_* (contraseña incluida) y vuelve a crear el DEMO.
 //   Las demás hojas que hayas agregado tú no se tocan.
@@ -4599,7 +4631,7 @@ function factoryReset_(params) {
   const blob = exportXlsx_(`Respaldo completo ${stamp_()}`, spreadsheet.getSheets().map(sh => ({ name: sh.getName(), matrix: sheetMatrix_(sh) })));
   const backup = saveZip_(`${SETTINGS.BACKUP_PREFIX}antes_de_fabrica_${stamp_()}.zip`, [blob]);
 
-  // 2. Hojas de la web y reportes
+  // 2. Hojas de la web y reportes (las de los exámenes se rehacen en el paso 6)
   ensureBaseSheets_();
   const removed = [];
   spreadsheet.getSheets().slice().forEach(sh => {
@@ -4626,11 +4658,16 @@ function factoryReset_(params) {
   props.setProperty("CCH_PAIRED_V641", new Date().toISOString());
   const demo = loadDemo_();
 
+  // 6. Exámenes en línea: resultados vacíos, contraseñas iniciales y parciales CERRADOS
+  let exams = false;
+  if (typeof Examenes !== "undefined") { Examenes.reiniciar(); exams = true; }
+
   return {
     backup,
     removed: removed.length,
     demo,
     message: `Restaurado a fábrica. Respaldo: ${backup.name}. Se creó el grupo DEMO (${demo.students} alumnos). ` +
+      (exams ? "Exámenes: resultados vacíos, contraseñas iniciales y parciales cerrados. " : "") +
       `Contraseña de administrador: ${SETTINGS.FACTORY_PASSWORD} (cámbiala en Propiedades del script → ${SETTINGS.ADMIN_PASSWORD_KEY}).`
   };
 }
@@ -4647,6 +4684,29 @@ function factoryReset_(params) {
 
 const EXAM_RESULTS_PREFIX = "Resultados ";
 const EXAM_PARCIALES = [1, 2];
+
+const EXAM_PAGES = { cib: "examenes_cibernetica.html", est: "examenes_estadistica.html" };
+const examsReady_ = () => typeof Examenes !== "undefined";
+
+/** Público: qué exámenes mostrar en la página de inicio (algún parcial abierto). */
+function examLinks_() {
+  if (!examsReady_()) return { exams: [] };
+  const st = Examenes.estado();
+  return { exams: Object.keys(st).filter(m => st[m].abierto1 || st[m].abierto2).map(m => ({ id: m, nombre: st[m].nombre, page: EXAM_PAGES[m] || "" })) };
+}
+
+/** Panel: estado de cada examen (parciales abiertos o cerrados). */
+function examAdmin_() {
+  if (!examsReady_()) return { installed: false, exams: [] };
+  const st = Examenes.estado();
+  return { installed: true, exams: Object.keys(st).map(m => Object.assign({ id: m, page: EXAM_PAGES[m] || "" }, st[m])) };
+}
+
+function examSetOpen_(params) {
+  if (!examsReady_()) throw new Error("Falta el archivo Examenes en Apps Script.");
+  Examenes.abrir(cleanText_(params.materia), Number(params.parcial), !!params.abierto);
+  return Object.assign(examAdmin_(), { message: `Parcial ${Number(params.parcial)} ${params.abierto ? "abierto" : "cerrado"}.` });
+}
 
 /** Exámenes disponibles: una opción por hoja «Resultados …» y parcial. */
 function examSources_() {

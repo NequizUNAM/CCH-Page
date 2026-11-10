@@ -304,7 +304,35 @@ const Examenes = (function () {
   }
 
   const ACTIONS = ['login', 'start', 'progress', 'submit', 'admin_data', 'admin_cfg', 'admin_setclave', 'admin_abierto', 'admin_liberar', 'admin_reloj', 'admin_cerrar', 'admin_cfgexamen'];
-  return { handle, ping, crearTablas, ACTIONS, MATERIAS, COLS };
+  /* ---- Para el panel de Asistencias (no cambian el examen) ---- */
+  // Estado de cada materia sin crear hojas: ¿existe su Config y qué parciales admiten alumnos?
+  function estado() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet(), out = {};
+    Object.keys(MATERIAS).forEach(m => {
+      const existe = !!ss.getSheetByName(MATERIAS[m].cfg) || !!(MATERIAS[m].viejoCfg && ss.getSheetByName(MATERIAS[m].viejoCfg));
+      const c = existe ? getCfg_(m) : {};
+      out[m] = { nombre: MATERIAS[m].nombre, existe, abierto1: c.abierto1 === 'SI', abierto2: c.abierto2 === 'SI' };
+    });
+    return out;
+  }
+  function abrir(m, p, on) {
+    if (!MATERIAS[m] || !(p === 1 || p === 2)) throw new Error('Examen o parcial inválido.');
+    setCfg_(m, 'abierto' + p, on ? 'SI' : 'NO');
+  }
+  // Estado de fábrica: borra resultados y configuración, los vuelve a crear con las contraseñas iniciales y CERRADOS
+  function reiniciar() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    Object.keys(MATERIAS).forEach(m => {
+      [MATERIAS[m].res, MATERIAS[m].cfg, MATERIAS[m].viejoRes, MATERIAS[m].viejoCfg].filter(Boolean).forEach(n => {
+        const sh = ss.getSheetByName(n); if (sh) ss.deleteSheet(sh);
+      });
+      cfgOlvidar_(m);
+    });
+    crearTablas();
+    Object.keys(MATERIAS).forEach(m => { setCfg_(m, 'abierto1', 'NO'); setCfg_(m, 'abierto2', 'NO'); });
+  }
+
+  return { handle, ping, crearTablas, estado, abrir, reiniciar, ACTIONS, MATERIAS, COLS };
 })();
 
 /* Ejecútala una vez desde el editor (botón Ejecutar) para crear las hojas de los exámenes y autorizar permisos. */

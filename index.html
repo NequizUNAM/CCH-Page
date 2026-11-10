@@ -83,11 +83,11 @@
       </div>
 
       <!-- Exámenes en línea (mismo servidor) -->
-      <div class="row g-3 justify-content-center mt-1 exam-links">
-        <div class="col-12 col-md-6 col-lg-4 d-grid">
+      <div class="row g-3 justify-content-center mt-1 exam-links d-none" id="exam-links">
+        <div class="col-12 col-md-6 col-lg-4 d-grid d-none" data-exam="cib">
           <a class="btn btn-exam-cib d-flex align-items-center gap-2" href="./examenes_cibernetica.html"><i class="bi bi-cpu"></i><span>Examen de Cibernética<small class="d-block fw-normal opacity-75">Con la contraseña que te da tu profesor(a)</small></span></a>
         </div>
-        <div class="col-12 col-md-6 col-lg-4 d-grid">
+        <div class="col-12 col-md-6 col-lg-4 d-grid d-none" data-exam="est">
           <a class="btn btn-exam-est d-flex align-items-center gap-2" href="./examenes_estadistica.html"><i class="bi bi-bar-chart-line"></i><span>Examen de Estadística<small class="d-block fw-normal opacity-75">Con la contraseña que te da tu profesor(a)</small></span></a>
         </div>
       </div>
@@ -153,6 +153,7 @@
     <!-- ============ PANEL ADMIN ============ -->
     <section id="view-admin" class="view d-none">
       <div id="adm-banner"></div>
+      <nav class="dash-switch mb-3" id="adm-switch" aria-label="Cambiar de panel"></nav>
       <div class="card card-soft mb-3">
         <div class="card-body d-flex flex-wrap align-items-center gap-2 p-2 p-md-3">
           <label class="visually-hidden" for="adm-group">Grupo</label>

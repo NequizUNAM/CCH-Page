@@ -876,6 +876,19 @@ const App = {
     if (Session.get("admin")) return Admin.open();
     if (Session.get("student")) return Student.open();
     App.show("view-login");
+    App.loadExamLinks();
+  },
+
+  /** Inicio: solo se muestran los exámenes que tienen algún parcial abierto. */
+  async loadExamLinks() {
+    const box = $("exam-links");
+    if (!box) return;
+    try {
+      const r = await Api.call("examLinks");
+      const open = new Set((r.exams || []).map(x => x.id));
+      box.querySelectorAll("[data-exam]").forEach(el => el.classList.toggle("d-none", !open.has(el.dataset.exam)));
+      box.classList.toggle("d-none", !open.size);
+    } catch (e) { box.classList.add("d-none"); }
   },
 
   /** Instalación nueva: pide la URL del Web App y la prueba antes de guardarla. */
@@ -1352,8 +1365,27 @@ const Admin = {
     Admin.boot = null; Admin.group = null; Admin.dirty = new Map(); Admin.compDraft = null; Admin.evidence = null;
   },
 
+  /** Barra para cambiar entre el panel de Asistencias y los paneles de los exámenes. */
+  async drawSwitch() {
+    const nav = $("adm-switch");
+    const item = (href, iconName, label, active, badge) => h(active ? "span" : "a", Object.assign({ class: `dash-tab ${active ? "active" : ""}` }, active ? { "aria-current": "page" } : { href }),
+      icon(iconName), h("span", { text: label }), badge || null);
+    nav.replaceChildren(item("#", "calendar-check", "Asistencias", true));
+    try {
+      const r = await Api.call("examAdmin", {}, "admin");
+      Admin.exams = r;
+      nav.replaceChildren(item("#", "calendar-check", "Asistencias", true),
+        ...(r.exams || []).map(x => {
+          const open = x.abierto1 || x.abierto2;
+          return item(`./${x.page}`, x.id === "cib" ? "cpu" : "bar-chart-line", `Examen ${x.nombre}`, false,
+            h("span", { class: `dash-badge ${open ? "on" : ""}`, title: open ? "Visible en la página de inicio" : "Oculto en la página de inicio", text: !x.existe ? "sin hojas" : open ? "abierto" : "cerrado" }));
+        }));
+    } catch (e) { /* sin exámenes: solo Asistencias */ }
+  },
+
   async open() {
     App.show("view-admin");
+    Admin.drawSwitch();
     $("adm-banner").replaceChildren(...kids(Session.get("factory") ? h("div", { class: "alert alert-warning d-flex align-items-start gap-2 py-2 small", role: "alert" },
       icon("shield-exclamation"), h("span", {}, "Estás usando la contraseña de fábrica ", h("b", { class: "mono", text: "123456789" }),
         ". Cámbiala en Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → ", h("b", { class: "mono", text: "CCH_ADMIN_PASSWORD" }), ".")) : null));
@@ -3226,7 +3258,7 @@ const Admin = {
     });
     const structureCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
       h("h2", { class: "h6" }, icon("diagram-3", "me-1"), "Estructura (hoja nueva en blanco)"),
-      h("p", { class: "small text-body-secondary", text: "Crea las hojas base (Course, Students, Attendance Log, Roles), las hojas W_ de la web y las carpetas (Students_Images, Course_Images, Material_Archivos…) junto a la hoja, solo si faltan. Las que ya existen no se modifican." }),
+      h("p", { class: "small text-body-secondary", text: "Crea las hojas base (Course, Students, Attendance Log, Roles), las hojas W_ de la web, las 4 hojas de los exámenes y las carpetas (Students_Images, Course_Images, Material_Archivos…) junto a la hoja, solo si faltan. Las que ya existen no se modifican." }),
       setupBtn, setupOut));
 
     const en = info.enrollment || { sinCurso: 0, inexistente: [], totalInexistente: 0, gruposVacios: [], ids: [] };
@@ -3243,9 +3275,37 @@ const Admin = {
           en.inexistente.length ? h("div", { class: "mt-1" }, en.inexistente.slice(0, 10).map(x => h("div", { class: "mono", text: `${x.cuenta} → «${x.course}»` }))) : null),
         en.gruposVacios.length ? h("li", { class: "text-warning-emphasis" }, "Grupos activos sin alumnos: ", en.gruposVacios.map(x => x.label).join(", ")) : null)));
 
+    // ---- Exámenes en línea ----
+    const examBox = h("div", {}, UI.empty("hourglass", "Leyendo exámenes…"));
+    const drawExams = r => {
+      if (!r.installed) { examBox.replaceChildren(h("p", { class: "small text-body-secondary mb-0" }, "Falta el archivo ", h("b", { text: "Examenes" }), " en Apps Script.")); return; }
+      examBox.replaceChildren(...r.exams.map(x => h("div", { class: "exam-row" },
+        h("div", { class: "d-flex align-items-center gap-2 mb-1" }, icon(x.id === "cib" ? "cpu" : "bar-chart-line"), h("b", { text: `Examen ${x.nombre}` }),
+          h("a", { class: "btn btn-sm btn-outline-primary ms-auto", href: `./${x.page}`, target: "_blank", rel: "noopener" }, icon("box-arrow-up-right", "me-1"), "Abrir su panel")),
+        !x.existe ? h("div", { class: "small text-warning-emphasis", text: "Aún no existen sus hojas: usa «Verificar / crear hojas» o ejecuta instalarTodo." })
+          : h("div", { class: "d-flex flex-wrap gap-3" }, [1, 2].map(p => {
+            const sw = h("input", { class: "form-check-input", type: "checkbox", role: "switch", id: `ex-${x.id}-${p}`, checked: x["abierto" + p] });
+            sw.addEventListener("change", async () => {
+              sw.disabled = true;
+              try { const res = await Api.call("examSetOpen", { materia: x.id, parcial: p, abierto: sw.checked }, "admin"); UI.toast("success", `${x.nombre}: ${res.message}`); drawExams(res); Admin.drawSwitch(); }
+              catch (error) { sw.checked = !sw.checked; if (error.code !== "AUTH") UI.toast("danger", error.message); }
+              sw.disabled = false;
+            });
+            return h("div", { class: "form-check form-switch mb-0" }, sw, h("label", { class: "form-check-label small", for: sw.id, text: `Parcial ${p} admite alumnos` }));
+          })))));
+    };
+    Api.call("examAdmin", {}, "admin").then(drawExams).catch(e => examBox.replaceChildren(h("p", { class: "small text-danger", text: e.message })));
+    const examCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
+      h("h2", { class: "h6" }, icon("journal-check", "me-1"), "Exámenes en línea"),
+      h("p", { class: "small text-body-secondary", text: "El botón de cada examen aparece en la página de inicio solo si tiene algún parcial abierto. Sus contraseñas y resultados se manejan en su propio panel (entra con la contraseña de administrador)." }),
+      examBox));
+
     // ---- Servidor (URL del Web App) ----
+    const sheetInfo = info.spreadsheet ? h("div", { class: "small mb-2" }, "Guarda en la hoja ", h("a", { href: info.spreadsheet.url, target: "_blank", rel: "noopener noreferrer", text: info.spreadsheet.name }),
+      h("div", { class: "mono text-body-secondary text-break", text: info.spreadsheet.id })) : null;
     const serverCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
       h("h2", { class: "h6" }, icon("plug", "me-1"), "Servidor (Apps Script)"),
+      sheetInfo,
       h("div", { class: "small mono text-break mb-2", text: ApiUrl.get() }),
       h("p", { class: "small text-body-secondary" }, CONFIG.API_URL
         ? "Fija en script.js (API_URL)."
@@ -3265,7 +3325,8 @@ const Admin = {
             h("li", {}, "Primero guarda un ", h("b", { text: "ZIP con todas las hojas" }), " en la carpeta de la hoja de cálculo."),
             h("li", {}, "Borra las hojas ", h("b", { text: "W_*" }), " y ", h("b", { text: "Reporte_*" }), ", y vacía Course, Students, Attendance Log y Roles (quedan los encabezados)."),
             h("li", {}, "Borra la configuración guardada (ciclo fijo, carpetas) y la contraseña: vuelve a ser ", h("b", { class: "mono", text: "123456789" }), "."),
-            h("li", { text: "Otras hojas que hayas agregado tú no se tocan." })),
+            h("li", {}, "Exámenes: borra sus resultados, vuelve a las contraseñas iniciales de cada parcial y los deja ", h("b", { text: "cerrados" }), "."),
+            h("li", { text: "Se conserva la URL del servidor (la de script.js y la de las páginas de examen). Otras hojas que hayas agregado tú no se tocan." })),
           h("p", { class: "text-danger fw-semibold mb-0", text: "No se puede deshacer desde la web (solo con el ZIP o el historial de versiones de Google)." }))
       });
       if (!ok) return;
@@ -3287,7 +3348,7 @@ const Admin = {
 
     content.replaceChildren(h("div", { class: "row g-3" },
       h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard, serverCard),
-      h("div", { class: "col-12 col-xl-7 vstack gap-3" }, backupCard, dangerCard, factoryCard)));
+      h("div", { class: "col-12 col-xl-7 vstack gap-3" }, examCard, backupCard, dangerCard, factoryCard)));
   }
 };
 

@@ -1,4 +1,4 @@
-# Dashboard CCH v6.6 · Instalación y ajustes
+# Dashboard CCH v6.7 · Instalación y ajustes
 
 ## Archivos
 
@@ -17,6 +17,10 @@ Los dos exámenes ya no usan su hoja aparte: viven en la hoja de **Asistencias**
 3. Si empiezas de cero, ejecuta `crearTablasExamenes` (botón ▶) y se crean esas 4 hojas.
 4. Implementar → Gestionar implementaciones → ✏️ → **Nueva versión**.
 5. Sube `examenes_cibernetica.html` y `examenes_estadistica.html` a GitHub (solo cambió su `CFG.ENDPOINT`). La página de inicio tiene un botón para cada examen.
+
+**Crear todas las tablas de una vez:** en Apps Script elige la función **`instalarTodo`** → ▶ Ejecutar. Crea lo que falte (Course, Students, Attendance Log, Roles, hojas W_, carpetas y las 4 hojas de exámenes) sin tocar lo que ya existe. El registro muestra el nombre y el ID de la hoja donde quedó todo. Desde la web hace lo mismo **Mantenimiento → Verificar / crear hojas y carpetas**.
+
+**Mostrar u ocultar los exámenes en la página de inicio:** el botón de cada examen aparece solo si tiene algún parcial abierto. Se abre o cierra cada parcial en **Mantenimiento → Exámenes en línea** (o desde el panel del propio examen). Arriba del panel, la barra **Asistencias · Examen Cibernética · Examen Estadística** te lleva al panel de cada examen.
 
 **Contraseña de administrador del examen** = la del panel (`CCH_ADMIN_PASSWORD`). Ya no está escrita en el código. Si quieres seguir usando la anterior, ponla como valor de `CCH_ADMIN_PASSWORD`.
 
