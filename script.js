@@ -326,8 +326,23 @@ const Parts = {
       td.tabIndex = 0;
       td.setAttribute("role", "button");
       td.title = `${d.label} · Falta — toca para justificar`;
+      // Primero pregunta (en línea: un modal cerraría la ficha)
+      const ask = () => {
+        if (td.classList.contains("busy")) return;
+        strip.querySelectorAll(".st-justify.asking").forEach(x => x.classList.remove("asking"));
+        td.classList.add("asking");
+        const yes = h("button", { class: "btn btn-sm btn-info", type: "button" }, icon("check2", "me-1"), "Sí, justificar");
+        const no = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", text: "Cancelar" });
+        no.onclick = () => { td.classList.remove("asking"); confirmBox.replaceChildren(); };
+        yes.onclick = () => { confirmBox.replaceChildren(); go(); };
+        confirmBox.replaceChildren(h("div", { class: "alert alert-info d-flex flex-wrap align-items-center gap-2 py-2 px-3 mt-2 mb-0 small", role: "alert" },
+          icon("question-circle"), h("span", {}, "¿Justificar la falta del ", h("b", { text: d.label }), "? Cambia ✗ por J en el Reporte_."),
+          h("div", { class: "ms-auto d-flex gap-1" }, no, yes)));
+        yes.focus();
+      };
       const go = async () => {
         if (td.classList.contains("busy")) return;
+        td.classList.remove("asking");
         td.classList.add("busy");
         try {
           await onJustify(d);
@@ -344,13 +359,15 @@ const Parts = {
           if (error.code !== "AUTH") UI.toast("danger", error.message);
         }
       };
-      td.onclick = go;
-      td.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+      td.onclick = ask;
+      td.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
       return td;
     };
-    return h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-bordered table-cch att-table mb-0" },
+    const confirmBox = h("div");
+    const strip = h("div", {}, h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-bordered table-cch att-table mb-0" },
       h("thead", {}, h("tr", {}, h("th", { class: "sticky-col", text: "Cuenta" }), dates.map(d => h("th", { text: d.label })))),
-      h("tbody", {}, h("tr", {}, cell, dates.map(cellFor)))));
+      h("tbody", {}, h("tr", {}, cell, dates.map(cellFor))))), confirmBox);
+    return strip;
   },
 
   pct(counts) {
@@ -1137,7 +1154,7 @@ const Student = {
       }
       return h("p", { class: "text-body-secondary small mb-0", text: "Tu profesor aún no publica la forma de evaluación." });
     }
-    const typeHint = { asistencia: "según tu asistencia", proyectos: "según tu equipo" };
+    const typeHint = { asistencia: "según tu asistencia", proyectos: "según tu equipo", examen: "examen en línea" };
     const rows = comps.map(comp => {
       const item = course.items[comp.id] || { score10: null, bonus: 0 };
       const rawText = comp.tipo === "manual" && comp.maximo !== 10 && item.raw !== null ? `${Fmt.num(item.raw)} / ${comp.maximo}` : "";
@@ -1619,7 +1636,7 @@ const Admin = {
 
   psiModal() {
     const g = Admin.group;
-    const manual = g.components.filter(c => c.tipo === "manual");
+    const manual = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
     const auto = manual.find(c => /tarea|teams|activ|sello|ejercicio/i.test(c.nombre));
     const opts = { tareas: auto ? auto.id : "none", extra: false, dejoN: 3, components: g.components };
 
@@ -2056,7 +2073,7 @@ const Admin = {
     };
     refreshSave();
 
-    const manual = comps.filter(c => c.tipo === "manual");
+    const manual = comps.filter(c => c.tipo === "manual" || c.tipo === "examen");
     const tbody = h("tbody");
 
     const moveFocus = (input, delta) => {
@@ -2134,7 +2151,7 @@ const Admin = {
   /** Excel con Cuenta, Nombre y una columna por componente manual (vacíos en amarillo). */
   gradesTemplate() {
     const g = Admin.group;
-    const comps = g.components.filter(c => c.tipo === "manual");
+    const comps = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
     if (!comps.length) return UI.toast("warning", "Este grupo no tiene componentes manuales.");
     const header = ["Cuenta", "Nombre"].concat(comps.map(c => c.nombre)).map(v => ({ v, s: "head" }));
     const rows = g.students.map(st => [Number(st.cuenta), st.nombre].concat(comps.map(c => {
@@ -2166,7 +2183,7 @@ const Admin = {
     const header = (sheet.rows[0] || []).map(v => String(v ?? ""));
     const iCuenta = header.findIndex(v => key(v) === "cuenta" || key(v).includes("cuenta"));
     if (iCuenta === -1) return UI.toast("danger", `La hoja «${sheet.name}» no tiene la columna Cuenta.`);
-    const comps = g.components.filter(c => c.tipo === "manual");
+    const comps = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
     const map = [], unknown = [];
     header.forEach((v, i) => {
       if (i === iCuenta || !v || key(v) === "nombre") return;
@@ -2234,11 +2251,12 @@ const Admin = {
   /* ---------------- Pestaña: Ponderaciones ---------------- */
   tabWeights(content, opts = {}) {
     const g = Admin.group;
-    const fresh = () => g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo }));
+    const fresh = () => g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo, fuente: c.fuente || "" }));
     // En la pestaña el borrador sobrevive al cambiar de pestaña; en el modal siempre parte de lo guardado
     if (!opts.modal && !Admin.compDraft) Admin.compDraft = fresh();
     const draft = opts.modal ? fresh() : Admin.compDraft;
-    const types = { manual: "Manual (capturo yo)", asistencia: "Asistencia (automática)", proyectos: "Proyectos en equipo (automática)" };
+    const types = { manual: "Manual (capturo yo)", asistencia: "Asistencia (automática)", proyectos: "Proyectos en equipo (automática)", examen: "Examen en línea (automática)" };
+    const exams = g.examSources || [];
 
     const list = h("div", { class: "vstack gap-2" });
     const sumBar = h("div", { class: "progress-bar" });
@@ -2270,6 +2288,9 @@ const Admin = {
         const scaleNote = isSello ? h("div", { class: "input-group input-group-sm mt-1", style: { maxWidth: "260px" } },
           h("span", { class: "input-group-text", text: "Máximo de sellos" }),
           h("input", { class: "form-control", type: "number", min: "1", step: "1", value: c.maximo, "aria-label": "Máximo de sellos", oninput: e => { c.maximo = e.target.value; } }))
+        : c.tipo === "examen" ? h("select", { class: "form-select form-select-sm mt-1", "aria-label": "Examen y parcial", onchange: e => { c.fuente = e.target.value; } },
+          h("option", { value: "", text: exams.length ? "— Elige examen y parcial —" : "No hay hojas «Resultados …» (ejecuta crearTablasExamenes)" }),
+          exams.map(x => h("option", { value: x.id, selected: c.fuente === x.id, text: x.label })))
         : c.tipo === "manual" && Number(c.maximo) !== 10 ? h("div", { class: "small text-body-secondary mt-1" },
           `En Captura se escribe de 0 a ${c.maximo}. `,
           h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
@@ -2277,7 +2298,7 @@ const Admin = {
           h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const was = /sello/.test(Fmt.normalize(c.nombre)); c.nombre = e.target.value; updateSum(); if (was !== /sello/.test(Fmt.normalize(c.nombre))) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
-            onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; draw(); }
+            onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; if (c.tipo !== "examen") c.fuente = ""; draw(); }
           }, Object.entries(types).map(([v, t]) => h("option", { value: v, selected: c.tipo === v, text: t })))),
           h("div", { class: "col-6 col-md-2" }, h("div", { class: "input-group input-group-sm" },
             h("input", { class: "form-control", type: "number", min: "0", max: "100", step: "any", value: c.ponderacion, "aria-label": "Ponderación", oninput: e => { c.ponderacion = e.target.value; updateSum(); } }),
@@ -2333,6 +2354,7 @@ const Admin = {
           "«Manual» = lo capturas tú en Captura, de 0 a 10; solo Sellos lleva su máximo (ej. 40 sellos). ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
+          "«Examen en línea» = la calificación que el alumno sacó en el examen (Cibernética o Estadística) de ese parcial, por número de cuenta. ",
           "«Calificación entera» suma lo obtenido y quita los decimales (no redondea). ",
           "Cada componente tiene su columna en el reporte: si quitas uno se borra su columna, y si agregas uno se crea.")
       )),

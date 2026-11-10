@@ -1,11 +1,60 @@
-# Dashboard CCH v6.4 · Instalación y ajustes
+# Dashboard CCH v6.6 · Instalación y ajustes
 
 ## Archivos
 
 | Va en… | Archivo |
 |---|---|
 | GitHub (tu página) | `index.html`, `estilo.css`, `script.js` |
-| Apps Script | `apps-script/Codigo.gs` (**un solo archivo**) y `appsscript.json` |
+| GitHub (exámenes) | `examenes_cibernetica.html`, `examenes_estadistica.html` (ya apuntan a la URL de Asistencias) |
+| Apps Script | `apps-script/Codigo.gs`, `apps-script/Examenes.gs` (archivo aparte) y `appsscript.json` |
+
+## Exámenes en línea (mismo proyecto, misma URL)
+
+Los dos exámenes ya no usan su hoja aparte: viven en la hoja de **Asistencias**.
+
+1. Apps Script de Asistencias → **+ → Secuencia de comandos** → nómbrala `Examenes` → pega `Examenes.gs`. Codigo.gs se queda igual.
+2. **Si quieres conservar los resultados anteriores:** en la hoja vieja de exámenes, clic derecho en cada pestaña (`Resultados Cibernética`, `Config Cibernética`, `Resultados Estadística`, `Config Estadística`) → **Copiar en → Hoja de cálculo existente** → Asistencias. En Asistencias quítales el «Copia de» del nombre. Así conservas también las contraseñas de cada parcial.
+3. Si empiezas de cero, ejecuta `crearTablasExamenes` (botón ▶) y se crean esas 4 hojas.
+4. Implementar → Gestionar implementaciones → ✏️ → **Nueva versión**.
+5. Sube `examenes_cibernetica.html` y `examenes_estadistica.html` a GitHub (solo cambió su `CFG.ENDPOINT`). La página de inicio tiene un botón para cada examen.
+
+**Contraseña de administrador del examen** = la del panel (`CCH_ADMIN_PASSWORD`). Ya no está escrita en el código. Si quieres seguir usando la anterior, ponla como valor de `CCH_ADMIN_PASSWORD`.
+
+**Enlazar el examen con el grupo:** Ponderaciones → en el componente (ej. Parcial 1) elige el tipo **Examen en línea** y luego **Examen Estadística · Parcial 1**.
+
+- Se empata por **número de cuenta**: solo cuenta para alumnos inscritos en ese grupo y solo exámenes **Entregados**.
+- Si un alumno no lo presentó en línea, vale lo que captures a mano en Captura (ej. examen en papel).
+- La calificación llega sola a su columna del Reporte_ (ej. Parcial_1) al abrir el grupo en el panel o con **Sync**.
+
+## Instalación nueva (otra escuela u otra cuenta)
+
+El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
+
+1. Crea una hoja de cálculo de Google en blanco → Extensiones → Apps Script.
+2. Pega `Codigo.gs` y `appsscript.json` → Implementar → Nueva implementación → **Aplicación web**, ejecutar como **Yo**, acceso **Cualquier usuario** → copia la URL que termina en `/exec`.
+3. Sube `index.html`, `estilo.css` y `script.js` a GitHub Pages y abre la página: te pide la **URL del Web App**. Pégala y presiona «Probar y guardar».
+4. Entra a **Admin** con la contraseña de fábrica **123456789**. Se crean las hojas y un grupo **DEMO** con 12 alumnos (asistencia, Parcial 1 y un proyecto) para probar.
+5. Cambia la contraseña: Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → `CCH_ADMIN_PASSWORD`. Mientras no exista, el panel muestra un aviso amarillo.
+
+**URL para los alumnos:** el QR de la página de inicio ya lleva la URL del servidor (`?api=…`), así que el alumno no configura nada. Si prefieres dejarla fija para todos, pégala en `API_URL` al inicio de `script.js`.
+
+## Restaurar a fábrica (DEMO)
+
+**Mantenimiento → Restaurar a fábrica** (escribe RESTAURAR):
+
+1. Guarda un ZIP con **todas** las hojas en la carpeta de la hoja de cálculo.
+2. Borra las hojas `W_*` y `Reporte_*`, y deja Course, Students, Attendance Log y Roles solo con encabezados.
+3. Borra las propiedades `CCH_*`: la contraseña vuelve a **123456789** y el ciclo a automático.
+4. Crea otra vez el grupo DEMO. Las hojas que agregaste tú (ej. Asesorias) no se tocan.
+
+## Celular
+
+- **Pase de lista:** en el celular se ve una tarjeta por alumno con botones grandes ✓ ✗ J y una barra fija abajo con el contador y **Guardar**. Si giras el celular no se pierden las marcas.
+- **Proyectos:** en el celular se califica **un equipo a la vez**: ‹ › o desliza el dedo; al presionar **Calificar** pasa solo al siguiente. Los puntos verdes son los equipos ya calificados.
+
+## Justificar desde la ficha
+
+En la ficha del alumno, toca una **✗**: aparece «¿Justificar la falta del 14/10?» con **Sí, justificar** o **Cancelar**. Al confirmar se vuelve **J** en el Reporte_. Solo las faltas se pueden tocar.
 
 ## Instalar o actualizar
 

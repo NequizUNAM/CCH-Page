@@ -12,6 +12,7 @@
  *
  * CONTRASEÑA DE ADMIN: Configuración del proyecto ⚙️ →
  *   Propiedades de la secuencia de comandos → CCH_ADMIN_PASSWORD
+ *   Mientras no exista, la de fábrica es 123456789 (el panel lo avisa).
  *
  * HOJAS
  *   AppSheet (pase de lista QR): Course, Students, Attendance Log, Roles
@@ -26,7 +27,7 @@
  * ============================================================
  */
 
-const API_VERSION = "6.4.0";
+const API_VERSION = "6.5.0";
 const REPORT_PREFIX = "Reporte_";
 
 const SHEETS = {
@@ -37,7 +38,7 @@ const SHEETS = {
 
 /** Hojas nuevas de la web: nombre + encabezados (fila 1). */
 const WEB = {
-  COMPONENTS:  { name: "W_Componentes",    headers: ["ID", "ID_Curso", "Nombre", "Tipo", "Ponderacion", "Maximo", "Orden"] },
+  COMPONENTS:  { name: "W_Componentes",    headers: ["ID", "ID_Curso", "Nombre", "Tipo", "Ponderacion", "Maximo", "Orden", "Fuente"] },
   GRADES:      { name: "W_Calificaciones", headers: ["ID_Curso", "Cuenta", "ID_Componente", "Valor", "Actualizado"] },
   PROJECTS:    { name: "W_Proyectos",      headers: ["ID", "ID_Curso", "Nombre", "Rubros", "ID_Componente", "Registro_Abierto", "Creado"] },
   TEAMS:       { name: "W_Equipos",        headers: ["ID_Equipo", "ID_Proyecto", "ID_Curso", "Nombre_Equipo", "Cuenta", "Registrado", "Registrado_Por"] },
@@ -105,7 +106,7 @@ const DRIVE_FOLDERS = [
  *   asistencia  se calcula: Asistencias / (Asistencias + Faltas) × 10
  *   proyectos   se calcula: promedio de los proyectos ligados a este componente
  */
-const COMPONENT_TYPES = ["manual", "asistencia", "proyectos"];
+const COMPONENT_TYPES = ["manual", "asistencia", "proyectos", "examen"];   // examen = Examenes.gs (Fuente = "Resultados …|parcial")
 
 /** Plantilla por defecto al configurar un grupo nuevo (editable en la web). */
 const DEFAULT_COMPONENTS = [
@@ -126,6 +127,8 @@ const DEFAULT_RUBRICS = [
 
 const SETTINGS = {
   ADMIN_PASSWORD_KEY: "CCH_ADMIN_PASSWORD",
+  FACTORY_PASSWORD: "123456789",                 // solo mientras NO exista CCH_ADMIN_PASSWORD (instalación nueva / demo)
+  FACTORY_WORD: "RESTAURAR",
   EVIDENCE_FOLDER_KEY: "CCH_EVIDENCE_FOLDER_ID",
   EVIDENCE_FOLDER_NAME: "Evidencias_Alumnos",   // dentro de la carpeta de la hoja
 
@@ -283,6 +286,7 @@ function routes_() {
   backupPreview:      { auth: "admin", fn: backupPreview_ },
   backupCycles:       { auth: "admin", fn: backupCycles_, lock: true },
   clearTable:         { auth: "admin", fn: clearTable_, lock: true },
+  factoryReset:       { auth: "admin", fn: factoryReset_, lock: true },
 
   // ---- Enlaces y altas ----
   saveLinks:          { auth: "admin", fn: saveLinks_, lock: true },
@@ -310,6 +314,8 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse_({ status: "error", message: "Solicitud inválida (JSON)." });
   }
+  // Exámenes en línea (Examenes.gs) comparten esta misma URL /exec
+  if (typeof Examenes !== "undefined" && Examenes.ACTIONS.indexOf(body.action) !== -1) return Examenes.handle(e);
   return handleRequest_(body, "POST");
 }
 
@@ -427,6 +433,7 @@ function setupWeb_(options) {
   ensureCourseWebColumns_();
   upgradeIntegerLinks_();
   pairAllComponentColumns_();
+  try { ensureDemoOnFirstInstall_(); } catch (e) { console.error(e); }
 
   // Hojas Reporte_ que ningún curso tiene ligadas → se ligan al curso detectado (si no tiene hoja)
   const courses = courseMap_();
@@ -461,11 +468,8 @@ function adminLogin_(params) {
   const rateKey = "fail_admin";
   checkRateLimit_(cache, rateKey);
 
-  const expected = PropertiesService.getScriptProperties().getProperty(SETTINGS.ADMIN_PASSWORD_KEY);
-  if (!expected) {
-    throw new Error(`Configura la propiedad de script "${SETTINGS.ADMIN_PASSWORD_KEY}" antes de usar el panel.`);
-  }
-  if (String(params.password || "") !== expected) {
+  const expected = adminPassword_();
+  if (String(params.password || "") !== expected.value) {
     registerFailure_(cache, rateKey);
     throw new Error("Contraseña incorrecta.");
   }
@@ -477,7 +481,7 @@ function adminLogin_(params) {
   // Primer ingreso: asegura que existan las hojas W_*
   withScriptLock_(() => setupWeb_());
 
-  return { token, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S };
+  return { token, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S, factoryPassword: expected.factory };
 }
 
 function requireAdmin_(token) {
@@ -1746,7 +1750,7 @@ function diagnoseAttendance_(sheetName) {
 // ============================================================
 // DETERMINAR CURSO DEL REPORTE
 //
-//   Reporte_ESTADISTICA_512, Reporte_CYC_517 …
+//   Reporte_MATERIA_101, Reporte_MATERIA_102 …
 //   1. Un solo curso con ese "Grupo"        → se usa directo.
 //   2. Varios cursos con el mismo "Grupo"   → desempate por cuántos
 //      alumnos del reporte están inscritos (Students) en cada uno.
@@ -2252,7 +2256,8 @@ function componentsFor_(idCurso) {
       tipo: COMPONENT_TYPES.includes(cleanText_(r.Tipo)) ? cleanText_(r.Tipo) : "manual",
       ponderacion: toNumberOrNull_(r.Ponderacion) || 0,
       maximo: toNumberOrNull_(r.Maximo) || 10,
-      orden: toNumberOrNull_(r.Orden) || 0
+      orden: toNumberOrNull_(r.Orden) || 0,
+      fuente: cleanText_(r.Fuente)
     }))
     .sort((a, b) => a.orden - b.orden);
 }
@@ -2277,6 +2282,8 @@ function saveComponents_(params) {
     if (!COMPONENT_TYPES.includes(tipo)) throw new Error(`Tipo inválido en "${nombre}".`);
     if (ponderacion === null || ponderacion < 0 || ponderacion > 100) throw new Error(`Ponderación inválida en "${nombre}" (0 a 100).`);
     if (!maximo || maximo <= 0 || maximo > 1000) throw new Error(`Máximo inválido en "${nombre}".`);
+    const fuente = tipo === "examen" ? cleanText_(c.fuente) : "";
+    if (tipo === "examen" && !examSources_().some(x => x.id === fuente)) throw new Error(`Elige el examen y parcial de "${nombre}".`);
 
     return {
       ID: cleanText_(c.id) || shortId_(),
@@ -2285,7 +2292,8 @@ function saveComponents_(params) {
       Tipo: tipo,
       Ponderacion: ponderacion,
       Maximo: maximo,
-      Orden: i + 1
+      Orden: i + 1,
+      Fuente: fuente
     };
   });
 
@@ -2349,7 +2357,7 @@ function saveGrades_(params) {
     const cuenta = limpiarCuenta_(entry.cuenta);
     const comp = components[cleanText_(entry.componentId)];
     if (!cuenta || !comp) return errors.push(`Registro inválido (${entry.cuenta}).`);
-    if (comp.tipo !== "manual") return errors.push(`"${comp.nombre}" se calcula solo; no se captura.`);
+    if (comp.tipo !== "manual" && comp.tipo !== "examen") return errors.push(`"${comp.nombre}" se calcula solo; no se captura.`);
 
     const key = keyOf(cuenta, comp.id);
     const raw = cleanText_(entry.valor);
@@ -2442,6 +2450,11 @@ function computeCourse_(idCurso, onlyCuenta) {
       if (comp.tipo === "manual") {
         const value = grades[student.cuenta] && grades[student.cuenta][comp.id];
         base = value === undefined ? null : value;
+      } else if (comp.tipo === "examen") {
+        // El examen en línea manda; si no lo presentó en línea, cuenta lo capturado a mano (ej. examen en papel)
+        const nota = examGrades_(comp.fuente)[student.cuenta];
+        const manual = grades[student.cuenta] && grades[student.cuenta][comp.id];
+        base = nota !== undefined ? nota : manual === undefined ? null : manual;
       } else if (comp.tipo === "asistencia") {
         base = attendanceScore_(att && att.counts);
       } else if (comp.tipo === "proyectos") {
@@ -2906,7 +2919,7 @@ function listEvidence_(params) {
   const componentsByCourse = {};
   Object.keys(groups).forEach(id => {
     componentsByCourse[id] = componentsFor_(id)
-      .filter(c => c.tipo === "manual")
+      .filter(c => c.tipo === "manual" || c.tipo === "examen")
       .map(c => ({ id: c.id, nombre: c.nombre, maximo: c.maximo }));
   });
 
@@ -3111,6 +3124,7 @@ function saveGroup_(params) {
 
 function groupData_(params) {
   const idCurso = cleanText_(params.idCurso);
+  refreshExamColumns_(idCurso);
   const result = computeCourse_(idCurso);
   const names = studentNames_();
   const commentCounts = commentCounts_();
@@ -3127,6 +3141,7 @@ function groupData_(params) {
     psi: { grupo: String(result.group.group || "").padStart(4, "0"), periodo: result.group.ciclo },
     currentCycle: currentCycle_(),
     components: result.components,
+    examSources: examSources_(),
     attendance: att ? {
       sheetName: att.sheetName,
       dates: att.dates.map(d => ({ key: d.key, label: d.label, visible: d.visible })),
@@ -4462,6 +4477,239 @@ function upgradeIntegerLinks_() {
   });
   if (changed) Db.writeAll(WEB.COLUMNS, out);
   return changed;
+}
+
+
+// ============================================================
+// ESTADO DE FÁBRICA Y DEMO
+//
+// - Si no existe la propiedad CCH_ADMIN_PASSWORD, la contraseña es la
+//   de fábrica (SETTINGS.FACTORY_PASSWORD) y el panel lo avisa.
+// - La primera vez (hoja sin cursos) se crea un grupo DEMO.
+// - «Restaurar a fábrica»: respaldo ZIP completo → borra W_* y Reporte_*,
+//   vacía Course/Students/Attendance Log/Roles, borra las propiedades
+//   CCH_* (contraseña incluida) y vuelve a crear el DEMO.
+//   Las demás hojas que hayas agregado tú no se tocan.
+// ============================================================
+
+const DEMO_ = {
+  materia: "Demo Estadística",
+  grupo: "101",
+  students: [
+    ["300000001", "ACOSTA BRAVO ANDREA"], ["300000002", "BENÍTEZ CRUZ LUIS"], ["300000003", "CASTRO DÍAZ MARIANA"],
+    ["300000004", "DOMÍNGUEZ ESTRADA JOSÉ"], ["300000005", "ESPINOSA FLORES VALERIA"], ["300000006", "FUENTES GÓMEZ DIEGO"],
+    ["300000007", "GUERRERO HERRERA SOFÍA"], ["300000008", "IBARRA JUÁREZ EMILIO"], ["300000009", "LARA MÉNDEZ CAMILA"],
+    ["300000010", "MORALES NAVARRO RICARDO"], ["300000011", "ORTEGA PÉREZ XIMENA"], ["300000012", "RÍOS SALAZAR MATEO"]
+  ],
+  // por alumno: faltas en las 6 fechas (índices) y Parcial 1
+  faltas: [[], [2], [], [1, 4], [], [0, 2, 3, 5], [], [5], [], [3], [1], [0, 1, 2, 3, 4]],
+  parcial1: [9, 7.5, 10, 6, 8.5, 5, 9.5, 7, 8, 6.5, 9, 4]
+};
+
+/** Contraseña vigente: la de la propiedad o, si no existe, la de fábrica. */
+function adminPassword_() {
+  const saved = PropertiesService.getScriptProperties().getProperty(SETTINGS.ADMIN_PASSWORD_KEY);
+  return { value: saved || SETTINGS.FACTORY_PASSWORD, factory: !saved };
+}
+
+/** Primera instalación: hoja sin cursos → grupo DEMO (una sola vez). */
+function ensureDemoOnFirstInstall_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty("CCH_DEMO_CREADO")) return null;
+  props.setProperty("CCH_DEMO_CREADO", new Date().toISOString());
+  if (Object.keys(courseMap_()).length) return null;
+  try { return loadDemo_(); } catch (e) { console.error("Demo: " + e.message); return null; }
+}
+
+function loadDemo_() {
+  Db.clearCache();
+  const g = createGroup_({ materia: DEMO_.materia, grupo: DEMO_.grupo, horario: "7:00" });
+  const idCurso = g.idCurso;
+  Db.clearCache();
+
+  DEMO_.students.forEach(([cuenta, nombre]) => {
+    addStudent_({ idCurso, cuenta, nombre, email: `${cuenta}@alumno.demo` });
+    Db.clearCache();
+  });
+
+  // Ponderación por defecto
+  saveComponents_({ idCurso, components: DEFAULT_COMPONENTS.map(c => ({ nombre: c.Nombre, tipo: c.Tipo, ponderacion: c.Ponderacion, maximo: c.Maximo })) });
+  Db.clearCache();
+
+  // Asistencia: 6 días hábiles anteriores a hoy
+  const tz = getSpreadsheetTz_();
+  const days = [];
+  const d = new Date();
+  while (days.length < 6) {
+    d.setDate(d.getDate() - 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) days.unshift(Utilities.formatDate(d, tz, "yyyy-MM-dd"));
+  }
+  days.forEach((date, k) => {
+    saveRollCall_({
+      idCurso, date,
+      marks: DEMO_.students.map(([cuenta], i) => ({
+        cuenta,
+        status: DEMO_.faltas[i].includes(k) ? (i === 3 && k === 4 ? "Justificante" : "Falta") : "Asistencia"
+      }))
+    });
+    Db.clearCache();
+  });
+
+  // Parcial 1
+  const p1 = componentsFor_(idCurso).find(c => /parcial1/.test(normalizeKey_(c.nombre).replace(/\s+/g, "")));
+  if (p1) saveGrades_({ idCurso, entries: DEMO_.students.map(([cuenta], i) => ({ cuenta, componentId: p1.id, valor: String(DEMO_.parcial1[i]) })) });
+  Db.clearCache();
+
+  // Proyecto con 3 equipos (2 calificados) y registro abierto
+  const projComp = componentsFor_(idCurso).find(c => c.tipo === "proyectos");
+  saveProject_({ idCurso, project: { nombre: "Proyecto demo", rubros: DEFAULT_RUBRICS.slice(), componentId: projComp ? projComp.id : "", abierto: true } });
+  Db.clearCache();
+  const project = projectsFor_(idCurso)[0];
+  const teams = [["Los Pitagóricos", 0, 3], ["Media y Moda", 3, 6], ["Los Outliers", 6, 9]];
+  teams.forEach(([nombre, a, b], k) => {
+    const r = registerTeamCore_({ projectId: project.id, nombre, cuentas: DEMO_.students.slice(a, b).map(s => s[0]), by: "admin", admin: true });
+    Db.clearCache();
+    if (k < 2) {
+      const stars = {};
+      DEFAULT_RUBRICS.forEach((rb, j) => { stars[rb] = k === 0 ? 5 - (j % 2) : 4 - (j % 3 === 0 ? 1 : 0); });
+      saveTeamEval_({ teamId: r.teamId, stars, observaciones: "Equipo de demostración" });
+      Db.clearCache();
+    }
+  });
+
+  try {
+    pairComponentColumns_(idCurso, null);
+    addReportColumn_({ idCurso, name: "Calificación", component: false });
+    Db.append(WEB.COLUMNS, [{ ID_Curso: idCurso, Columna: "Calificación", Tipo: "entero", Ref: "" }]);
+    Db.clearCache();
+    syncReportColumns_(idCurso);
+  } catch (e) { console.error("Demo columnas: " + e.message); }
+  Db.clearCache();
+  return { idCurso, sheet: g.sheetName, students: DEMO_.students.length };
+}
+
+/** Borra TODO lo del sistema (con respaldo) y deja el DEMO. */
+function factoryReset_(params) {
+  if (cleanText_(params.confirm).toUpperCase() !== SETTINGS.FACTORY_WORD) {
+    throw new Error(`Escribe ${SETTINGS.FACTORY_WORD} para confirmar.`);
+  }
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Respaldo completo (todas las hojas, valores)
+  const blob = exportXlsx_(`Respaldo completo ${stamp_()}`, spreadsheet.getSheets().map(sh => ({ name: sh.getName(), matrix: sheetMatrix_(sh) })));
+  const backup = saveZip_(`${SETTINGS.BACKUP_PREFIX}antes_de_fabrica_${stamp_()}.zip`, [blob]);
+
+  // 2. Hojas de la web y reportes
+  ensureBaseSheets_();
+  const removed = [];
+  spreadsheet.getSheets().slice().forEach(sh => {
+    const name = sh.getName();
+    if (/^W_/.test(name) || /^Reporte_/i.test(name)) { spreadsheet.deleteSheet(sh); removed.push(name); }
+  });
+
+  // 3. Tablas de AppSheet: solo encabezados
+  BASE_SHEETS.forEach(def => {
+    const sh = spreadsheet.getSheetByName(def.name);
+    if (!sh || sh.getLastRow() < 2) return;
+    if (sh.getMaxRows() <= sh.getLastRow()) sh.insertRowsAfter(sh.getLastRow(), 1);
+    sh.deleteRows(2, sh.getLastRow() - 1);
+  });
+
+  // 4. Propiedades CCH_* (contraseña, ciclo fijo, carpetas, banderas)
+  const props = PropertiesService.getScriptProperties();
+  Object.keys(props.getProperties()).filter(k => /^CCH_/.test(k)).forEach(k => props.deleteProperty(k));
+
+  // 5. Estructura y DEMO
+  Db.clearCache();
+  Object.keys(WEB).forEach(key => Db.sheet(WEB[key]));
+  props.setProperty("CCH_DEMO_CREADO", new Date().toISOString());
+  props.setProperty("CCH_PAIRED_V641", new Date().toISOString());
+  const demo = loadDemo_();
+
+  return {
+    backup,
+    removed: removed.length,
+    demo,
+    message: `Restaurado a fábrica. Respaldo: ${backup.name}. Se creó el grupo DEMO (${demo.students} alumnos). ` +
+      `Contraseña de administrador: ${SETTINGS.FACTORY_PASSWORD} (cámbiala en Propiedades del script → ${SETTINGS.ADMIN_PASSWORD_KEY}).`
+  };
+}
+
+
+// ============================================================
+// ENLACE CON LOS EXÁMENES EN LÍNEA (Examenes.gs)
+//
+// Un componente de tipo «examen» toma la «Calificación (0-10)» de la hoja
+// «Resultados …» del examen, por número de cuenta y parcial (solo entregados).
+// Fuente = "<hoja de resultados>|<parcial>", ej. "Resultados Estadística|1".
+// Solo cuentan los alumnos inscritos en el grupo (mismo número de cuenta).
+// ============================================================
+
+const EXAM_RESULTS_PREFIX = "Resultados ";
+const EXAM_PARCIALES = [1, 2];
+
+/** Exámenes disponibles: una opción por hoja «Resultados …» y parcial. */
+function examSources_() {
+  if (Db._cache.__examSources) return Db._cache.__examSources;
+  const out = [];
+  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(sh => {
+    const name = sh.getName();
+    if (name.indexOf(EXAM_RESULTS_PREFIX) !== 0) return;
+    const materia = name.slice(EXAM_RESULTS_PREFIX.length);
+    EXAM_PARCIALES.forEach(p => out.push({ id: `${name}|${p}`, label: `Examen ${materia} · Parcial ${p}` }));
+  });
+  Db._cache.__examSources = out;
+  return out;
+}
+
+/** { cuenta: calificación } de un examen y parcial (solo «Entregado»). */
+function examGrades_(fuente) {
+  const key = "__exam_" + fuente;
+  if (Db._cache[key]) return Db._cache[key];
+  const map = {};
+  const [sheetName, parcialText] = String(fuente || "").split("|");
+  const sheet = sheetName && SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (sheet && sheet.getLastRow() > 1) {
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0].map(cleanText_);
+    const iCuenta = findColumn_(headers, "Número de cuenta");
+    const iParcial = findColumn_(headers, "Parcial");
+    const iEstado = findColumn_(headers, "Estado");
+    const iNota = headers.findIndex(h => /^calificaci/i.test(h));
+    if (iCuenta !== -1 && iParcial !== -1 && iNota !== -1) {
+      values.slice(1).forEach(r => {
+        if (Number(r[iParcial]) !== Number(parcialText)) return;
+        if (iEstado !== -1 && cleanText_(r[iEstado]) !== "Entregado") return;
+        const cuenta = limpiarCuenta_(r[iCuenta]);
+        const nota = toNumberOrNull_(r[iNota]);
+        if (cuenta && nota !== null) map[cuenta] = Math.max(0, Math.min(10, nota));
+      });
+    }
+  }
+  Db._cache[key] = map;
+  return map;
+}
+
+/**
+ * Lo llama Examenes.gs al entregar. Solo anota la hora (rápido, sin candado extra);
+ * las columnas del Reporte_ se reescriben al abrir el grupo en el panel o con Sync.
+ */
+function examSubmitted_(sheetName, parcial) {
+  CacheService.getScriptCache().put(`exam_ts_${sheetName}|${parcial}`, String(Date.now()), 21600);
+}
+
+/** Si hubo entregas nuevas de un examen ligado al grupo, reescribe sus columnas. */
+function refreshExamColumns_(idCurso) {
+  const fuentes = componentsFor_(idCurso).filter(c => c.tipo === "examen" && c.fuente).map(c => c.fuente);
+  if (!fuentes.length) return;
+  const cache = CacheService.getScriptCache();
+  const last = Number(cache.get("exam_sync_" + idCurso) || 0);
+  const newest = Math.max.apply(null, fuentes.map(f => Number(cache.get("exam_ts_" + f) || 0)));
+  if (newest <= last) return;
+  try {
+    withScriptLock_(() => syncReportColumns_(idCurso));
+    cache.put("exam_sync_" + idCurso, String(Date.now()), 21600);
+  } catch (e) { /* lo hará el siguiente Sync */ }
 }
 
 
