@@ -954,6 +954,7 @@ const Student = {
     $("stu-name").textContent = data.student.nombre || "Alumno";
     $("stu-links-count").textContent = (data.links || []).length || "";
     $("stu-cuenta").textContent = data.student.cuenta;
+    $("stu-groups").textContent = data.courses.length ? ` · Grupo: ${data.courses.map(c => c.label).join(", ")}` : "";
     $("stu-tabs").querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === (tab === "evidencias" ? "evidencias" : "avance")));
 
     // Pastillas de grupos (solo si hay más de uno)
@@ -1064,9 +1065,10 @@ const Student = {
               : h("span", { class: "badge text-bg-secondary", text: "Por calificar" })),
           h("ul", { class: "list-unstyled small mb-2" }, t.members.map(m => h("li", {}, icon("person", "me-1"), h("span", { class: "mono me-1", text: m.cuenta }), m.nombre))),
           t.stars ? h("div", { class: "border-top pt-2" }, project.rubros.map(r => h("div", { class: "rubric-row small" }, h("span", { text: r }), Parts.starsReadonly(t.stars[r] || 0)))) : null,
+          h("div", { class: "form-text mt-2" }, icon("lock", "me-1"), "Equipo registrado. Solo tu profesor puede modificarlo."),
         );
       } else if (project.abierto) {
-        body = Student.teamForm(project);
+        body = Student.teamForm(project, course);
       } else {
         body = h("p", { class: "text-body-secondary small mb-0" }, icon("lock", "me-1"), "El registro está cerrado. Si no tienes equipo, habla con tu profesor.");
       }
@@ -1078,7 +1080,7 @@ const Student = {
     }));
   },
 
-  teamForm(project) {
+  teamForm(project, course) {
     const max = Student.data.maxTeamSize || 8;
     const list = h("div", { class: "vstack gap-2 mb-2" });
     const addInput = (value = "") => {
@@ -1105,6 +1107,8 @@ const Student = {
         }
       }
     },
+      h("div", { class: "alert alert-info py-2 px-3 small mb-2" }, icon("people", "me-1"), "Registras tu equipo en el grupo ", h("b", { text: course ? `${course.label} (${course.ciclo})` : "" }),
+        ". Solo se registra una vez: tú y tus integrantes ya no podrán cambiarlo."),
       h("div", { class: "mb-2" }, h("label", { class: "form-label small", for: name.id, text: "Nombre del equipo" }), name),
       h("label", { class: "form-label small mb-1", text: "Integrantes" }),
       h("div", { class: "input-group input-group-sm mb-2" }, h("span", { class: "input-group-text" }, icon("person-check")), h("input", { class: "form-control", value: `${Student.data.student.cuenta} (tú)`, disabled: true })),
@@ -2101,9 +2105,9 @@ const Admin = {
       const ids = new Set(draft.map(c => c.id).filter(Boolean));
       const gone = (g.columns || []).filter(l => l.tipo === "componente" && !ids.has(l.ref)).map(l => l.columna);
       const fresh = draft.filter(c => !c.id && c.nombre.trim()).map(c => c.nombre.trim());
-      pairNote.replaceChildren(
+      pairNote.replaceChildren(...kids(
         gone.length ? h("div", { class: "alert alert-warning py-1 px-2 mb-1 small" }, icon("exclamation-triangle", "me-1"), `Al guardar se borrarán del reporte las columnas: ${gone.join(", ")} (con sus datos).`) : null,
-        fresh.length ? h("div", { class: "alert alert-info py-1 px-2 mb-1 small" }, icon("plus-lg", "me-1"), `Al guardar se crea su columna en el reporte: ${fresh.join(", ")}.`) : null);
+        fresh.length ? h("div", { class: "alert alert-info py-1 px-2 mb-1 small" }, icon("plus-lg", "me-1"), `Al guardar se crea su columna en el reporte: ${fresh.join(", ")}.`) : null));
       sumBar.className = `progress-bar ${exact ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
       sumHint.textContent = exact ? "" : `Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`;
       saveBtn.disabled = !exact;
@@ -2114,12 +2118,16 @@ const Admin = {
 
     const draw = () => {
       list.replaceChildren(...draft.map((c, i) => {
-        // Solo porcentaje. Si un componente viejo se captura en otra escala (Sellos 0–15), se avisa aquí.
-        const scaleNote = c.tipo === "manual" && Number(c.maximo) !== 10 ? h("div", { class: "small text-body-secondary mt-1" },
+        // Solo porcentaje. Sellos es el único con máximo propio (ej. 40 sellos = su 100 %).
+        const isSello = c.tipo === "manual" && /sello/.test(Fmt.normalize(c.nombre));
+        const scaleNote = isSello ? h("div", { class: "input-group input-group-sm mt-1", style: { maxWidth: "260px" } },
+          h("span", { class: "input-group-text", text: "Máximo de sellos" }),
+          h("input", { class: "form-control", type: "number", min: "1", step: "1", value: c.maximo, "aria-label": "Máximo de sellos", oninput: e => { c.maximo = e.target.value; } }))
+        : c.tipo === "manual" && Number(c.maximo) !== 10 ? h("div", { class: "small text-body-secondary mt-1" },
           `En Captura se escribe de 0 a ${c.maximo}. `,
           h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
         return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
-          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { c.nombre = e.target.value; updateSum(); } }), scaleNote),
+          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const was = /sello/.test(Fmt.normalize(c.nombre)); c.nombre = e.target.value; updateSum(); if (was !== /sello/.test(Fmt.normalize(c.nombre))) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
             onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; draw(); }
@@ -2175,7 +2183,7 @@ const Admin = {
         h("div", { class: "progress weight-bar mb-2", role: "progressbar", "aria-label": "Suma de ponderaciones" }, sumBar),
         h("p", { class: "small text-body-secondary mb-0" },
           "Cada componente vale el % que le pongas y entre todos deben sumar 100 % (= 10). Ej.: Parcial 1 al 40 % con 8 aporta 3.2. ",
-          "«Manual» = lo capturas tú en Captura. ",
+          "«Manual» = lo capturas tú en Captura, de 0 a 10; solo Sellos lleva su máximo (ej. 40 sellos). ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
           "«Calificación entera» suma lo obtenido y quita los decimales (no redondea). ",
