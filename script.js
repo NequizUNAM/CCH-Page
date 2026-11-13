@@ -13,7 +13,7 @@ const CONFIG = {
   // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
   // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
-  VERSION: "7.0",
+  VERSION: "7.1",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -447,6 +447,28 @@ const Parts = {
   pct(counts) {
     const total = counts.asistencia + counts.falta;
     return total ? Math.round(counts.asistencia / total * 100) : null;
+  },
+
+  /** Nivel de riesgo del alumno (mismos umbrales que PSI): alto = promedio < 6,
+      más de 4 faltas o 3 faltas seguidas; medio = promedio 6–6.9, 4 faltas,
+      2 faltas seguidas o menos de 80% de asistencia. */
+  risk(s) {
+    const c = s.counts || { asistencia: 0, falta: 0, justificante: 0 };
+    const pct = Parts.pct(c);
+    const streak = Psi.trailingAbsences(s.statuses || []);
+    const final = s.final;
+    const reasons = [];
+    let level = null;
+    if (final !== null && final !== undefined && final < CONFIG.RISK_THRESHOLD) { level = "alto"; reasons.push(`promedio ${Fmt.grade(final)}`); }
+    if (c.falta > CONFIG.FALTAS_UMBRAL) { level = "alto"; reasons.push(`${c.falta} faltas`); }
+    if (streak >= 3) { level = "alto"; reasons.push(`${streak} faltas seguidas`); }
+    if (!level) {
+      if (final !== null && final !== undefined && final < 7) { level = "medio"; reasons.push(`promedio ${Fmt.grade(final)}`); }
+      if (c.falta === CONFIG.FALTAS_UMBRAL) { level = "medio"; reasons.push(`${c.falta} faltas`); }
+      if (streak === 2) { level = "medio"; reasons.push("2 faltas seguidas"); }
+      if (pct !== null && pct < 80) { level = "medio"; reasons.push(`${pct}% asistencia`); }
+    }
+    return { level, reasons, pct, streak };
   },
 
   /** Rojo pastel que se intensifica con cada falta por encima del umbral. */
@@ -1874,25 +1896,40 @@ const Admin = {
     const dateCols = att.dates.map((d, i) => ({ d, i })).filter(x => showHidden || x.d.visible);
     const otherCols = att.others.map((o, i) => ({ o, i })).filter(x => showHidden || x.o.visible);
 
+    // Parciales para el filtro «Sin calificar parcial» (si no hay, cualquier manual).
+    const parciales = g.components.filter(c => (c.tipo === "manual" || c.tipo === "examen") && /parcial/i.test(c.nombre));
+    const fuentesNota = parciales.length ? parciales : g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
+    const sinNota = s => fuentesNota.length && fuentesNota.some(cp => !s.items[cp.id] || s.items[cp.id].score10 === null || s.items[cp.id].score10 === undefined);
+    const matchFilter = s => {
+      const f = Admin._attFilter || "all";
+      if (f === "risk") return Parts.risk(s).level === "alto";
+      if (f === "faltas") return s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL;
+      if (f === "sinNota") return sinNota(s);
+      return true;
+    };
+
     const tbody = h("tbody");
     const draw = (q = Admin._attQuery || "") => {
       Admin._attQuery = q;
       const rows = g.students
-        .filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q))
+        .filter(s => (!q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q)) && matchFilter(s))
         .map(s => {
           const cuenta = h("td", { class: "sticky-col cuenta-cell", text: s.cuenta });
           Parts.applyFaltas(cuenta, s.counts && s.counts.falta);
+          const r = Parts.risk(s);
+          const dot = r.level ? h("span", { class: `risk-dot risk-${r.level}`, role: "img", title: `Riesgo ${r.level}: ${r.reasons.join(" · ")}`, "aria-label": `Riesgo ${r.level}: ${r.reasons.join(", ")}` }) : "";
           return h("tr", {}, cuenta, Admin.nameCell(s),
+            h("td", { class: "risk-cell" }, dot),
             h("td", { class: s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL ? "fw-bold text-danger" : "", text: s.counts ? s.counts.falta : "" }),
             h("td", { text: s.counts ? s.counts.justificante : "" }),
+            h("td", { class: "text-body-secondary", text: r.pct === null ? "" : `${r.pct}%` }),
             dateCols.map(x => Parts.statusCell(s.statuses[x.i], x.d.label)),
             otherCols.map(x => h("td", { text: s.others[x.i] || "" })));
         });
-      tbody.replaceChildren(...(rows.length ? rows : [h("tr", {}, h("td", { colspan: 4 + dateCols.length + otherCols.length, class: "text-body-secondary py-4", text: "Sin coincidencias." }))]));
-    };
+      tbody.replaceChildren(...(rows.length ? rows : [h("tr", {}, h("td", { colspan: 6 + dateCols.length + otherCols.length, class: "text-body-secondary py-4", text: "Sin coincidencias." }))]));    };
     draw();
 
-    const th = (text, visible, cls = "") => h("th", { class: `${cls} ${visible === false ? "col-hidden" : ""}`, title: visible === false ? "Oculto para alumnos" : null, text });
+    const th = (text, visible, cls = "", title = null) => h("th", { class: `${cls} ${visible === false ? "col-hidden" : ""}`, title: title || (visible === false ? "Oculto para alumnos" : null), text });
     // Encabezado de columna (no fecha) → clic abre la ponderación en un modal, resaltando su componente
     const linkTh = (text, visible) => {
       const link = (g.columns || []).find(l => Fmt.normalize(l.columna) === Fmt.normalize(text));
@@ -1902,16 +1939,51 @@ const Admin = {
         h("button", { type: "button", class: "th-link", onclick: () => Admin.weightsModal(focus) }, link ? icon("link-45deg", "me-1") : null, text));
     };
 
-    $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
-      Admin.searchBox("Buscar cuenta o nombre…", draw, Admin._attQuery || ""),
-      h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Descargar reporte (Excel/CSV)", onclick: () => Admin.exportGroup() }, icon("download", "me-1"), "Exportar"),
-      h("button", { class: "btn btn-sm btn-success", type: "button", title: "Llenar el formulario de PSI", onclick: () => Admin.psiModal() }, icon("send-check", "me-1"), "Exportar a PSI"),
-      h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
-      h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas"),
-      h("div", { class: "ms-auto d-flex flex-column gap-1 align-items-end" }, Parts.legend(), Admin.linksLegend())));
+    // Chips de triaje «Necesitan atención» (filtran en el cliente, sin pedir nada).
+    const counts = {
+      all: g.students.length,
+      risk: g.students.filter(s => Parts.risk(s).level === "alto").length,
+      faltas: g.students.filter(s => s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL).length,
+      sinNota: parciales.length ? g.students.filter(sinNota).length : 0
+    };
+    const chipDefs = [
+      { key: "all", label: "Todos" },
+      { key: "risk", label: "En riesgo" },
+      { key: "faltas", label: "+4 faltas" },
+      { key: "sinNota", label: "Sin calificar parcial", disabled: !parciales.length, hint: parciales.length ? null : "No hay parciales definidos en Ponderaciones" }
+    ];
+    const chips = chipDefs.map(d => h("button", {
+      type: "button", class: `btn btn-sm triage-chip ${Admin._attFilter === d.key || (!Admin._attFilter && d.key === "all") ? "active" : ""}`,
+      disabled: d.disabled || undefined, title: d.hint || null,
+      "aria-pressed": String(Admin._attFilter === d.key || (!Admin._attFilter && d.key === "all")),
+      onclick: e => {
+        Admin._attFilter = d.key;
+        chips.forEach(c => { c.classList.toggle("active", c === e.currentTarget); c.setAttribute("aria-pressed", String(c === e.currentTarget)); });
+        draw();
+      }
+    }, d.label, " ", h("span", { class: "badge text-bg-light border", text: counts[d.key] })));
+    // Leyenda colapsable: antes ocupaba dos filas fijas junto a la barra.
+    const legendsBox = h("div", { class: "d-none", id: "att-legends" }, Parts.legend(), Admin.linksLegend());
+    const legendBtn = h("button", {
+      type: "button", class: "btn btn-sm btn-outline-secondary ms-auto", "aria-expanded": "false",
+      title: "Mostrar la leyenda de estados y enlaces",
+      onclick: e => { const open = legendsBox.classList.toggle("d-none") === false; e.currentTarget.setAttribute("aria-expanded", String(open)); }
+    }, icon("info-circle", "me-1"), "Leyenda");
+
+    $("adm-toolbar").replaceChildren(h("div", { class: "vstack gap-2" },
+      h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
+        Admin.searchBox("Buscar cuenta o nombre…", draw, Admin._attQuery || ""),
+        h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Descargar reporte (Excel/CSV)", onclick: () => Admin.exportGroup() }, icon("download", "me-1"), "Exportar"),
+        h("button", { class: "btn btn-sm btn-success", type: "button", title: "Llenar el formulario de PSI", onclick: () => Admin.psiModal() }, icon("send-check", "me-1"), "Exportar a PSI"),
+        h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
+        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas"),
+        legendBtn),
+      h("div", { class: "d-flex flex-wrap align-items-center gap-2 small" },
+        h("span", { class: "fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips),
+      legendsBox));
 
     content.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch att-table" },
-      h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"), th("F", true), th("J", true),
+      h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"), th("⚠", true, "risk-col", "Riesgo: promedio menor a 6, más de 4 faltas o 3 faltas seguidas"), th("F", true), th("J", true), th("%", true, "", "Porcentaje de asistencia"),
         dateCols.map(x => th(x.d.label, x.d.visible)), otherCols.map(x => linkTh(x.o.label, x.o.visible)))),
       tbody)));
   },
@@ -2449,9 +2521,9 @@ const Admin = {
           });
 
           return h("tr", {}, cuenta, Admin.nameCell(s), cells,
-            h("td", { class: `final-cell ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
-            h("td", { class: "text-body-secondary", text: Fmt.grade(s.finalStrict) }),
-            h("td", { class: "fw-semibold", text: s.entero ?? "" }));
+            h("td", { class: `final-cell sticky-right cap-final ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
+            h("td", { class: "text-body-secondary sticky-right cap-strict", text: Fmt.grade(s.finalStrict) }),
+            h("td", { class: "fw-semibold sticky-right cap-entera", text: s.entero ?? "" }));
         }));
       // Los popovers de bonos se crean dentro de gradeWithBonus
     };
@@ -2471,7 +2543,7 @@ const Admin = {
           h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start sticky-col sticky-name", text: "Nombre" }),
           comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
             c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo !== "manual" ? " · auto" : Number(c.maximo) !== 10 ? ` · 0–${c.maximo}` : ""}` }))),
-          h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", text: "Entera" }))),
+          h("th", { dataset: { comp: "final" }, class: "sticky-right cap-final", text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", class: "sticky-right cap-strict", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", class: "sticky-right cap-entera", text: "Entera" }))),
         tbody)),
       manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
     ));
@@ -3098,6 +3170,10 @@ const Admin = {
     const section = (title, iconName, ...children) => h("section", { class: "profile-section" },
       h("h3", { class: "profile-title" }, icon(iconName, "me-1"), title), ...children);
 
+    // Secciones plegables (v7.1): lo secundario de la ficha arranca cerrado.
+    const collapsible = (title, iconName, open, ...children) => h("details", { class: "profile-section profile-collapse", open: open || undefined },
+      h("summary", { class: "profile-title" }, icon(iconName, "me-1"), title), ...children);
+
     // ---------- Cards de grupos ----------
     const cardsRow = h("div", { class: "row g-3 mb-3" });
     const detail = h("div");
@@ -3198,7 +3274,23 @@ const Admin = {
           if (Admin.group && Admin.group.group.id === gr.idCurso) Admin.loadGroup();
         } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
       });
+      // Resumen de atención del grupo elegido (mismos umbrales que PSI).
+      const stu = {
+        cuenta: p.cuenta, nombre: p.nombres[0] || "",
+        counts: gr.attendance ? gr.attendance.counts : null,
+        statuses: gr.attendance ? gr.attendance.dates.map(d => d.status) : [],
+        final: gr.final, items: gr.items || {}, notas: []
+      };
+      const rk = Parts.risk(stu);
+      const sug = Psi.suggest(stu, { tareas: "none", extra: false, dejoN: 3, components: gr.components });
+      const verdict = rk.level === "alto" ? ["En riesgo", "alert-danger"] : rk.level === "medio" ? ["Atención", "alert-warning"] : ["Sin riesgo aparente", "alert-success"];
+      const attention = h("div", { class: `alert attention-strip ${verdict[1]} d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-2 small` },
+        h("span", { class: "fw-bold" }, icon("exclamation-triangle", "me-1"), verdict[0]),
+        rk.reasons.length ? h("span", { text: rk.reasons.join(" · ") }) : null,
+        h("span", { class: "text-body-secondary", text: `Promedio ${Fmt.grade(gr.final)} · ${rk.pct === null ? "—" : `${rk.pct}%`} asistencia · ${gr.attendance && gr.attendance.counts ? gr.attendance.counts.falta : "—"} faltas` }),
+        sug.s ? h("span", { class: "ms-auto badge text-bg-dark", text: `PSI: ${sug.s}${sug.r !== "0" ? ` · riesgo ${Psi.RIESGO[sug.r][0].toLowerCase()}` : ""}` }) : null);
       detail.replaceChildren(
+        attention,
         h("div", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" },
           h("div", { class: "fw-semibold me-auto" }, icon("journal-text", "me-1"), gr.label), statusSel, remove),
         section("Asistencia", "calendar-check",
@@ -3253,7 +3345,7 @@ const Admin = {
       h("span", { class: `badge align-self-start ${badge[e.estado]}`, text: e.estado }))) : [h("p", { class: "small text-body-secondary mb-0", text: "Sin evidencias." })];
 
     const history = p.history && p.history.length
-      ? section("Ciclos anteriores", "clock-history", ...p.history.map(x => h("div", { class: "mini-card small" },
+      ? collapsible("Ciclos anteriores", "clock-history", false, ...p.history.map(x => h("div", { class: "mini-card small" },
           h("div", { class: "d-flex justify-content-between" }, h("b", { text: `${x.curso} ${x.grupo}` }), h("span", { class: "text-body-secondary", text: x.ciclo })),
           h("div", { class: "text-body-secondary", text: `Final ${Fmt.grade(x.final)} · ${x.faltas ?? "—"} faltas` }),
           x.comentarios ? h("div", { class: "mt-1", text: x.comentarios }) : null)))
@@ -3274,11 +3366,11 @@ const Admin = {
       groups.length ? cardsRow : h("div", { class: "alert alert-light border small", text: "No está en ningún grupo activo." }),
       detail,
       h("div", { class: "row g-3 mt-1" },
-        h("div", { class: "col-12 col-lg-6" }, section(`Comentarios (${p.comments.length})`, "chat-left-text", commentsBox,
+        h("div", { class: "col-12 col-lg-6" }, collapsible(`Comentarios (${p.comments.length})`, "chat-left-text", true, commentsBox,
           h("div", { class: "row g-2" }, h("div", { class: "col-12" }, text), h("div", { class: "col-8" }, course), h("div", { class: "col-4 text-end" }, add)))),
         h("div", { class: "col-12 col-lg-6" },
-          section("Evidencias", "cloud-arrow-up", ...evidences),
-          section("Inscripciones", "diagram-3", h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))),
+          collapsible("Evidencias", "cloud-arrow-up", false, ...evidences),
+          collapsible("Inscripciones", "diagram-3", false, h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))),
           history))
     ));
   },

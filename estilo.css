@@ -426,3 +426,41 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .att-cell-edit.busy { opacity: .5; cursor: progress !important; }
 .att-editor .btn { min-height: 2.4rem; font-weight: 700; }
 .att-markbar .btn { font-weight: 700; }
+
+/* ============================================================
+   15. Mejoras UX v7.1 (triage, riesgo, leyenda, ficha, Captura)
+   ------------------------------------------------------------
+   - Columna de riesgo (punto rojo/ámbar) + % asistencia en Asistencia.
+   - Chips de triaje «Necesitan atención» (filtran en el cliente).
+   - Leyenda colapsable (antes dos filas fijas junto a la barra).
+   - Ficha: resumen de atención arriba + secciones plegables.
+   - Captura: Final, Estricta y Entera fijas a la derecha.
+   ============================================================ */
+
+/* Columna de riesgo en Asistencia. */
+.risk-col, .risk-cell { min-width: 2.2rem; }
+.risk-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; vertical-align: middle; }
+.risk-dot.risk-alto { background: #dc3545; box-shadow: 0 0 0 3px rgba(220, 53, 69, .18); }
+.risk-dot.risk-medio { background: #fd7e14; box-shadow: 0 0 0 3px rgba(253, 126, 20, .18); }
+
+/* Chips de triaje: el activo usa el acento del panel. */
+.triage-chip.active { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 700; }
+.triage-chip.active .badge { background: rgba(255, 255, 255, .92) !important; color: var(--acc) !important; border-color: transparent !important; }
+
+/* Leyenda colapsable bajo la barra. */
+#att-legends { display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: center; }
+
+/* Ficha: resumen de atención + secciones plegables. */
+.attention-strip { margin-bottom: .5rem; }
+.profile-collapse > summary { cursor: pointer; list-style: none; margin-bottom: .6rem; }
+.profile-collapse > summary::-webkit-details-marker { display: none; }
+.profile-collapse > summary::before { content: "\25b8  "; }
+.profile-collapse[open] > summary::before { content: "\25be  "; }
+
+/* Captura: Final, Estricta y Entera fijas a la derecha al desplazar. */
+.table-cch .cap-final, .table-cch .cap-strict, .table-cch .cap-entera { min-width: 4.5rem; }
+.table-cch .sticky-right { position: sticky; z-index: 2; background: var(--bs-body-bg); box-shadow: -1px 0 0 var(--line); }
+.table-cch thead .sticky-right { z-index: 5; background: var(--navy); }
+.table-cch .cap-entera { right: 0; }
+.table-cch .cap-strict { right: 4.5rem; }
+.table-cch .cap-final { right: 9rem; }

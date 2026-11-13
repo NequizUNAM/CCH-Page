@@ -274,3 +274,17 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 | Alumnos | Buscar a cualquier alumno, de cualquier ciclo |
 | Grupos | Ligar hojas, **Nuevo grupo** (crea Course + Reporte_) y **Enlaces para alumnos** |
 | Mantenimiento | Ciclo, respaldos ZIP, alumnos agregados a mano, vaciar tablas |
+
+## Novedades v7.1 — triaje y riesgo a la vista
+
+**Asistencia — columna de riesgo (⚠) y % asistencia.** Cada fila muestra un punto de color: rojo si el alumno está en riesgo alto (promedio menor a 6, más de 4 faltas o 3 faltas seguidas) y ámbar si necesita atención (promedio 6–6.9, 4 faltas, 2 faltas seguidas o menos de 80% de asistencia). Al pasar el cursor sobre el punto ves el motivo. La columna % muestra asistencias ÷ (asistencias + faltas); vacía si aún no hay lista. Son los mismos umbrales que usa PSI, así que lo que ves en la tabla es lo que se exporta.
+
+**Asistencia — filtros «Necesitan atención».** Sobre la tabla hay cuatro chips con su conteo: Todos, En riesgo, +4 faltas y Sin calificar parcial. Un clic filtra las filas en el momento, sin pedir nada al servidor, y se combina con la búsqueda. «Sin calificar parcial» busca alumnos sin calificación en algún parcial (si el grupo no tiene parciales definidos en Ponderaciones, el chip queda deshabilitado).
+
+**Leyenda colapsable.** Las leyendas de estados y enlaces ya no ocupan dos filas fijas junto a la barra: están detrás del botón «Leyenda». La tabla sube y ganas espacio en pantalla.
+
+**Ficha — resumen de atención arriba.** Al abrir la ficha, arriba del detalle del grupo aparece una franja: «En riesgo», «Atención» o «Sin riesgo aparente», con el motivo, el promedio, el % de asistencia, las faltas y la derivación que sugeriría PSI (por ejemplo: «PSI: Dejó de asistir · riesgo alto»). Se actualiza al cambiar de grupo y al pasar asistencia.
+
+**Ficha — secciones plegables.** Comentarios sigue abierto (ahí está el formulario para agregar), pero Evidencias, Inscripciones y Ciclos anteriores arrancan cerrados: toca el título para desplegarlos.
+
+**Captura — Final, Estricta y Entera fijas a la derecha.** Al desplazar la tabla a la derecha para ver los componentes, las tres columnas de resultado ya no se pierden: quedan fijas en el borde derecho.
