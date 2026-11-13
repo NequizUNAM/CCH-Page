@@ -385,3 +385,44 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ============================================================
+   14. Mejoras UX v7.0 (solo presentación, sin cambiar lógica)
+   ------------------------------------------------------------
+   - Nombre fijo al desplazar tablas anchas (Cuenta + Nombre).
+   - Barra de herramientas y ficha con mejor acomodo en celular.
+   - Editor de asistencia de la ficha.
+   ============================================================ */
+
+/* Nombre fijo: segunda columna fija junto a Cuenta (5.75rem). */
+.table-cch .cuenta-cell { min-width: 5.75rem; }
+.table-cch .sticky-name { left: 5.75rem; }
+.table-cch thead .sticky-name { z-index: 5; }
+.table-cch > tbody > tr:hover > :is(td, th) { background-color: var(--acc-soft); }
+
+/* La búsqueda de la barra crece y los botones no se amontonan. */
+#adm-toolbar input[type="search"] { flex: 1 1 200px; min-width: 180px; }
+
+/* Tarjeta superior del panel: en celular las estadísticas bajan a su propia fila. */
+@media (max-width: 767.98px) {
+  #adm-stats { width: 100%; }
+}
+
+/* Ficha: las 4 cifras (promedio, asistencia, faltas, justif.) en 2 columnas en celular. */
+@media (max-width: 576px) {
+  .group-stats { grid-template-columns: repeat(2, 1fr); gap: .75rem .5rem; }
+}
+
+/* Modales con más respiro y secciones de la ficha mejor separadas. */
+.modal-dialog-scrollable .modal-body { padding: 1.1rem 1.25rem; }
+.profile-section { padding: 1rem 1.1rem; }
+.profile-section .table-wrap { box-shadow: none; }
+.modal-body .profile-section:last-child { margin-bottom: 0; }
+
+/* Editor de asistencia de la ficha (celda editable + botones de marca). */
+.att-cell-edit { cursor: pointer !important; }
+.att-cell-edit:hover, .att-cell-edit:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+.att-cell-edit.asking { outline: 3px solid var(--acc); outline-offset: -3px; }
+.att-cell-edit.busy { opacity: .5; cursor: progress !important; }
+.att-editor .btn { min-height: 2.4rem; font-weight: 700; }
+.att-markbar .btn { font-weight: 700; }

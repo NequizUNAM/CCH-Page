@@ -13,7 +13,7 @@ const CONFIG = {
   // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
   // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
-  VERSION: "6.9",
+  VERSION: "7.0",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -157,7 +157,21 @@ function debounce(fn, wait) {
    API
    ============================================================ */
 const Api = {
+  _pending: new Map(),
   async call(action, params = {}, auth = null) {
+    // Lecturas repetidas mientras una igual sigue en vuelo comparten la misma
+    // petición (doble clic en Recargar, abrir la misma ficha dos veces…).
+    const dedupKey = READ_ACTIONS.has(action) ? `${auth || ""}|${action}|${JSON.stringify(params)}` : null;
+    if (dedupKey && Api._pending.has(dedupKey)) return Api._pending.get(dedupKey);
+    const promise = Api._call(action, params, auth);
+    if (dedupKey) {
+      Api._pending.set(dedupKey, promise);
+      const drop = () => { if (Api._pending.get(dedupKey) === promise) Api._pending.delete(dedupKey); };
+      promise.then(drop, drop);
+    }
+    return promise;
+  },
+  async _call(action, params = {}, auth = null) {
     const token = auth === "admin" ? Session.get("admin")
       : auth === "student" ? (Session.get("student") || {}).token
       : undefined;
@@ -186,7 +200,7 @@ const Api = {
     let result;
     try { result = await response.json(); } catch (e) { throw new Error("La respuesta del servidor no es válida."); }
 
-    if (auth === "admin" && !READ_ACTIONS.has(action)) { Cache.clear("g:"); Cache.clear("boot"); }
+    if (auth === "admin" && !READ_ACTIONS.has(action)) Cache.invalidate(action, params);
 
     if (result.status !== "success") {
       const error = new Error(result.message || "Ocurrió un error inesperado.");
@@ -316,12 +330,71 @@ const Parts = {
   },
 
   /** Tabla de una fila: cuenta (rojo por faltas) + una celda por fecha. */
-  attendanceStrip(cuenta, dates, faltas, onJustify) {
+  attendanceStrip(cuenta, dates, faltas, onJustify, onMark) {
     const cell = h("td", { class: "sticky-col cuenta-cell", text: cuenta });
     Parts.applyFaltas(cell, faltas);
-    // onJustify(d): solo las faltas se pueden tocar para cambiarlas a Justificante
+    const useRetardo = !!(Admin.boot && Admin.boot.useRetardo);
+    const MARK_OPTS = [
+      { v: "Asistencia", k: "✓", cls: "success" },
+      useRetardo ? { v: "Retardo", k: "R", cls: "warning" } : null,
+      { v: "Falta", k: "✗", cls: "danger" },
+      { v: "Justificante", k: "J", cls: "info" }
+    ].filter(Boolean);
+    // onMark(d, status): editor para cambiar la marca de una fecha (desde la
+    // ficha). Sin onMark queda el comportamiento anterior: solo las faltas se
+    // pueden tocar y solo para justificarlas (onJustify). Sin ninguno es lectura.
     const cellFor = d => {
       const td = Parts.statusCell(d.status, d.label);
+      if (onMark) {
+        td.classList.add("att-cell-edit");
+        td.tabIndex = 0;
+        td.setAttribute("role", "button");
+        td.title = `${d.label} · ${Parts.statusInfo(d.status).label} — toca para cambiar`;
+        const ask = () => {
+          if (td.classList.contains("busy")) return;
+          strip.querySelectorAll(".att-cell-edit.asking").forEach(x => x.classList.remove("asking"));
+          td.classList.add("asking");
+          const current = Fmt.normalize(d.status);
+          const btns = MARK_OPTS.map(o => h("button", {
+            type: "button", class: `btn btn-sm ${current === Fmt.normalize(o.v) ? "btn-" + o.cls : "btn-outline-" + o.cls}`,
+            onclick: () => go(o.v)
+          }, `${o.k} ${o.v === "Justificante" ? "Justif." : o.v}`));
+          const clear = current ? h("button", {
+            type: "button", class: "btn btn-sm btn-outline-secondary",
+            onclick: () => go("")
+          }, "Quitar marca") : null;
+          const no = h("button", { type: "button", class: "btn btn-sm btn-outline-secondary", text: "Cancelar" });
+          no.onclick = () => { td.classList.remove("asking"); confirmBox.replaceChildren(); };
+          confirmBox.replaceChildren(h("div", { class: "alert alert-light border d-flex flex-wrap align-items-center gap-2 py-2 px-3 mt-2 mb-0 small", role: "group", "aria-label": `Asistencia del ${d.label}` },
+            icon("calendar-check"), h("span", {}, "Asistencia del ", h("b", { text: d.label }), ":"),
+            h("div", { class: "att-editor d-flex flex-wrap gap-1" }, ...btns, clear, no)));
+          btns[0] && btns[0].focus();
+        };
+        const go = async status => {
+          if (td.classList.contains("busy")) return;
+          td.classList.remove("asking");
+          td.classList.add("busy");
+          confirmBox.replaceChildren();
+          try {
+            const counts = await onMark(d, status);
+            const info = Parts.statusInfo(status);
+            td.className = `st att-cell-edit ${info.cls}`;
+            td.textContent = info.sym;
+            td.title = `${d.label} · ${info.label} — toca para cambiar`;
+            d.status = status || "";
+            if (counts) {
+              cell.style.removeProperty("background");
+              cell.classList.remove("alert-faltas");
+              Parts.applyFaltas(cell, counts.falta);
+            }
+          } catch (error) {
+            if (error.code !== "AUTH") UI.toast("danger", error.message);
+          } finally { td.classList.remove("busy"); }
+        };
+        td.onclick = ask;
+        td.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
+        return td;
+      }
       if (!onJustify || Fmt.normalize(d.status) !== "falta") return td;
       td.classList.add("st-justify");
       td.tabIndex = 0;
@@ -612,30 +685,95 @@ const Xlsx = {
    ============================================================ */
 const Cache = {
   PREFIX: "cch.cache.",
-  TTL_MS: 12 * 60 * 60 * 1000,
+  TTL_MS: 12 * 60 * 60 * 1000,          // boot y grupos (solo lectura)
+  TTL_PROFILE_MS: 15 * 60 * 1000,       // ficha del alumno
   on() { return Prefs.get("cache") !== false; },
+  /** null si está apagada, caducada o es de otra versión de la página. */
   get(key) {
     if (!Cache.on()) return null;
     try {
       const x = JSON.parse(localStorage.getItem(Cache.PREFIX + key) || "null");
-      return x && Date.now() - x.t < Cache.TTL_MS ? x : null;
+      if (!x || x.v !== CONFIG.VERSION) return null;
+      const ttl = x.ttl || Cache.TTL_MS;
+      return Date.now() - x.t < ttl ? x : null;
     } catch (e) { return null; }
   },
-  set(key, data) {
+  set(key, data, ttlMs) {
     if (!Cache.on()) return;
-    const value = JSON.stringify({ t: Date.now(), d: data });
+    const value = JSON.stringify({ t: Date.now(), v: CONFIG.VERSION, ttl: ttlMs || Cache.TTL_MS, d: data });
     try { localStorage.setItem(Cache.PREFIX + key, value); }
-    catch (e) { Cache.clear(); try { localStorage.setItem(Cache.PREFIX + key, value); } catch (e2) { /* sin espacio */ } }
+    catch (e) {
+      // Sin espacio: expulsa primero lo caducado y luego lo más viejo, una
+      // entrada a la vez, en lugar de borrar toda la caché (antes un grupo
+      // grande vaciaba la caché de todos los grupos).
+      Cache.prune();
+      for (let i = 0; i < 5; i++) {
+        try { localStorage.setItem(Cache.PREFIX + key, value); return; }
+        catch (e2) { if (!Cache.evictOldest()) break; }
+      }
+    }
   },
   clear(prefix = "") {
     try {
       Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX + prefix)).forEach(k => localStorage.removeItem(k));
     } catch (e) { /* nada */ }
+  },
+  /** Borra solo las entradas caducadas o de otra versión. */
+  prune() {
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX)).forEach(k => {
+        try {
+          const x = JSON.parse(localStorage.getItem(k) || "null");
+          if (!x || x.v !== CONFIG.VERSION || Date.now() - x.t >= (x.ttl || Cache.TTL_MS)) localStorage.removeItem(k);
+        } catch (e) { localStorage.removeItem(k); }
+      });
+    } catch (e) { /* nada */ }
+  },
+  /** Expulsa la entrada guardada más vieja. Devuelve false si no quedaba ninguna. */
+  evictOldest() {
+    try {
+      let oldest = null, oldestT = Infinity;
+      Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX)).forEach(k => {
+        try { const x = JSON.parse(localStorage.getItem(k) || "null"); if (x && x.t < oldestT) { oldestT = x.t; oldest = k; } } catch (e) { /* se ignora */ }
+      });
+      if (!oldest) return false;
+      localStorage.removeItem(oldest);
+      return true;
+    } catch (e) { return false; }
+  },
+  /**
+   * Invalida solo lo que la escritura tocó (antes: TODOS los grupos + boot
+   * en cada guardado). params es lo que se envió al servidor.
+   */
+  invalidate(action, params = {}) {
+    if (!Cache.on()) return;
+    const p = params || {};
+    const id = p.idCurso || "";
+    if (Array.isArray(p.marks)) p.marks.forEach(m => m && m.cuenta && Cache.clear("p:" + m.cuenta));
+    if (p.cuenta) Cache.clear("p:" + p.cuenta);
+    // Escrituras que cambian la lista de grupos o los conteos del boot
+    const BOOT_ACTIONS = new Set(["addStudent", "removeStudent", "saveGroup", "createGroup", "createReportSheet", "saveLinks", "factoryReset", "backupCycles", "clearTable", "setupStructure", "setCurrentCycle"]);
+    if (BOOT_ACTIONS.has(action)) { Cache.clear("boot"); Cache.clear("g:"); Cache.clear("p:"); return; }
+    if (action === "deleteComment") { Cache.clear("p:"); return; }
+    if (action === "saveColumns" || action === "addReportColumn" || action === "deleteReportColumn" || action === "saveComponents") {
+      if (id) Cache.clear("g:" + id);
+      Cache.clear("p:");
+      return;
+    }
+    // Escrituras de un grupo: solo ese grupo (la ficha ya se limpió arriba)
+    const GROUP_ACTIONS = new Set(["saveRollCall", "saveGrades", "saveProject", "deleteProject", "saveTeamEval", "adminSaveTeam", "deleteTeam", "reviewEvidence", "syncAttendance", "addComment", "setStudentStatus"]);
+    if (GROUP_ACTIONS.has(action)) {
+      const gid = id || (Admin.group && Admin.group.group.id) || "";
+      if (gid) Cache.clear("g:" + gid); else { Cache.clear("g:"); Cache.clear("boot"); }
+      return;
+    }
+    // Cualquier otra escritura de admin: comportamiento anterior (seguro).
+    Cache.clear("g:"); Cache.clear("boot");
   }
 };
 
 // Acciones que solo leen; cualquier otra acción de admin invalida la caché de grupos
-const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout"]);
+const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
 
 /* ============================================================
    EXPORTAR A PSI (psi.cch.unam.mx)
@@ -670,6 +808,16 @@ const Psi = {
     const streak = Psi.trailingAbsences(s.statuses || []);
     const final = s.final;
 
+    // Calificación que se exporta: la del parcial elegido o el promedio actual.
+    // Antes SIEMPRE era el promedio (s.final), aunque el registro fuera Parcial:
+    // si el alumno aún no tenía promedio, el avance salía vacío y PSI no recibía
+    // ninguna calificación; y si ya tenía otros componentes, se exportaba el
+    // promedio mezclado y no la del parcial.
+    const fuente = opts.fuente ? (opts.components || []).find(cp => cp.id === opts.fuente) : null;
+    const parcial = fuente && s.items[fuente.id] ? s.items[fuente.id].score10 : null;
+    const grade = fuente ? parcial : final;
+    const gradeLabel = fuente ? fuente.nombre : "Promedio actual";
+
     let asis = "";
     if (total && c.asistencia === 0) asis = "Nunca se presentó";
     else if (total && streak >= opts.dejoN) asis = "Dejó de asistir";
@@ -677,7 +825,7 @@ const Psi = {
     else if (total) asis = "Asiste siempre";
 
     const avance = asis === "Nunca se presentó" ? "NP"
-      : final === null || final === undefined ? "" : String(Math.min(10, Math.max(5, Math.floor(final + 1e-9))));
+      : grade === null || grade === undefined ? "" : String(Math.min(10, Math.max(5, Math.floor(grade + 1e-9))));
 
     let tareas = "-1";
     if (opts.tareas === "none") tareas = "5";
@@ -688,11 +836,11 @@ const Psi = {
     }
 
     const psico = Psi.KEYWORDS.test((s.notas || []).join(" "));
-    const low = final !== null && final !== undefined && final < 6;
-    const dif = psico ? "Psicoemocional" : (low || tareas === "0") ? "Académico" : (total || final !== null) ? "Ninguno" : "";
+    const low = grade !== null && grade !== undefined && grade < 6;
+    const dif = psico ? "Psicoemocional" : (low || tareas === "0") ? "Académico" : (total || grade !== null) ? "Ninguno" : "";
 
     let score = 0;
-    if (low) score += 2; else if (final !== null && final < 7) score += 1;
+    if (low) score += 2; else if (grade !== null && grade < 7) score += 1;
     if (asis === "Nunca se presentó" || asis === "Dejó de asistir") score += 3;
     else if (c.falta > 3) score += 2; else if (c.falta >= 2) score += 1;
     if (tareas === "0") score += 1;
@@ -707,12 +855,12 @@ const Psi = {
       const weak = opts.components
         .filter(cp => s.items[cp.id] && s.items[cp.id].score10 !== null && cp.ponderacion > 0)
         .sort((a, b) => s.items[a.id].score10 - s.items[b.id].score10)[0];
-      m[2] = `Promedio ${final.toFixed(1)}${weak ? `; reforzar ${weak.nombre}` : ""}`;
+      m[2] = `${gradeLabel} ${grade.toFixed(1)}${weak ? `; reforzar ${weak.nombre}` : ""}`;
     }
     if (psico) m[3] = "Situación psicoemocional reportada por el docente";
-    if (opts.extra && final !== null && final >= 9 && (pct === null || pct >= 90)) m[4] = "Buen desempeño; invitar a actividad extracurricular";
+    if (opts.extra && grade !== null && grade >= 9 && (pct === null || pct >= 90)) m[4] = "Buen desempeño; invitar a actividad extracurricular";
 
-    return { cuenta: String(s.cuenta).replace(/\D/g, ""), nombre: s.nombre, c: avance, a: pct, t: tareas, d: dif, s: asis, r, m, final, faltas: c.falta };
+    return { cuenta: String(s.cuenta).replace(/\D/g, ""), nombre: s.nombre, c: avance, a: pct, t: tareas, d: dif, s: asis, r, m, final, grade, gradeLabel, sinNota: !!fuente && (parcial === null || parcial === undefined), faltas: c.falta };
   },
 
   /** Texto sugerido para «Observaciones generales» y «Acciones a realizar». */
@@ -720,15 +868,15 @@ const Psi = {
     const n = rows.length;
     const withPct = rows.filter(x => x.a !== null);
     const avgPct = withPct.length ? Math.round(withPct.reduce((a, x) => a + x.a, 0) / withPct.length) : null;
-    const finals = rows.map(x => x.final).filter(v => v !== null && v !== undefined);
+    const finals = rows.map(x => x.grade).filter(v => v !== null && v !== undefined);
     const avg = finals.length ? (finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1) : null;
     const cnt = f => rows.filter(f).length;
-    const destacados = cnt(x => x.final >= 9 && (x.a === null || x.a >= 90));
+    const destacados = cnt(x => x.grade >= 9 && (x.a === null || x.a >= 90));
     const regulares = cnt(x => x.s === "Asiste siempre");
     const faltas = cnt(x => x.s === "Más de tres faltas");
     const dejo = cnt(x => x.s === "Dejó de asistir");
     const nunca = cnt(x => x.s === "Nunca se presentó");
-    const bajos = cnt(x => x.final !== null && x.final < 6);
+    const bajos = cnt(x => x.grade !== null && x.grade < 6);
     const psico = cnt(x => x.d === "Psicoemocional");
     const alto = cnt(x => x.r === "3");
     const weak = {};
@@ -747,7 +895,7 @@ const Psi = {
 
     const obs = `Grupo de ${n} alumnos.` +
       (avgPct !== null ? ` Asistencia promedio ${avgPct}%.` : "") +
-      (avg !== null ? ` Promedio actual del grupo ${avg}.` : "") +
+      (avg !== null ? ` ${(rows[0] && rows[0].gradeLabel) || "Promedio actual"} del grupo ${avg}.` : "") +
       (fort.length ? ` Fortalezas: ${fort.join("; ")}.` : "") +
       (prob.length ? ` Problemáticas: ${prob.join("; ")}.` : " Sin problemáticas relevantes.") +
       (alto ? ` ${alto} alumno(s) en riesgo alto.` : "");
@@ -763,7 +911,7 @@ const Psi = {
   /** JS para pegar en la consola de PSI. */
   script(rows, meta) {
     const data = {};
-    rows.forEach(x => { data[x.cuenta] = { c: x.c, a: x.a, t: x.t, d: x.d, s: x.s, r: x.r, m: x.m }; });
+    rows.forEach(x => { data[x.cuenta] = { c: x.c, a: x.a, t: x.t, d: x.d, s: x.s, r: x.r, m: x.m, n: x.sinNota ? 1 : 0 }; });
     return `// Dashboard CCH → PSI · ${meta.label} · grupo ${meta.grupo} · ${meta.periodo} · ${new Date().toLocaleString("es-MX")}
 // Pega en la consola (F12) de la página del grupo en psi.cch.unam.mx. NO guarda: revisa y presiona "Guardar".
 (() => {
@@ -775,18 +923,31 @@ const Psi = {
     el.value = String(v);
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const enPSI = [...document.querySelectorAll('select[name^="c_"]')].map(s => dig(s.name));
-  if (!enPSI.length) { console.warn("No encontré el formulario de PSI en esta página."); return; }
+  // La captura Final usa c_<cuenta>; la Parcial puede usar otro prefijo.
+  // Se busca el prefijo cuyas listas tengan opciones de calificación (5-10 o NP);
+  // si no se encuentra ninguno, se avisa en lugar de no llenar nada en silencio.
+  const hasGradeOptions = (sel) => {
+    const vals = [...sel.options].map(o => String(o.value).trim().toUpperCase());
+    return vals.includes("NP") || [5, 6, 7, 8, 9, 10].some(v => vals.includes(String(v)));
+  };
+  let prefix = "";
+  for (const cand of ["c_", "p_", "parcial_", "cal_", "cp_"]) {
+    const found = [...document.querySelectorAll('select[name^="' + cand + '"]')].filter(hasGradeOptions);
+    if (found.length) { prefix = cand; break; }
+  }
+  const enPSI = prefix ? [...document.querySelectorAll('select[name^="' + prefix + '"]')].map(s => dig(s.name.slice(prefix.length))) : [];
+  if (!enPSI.length) { console.warn("No encontré el formulario de PSI en esta página (ni c_, ni p_, ni parcial_, ni cal_). Revisa que estés en la captura del grupo."); return; }
   const G = ${JSON.stringify(meta.header || {})};
   if (G.fecha) set("fecha", G.fecha);
   if (G.tipo !== undefined) set("tipo", G.tipo);
   if (G.obs) set("observaciones", G.obs);
   if (G.acc) set("acciones", G.acc);
-  let llenados = 0; const sinDatos = [];
+  let llenados = 0; const sinDatos = []; const sinNota = [];
   enPSI.forEach(c => {
     const d = DATA[c];
     if (!d) { sinDatos.push(c); return; }
-    set("c_" + c, d.c); set("a_" + c, d.a); set("tareas_" + c, d.t);
+    if (d.n) sinNota.push(c);
+    set(prefix + c, d.c); set("a_" + c, d.a); set("tareas_" + c, d.t);
     set("dificultades_" + c, d.d); set("asistencias_" + c, d.s); set("r_" + c, d.r);
     [1, 2, 3, 4].forEach(k => {
       const cb = document.getElementById("atenci" + k + "_" + c);
@@ -799,6 +960,7 @@ const Psi = {
   });
   const fuera = Object.keys(DATA).filter(c => !enPSI.includes(c));
   const msg = "Dashboard CCH: " + llenados + " de " + enPSI.length + " alumnos llenados." +
+    (sinNota.length ? " Sin calificación en este parcial: " + sinNota.length + "." : "") +
     (sinDatos.length ? " Sin datos: " + sinDatos.join(", ") + "." : "") +
     (fuera.length ? " No están en PSI: " + fuera.join(", ") + "." : "") + " Revisa y presiona Guardar.";
   console.log(msg);
@@ -818,6 +980,7 @@ const Psi = {
 const App = {
   init() {
     Prefs.load();
+    Cache.prune();
     Session.load();
     App.applyTheme();
     App.applyRows();
@@ -1536,6 +1699,55 @@ const Admin = {
     }
   },
 
+  /**
+   * Aplica en memoria una marca de asistencia (desde la ficha) sin volver a
+   * pedir todo el grupo: actualiza la tabla que está detrás del modal y la
+   * ficha (conteos y, si la fecha es nueva, la columna, en orden cronológico).
+   * El servidor ya guardó; la caché de la ficha se invalidó al guardar.
+   */
+  applyRollMark(idCurso, cuenta, dateKey, status, att) {
+    const countFrom = statuses => {
+      const c = { asistencia: 0, falta: 0, justificante: 0, nd: 0, otro: 0 };
+      statuses.forEach(v => {
+        const k = Fmt.normalize(v);
+        if (!k) return;
+        if (k === "asistencia" || k === "retardo") c.asistencia++;
+        else if (k === "falta") c.falta++;
+        else if (k === "justificante" || k === "justificada" || k === "justificado") c.justificante++;
+        else if (k === "n/d") c.nd++;
+        else c.otro++;
+      });
+      return c;
+    };
+    const labelOf = key => { const q = key.split("-"); return `${q[2]}/${q[1]}`; };
+    const insertAt = dates => { const i = dates.findIndex(d => d.key > dateKey); return i === -1 ? dates.length : i; };
+    // La ficha que se está viendo (att es gr.attendance)
+    if (att) {
+      const i = att.dates.findIndex(d => d.key === dateKey);
+      if (i === -1) att.dates.splice(insertAt(att.dates), 0, { key: dateKey, label: labelOf(dateKey), status: status || "" });
+      else att.dates[i].status = status || "";
+      att.counts = countFrom(att.dates.map(d => d.status));
+    }
+    // El grupo abierto detrás del modal
+    const g = Admin.group;
+    if (g && g.group.id === idCurso && g.attendance) {
+      const dates = g.attendance.dates;
+      let i = dates.findIndex(d => d.key === dateKey);
+      if (i === -1) {
+        i = insertAt(dates);
+        dates.splice(i, 0, { key: dateKey, label: labelOf(dateKey), visible: true });
+        g.students.forEach(x => { x.statuses = x.statuses || []; x.statuses.splice(i, 0, ""); });
+      }
+      const s = g.students.find(x => x.cuenta === cuenta);
+      if (s) {
+        s.statuses = s.statuses || [];
+        s.statuses[i] = status || "";
+        s.counts = countFrom(s.statuses);
+      }
+      Admin.renderStats(false);
+    }
+  },
+
   async leaveCapture() {
     if (!Admin.dirty.size) return true;
     const ok = await UI.confirm(`Tienes ${Admin.dirty.size} calificación(es) sin guardar. ¿Descartarlas?`, { okText: "Descartar", danger: true });
@@ -1566,19 +1778,26 @@ const Admin = {
     $("adm-toolbar").replaceChildren();
     const content = $("adm-content");
 
+    // Al re-renderizar por un refresco en segundo plano no se pierde el lugar:
+    // se guarda el desplazamiento de cada tabla y se restaura después.
+    const scrolls = Array.from(content.querySelectorAll(".table-wrap")).map(el => ({ top: el.scrollTop, left: el.scrollLeft }));
+    const restoreScrolls = () => content.querySelectorAll(".table-wrap").forEach((el, i) => { if (scrolls[i]) { el.scrollTop = scrolls[i].top; el.scrollLeft = scrolls[i].left; } });
+
     const global = { evidencias: Admin.tabEvidence, alumnos: Admin.tabStudents, grupos: Admin.tabGroups, mantenimiento: Admin.tabMaintenance };
-    if (global[tab]) return global[tab](content);
+    if (global[tab]) { global[tab](content); restoreScrolls(); return; }
 
     if (!Admin.group) {
       content.replaceChildren(UI.empty("collection", "Configura un grupo en la pestaña «Grupos»."));
+      restoreScrolls();
       return;
     }
     const views = { asistencia: Admin.tabAttendance, lista: Admin.tabRollCall, captura: Admin.tabCapture, evaluacion: Admin.tabWeights, proyectos: Admin.tabProjects };
     (views[tab] || Admin.tabAttendance)(content);
+    restoreScrolls();
   },
 
-  searchBox(placeholder, onInput) {
-    return h("input", { type: "search", class: "form-control form-control-sm", placeholder, "aria-label": placeholder, style: { maxWidth: "260px" }, oninput: debounce(e => onInput(Fmt.normalize(e.target.value)), CONFIG.SEARCH_DEBOUNCE_MS) });
+  searchBox(placeholder, onInput, value = "") {
+    return h("input", { type: "search", class: "form-control form-control-sm", placeholder, "aria-label": placeholder, value, style: { maxWidth: "260px" }, oninput: debounce(e => onInput(Fmt.normalize(e.target.value)), CONFIG.SEARCH_DEBOUNCE_MS) });
   },
 
   /**
@@ -1617,7 +1836,7 @@ const Admin = {
       wrap.append(h("span", { class: "badge status-badge", title: label ? label.label : s.status, text: s.status }));
     }
 
-    const td = h("td", { class: "text-start name-cell" }, wrap);
+    const td = h("td", { class: "text-start name-cell sticky-col sticky-name" }, wrap);
     if (same.length) td.classList.add("has-same");
     if (prev.length) td.classList.add("has-prev");
     return td;
@@ -1656,7 +1875,8 @@ const Admin = {
     const otherCols = att.others.map((o, i) => ({ o, i })).filter(x => showHidden || x.o.visible);
 
     const tbody = h("tbody");
-    const draw = (q = "") => {
+    const draw = (q = Admin._attQuery || "") => {
+      Admin._attQuery = q;
       const rows = g.students
         .filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q))
         .map(s => {
@@ -1683,7 +1903,7 @@ const Admin = {
     };
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
-      Admin.searchBox("Buscar cuenta o nombre…", draw),
+      Admin.searchBox("Buscar cuenta o nombre…", draw, Admin._attQuery || ""),
       h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Descargar reporte (Excel/CSV)", onclick: () => Admin.exportGroup() }, icon("download", "me-1"), "Exportar"),
       h("button", { class: "btn btn-sm btn-success", type: "button", title: "Llenar el formulario de PSI", onclick: () => Admin.psiModal() }, icon("send-check", "me-1"), "Exportar a PSI"),
       h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
@@ -1691,7 +1911,7 @@ const Admin = {
       h("div", { class: "ms-auto d-flex flex-column gap-1 align-items-end" }, Parts.legend(), Admin.linksLegend())));
 
     content.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch att-table" },
-      h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start"), th("F", true), th("J", true),
+      h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"), th("F", true), th("J", true),
         dateCols.map(x => th(x.d.label, x.d.visible)), otherCols.map(x => linkTh(x.o.label, x.o.visible)))),
       tbody)));
   },
@@ -1724,11 +1944,19 @@ const Admin = {
     const manual = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
     const auto = manual.find(c => /tarea|teams|activ|sello|ejercicio/i.test(c.nombre));
     const opts = { tareas: auto ? auto.id : "none", extra: false, dejoN: 3, components: g.components };
+    // Parciales disponibles como fuente de la calificación a exportar.
+    const parciales = g.components.filter(c => (c.tipo === "manual" || c.tipo === "examen") && /parcial/i.test(c.nombre));
+    const fuentes = parciales.length ? parciales : manual;
+    const conNota = c => g.students.some(st => st.items[c.id] && st.items[c.id].score10 !== null && st.items[c.id].score10 !== undefined);
+    opts.fuente = (fuentes.find(conNota) || fuentes[0] || {}).id || "";
 
     const tareasSel = h("select", { class: "form-select form-select-sm", id: "psi-tareas" },
       manual.map(c => h("option", { value: c.id, selected: opts.tareas === c.id, text: c.nombre })),
       h("option", { value: "none", selected: opts.tareas === "none", text: "No se dejan tareas" }));
     const extra = h("input", { class: "form-check-input", type: "checkbox", id: "psi-extra" });
+    const fuenteSel = h("select", { class: "form-select form-select-sm", id: "psi-fuente" },
+      h("option", { value: "", text: "Promedio actual (lo evaluado)" }),
+      fuentes.map(c => h("option", { value: c.id, selected: opts.fuente === c.id, text: c.nombre })));
     const pad = n => String(n).padStart(2, "0");
     const now = new Date();
     const fecha = h("input", { type: "date", class: "form-control form-control-sm", id: "psi-fecha", value: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` });
@@ -1737,7 +1965,15 @@ const Admin = {
     const accTxt = h("textarea", { class: "form-control form-control-sm", rows: "3", id: "psi-acc" });
     let edited = false;
     [obsTxt, accTxt].forEach(t => t.addEventListener("input", () => { edited = true; refreshCode(); }));
-    [fecha, tipo].forEach(t => t.addEventListener("change", () => refreshCode()));
+    fecha.addEventListener("change", () => refreshCode());
+    tipo.addEventListener("change", () => {
+      // Parcial -> la calificación de ese parcial; Final -> el promedio actual.
+      if (tipo.value === "0" && !fuenteSel.value) {
+        const f = fuentes.find(conNota) || fuentes[0];
+        if (f) fuenteSel.value = f.id;
+      } else if (tipo.value === "1") fuenteSel.value = "";
+      draw();
+    });
     let lastRows = [];
     const refreshCode = () => {
       code.value = Psi.script(lastRows, {
@@ -1751,6 +1987,7 @@ const Admin = {
     const draw = () => {
       opts.tareas = tareasSel.value;
       opts.extra = extra.checked;
+      opts.fuente = fuenteSel.value;
       const rows = g.students.map(st => Psi.suggest(st, opts));
       lastRows = rows;
       if (!edited) {
@@ -1761,14 +1998,17 @@ const Admin = {
       refreshCode();
 
       const count = k => rows.filter(x => x.r === k).length;
+      const fuenteNombre = (fuentes.find(c => c.id === opts.fuente) || {}).nombre || "";
+      const sinNota = rows.filter(x => x.sinNota).length;
       body.replaceChildren(
+        sinNota ? h("div", { class: "alert alert-warning py-2 small mb-2" }, icon("exclamation-triangle", "me-1"), `${sinNota} alumno(s) sin calificación en ${fuenteNombre}: en PSI su avance quedará vacío. Captúralo en Captura antes de exportar.`) : null,
         h("div", { class: "d-flex flex-wrap gap-2 mb-2" }, ["3", "2", "1", "0"].map(k => h("span", { class: `badge ${Psi.RIESGO[k][1]}`, text: `Riesgo ${Psi.RIESGO[k][0]}: ${count(k)}` }))),
         h("div", { class: "table-wrap auto-h", style: { maxHeight: "48vh" } }, h("table", { class: "table table-sm table-cch mb-0" },
-          h("thead", {}, h("tr", {}, ["Cuenta", "Nombre", "Avance", "% Asist.", "Tareas", "Dificultades", "Asistencias", "Riesgo", "Derivación"].map((t, i) => h("th", { class: i === 1 || i === 8 ? "text-start" : "", text: t })))),
+          h("thead", {}, h("tr", {}, ["Cuenta", "Nombre", "Avance", "% Asist.", "Tareas", "Dificultades", "Asistencias", "Riesgo", "Derivación"].map((t, i) => h("th", { class: i === 0 ? "sticky-col" : i === 1 ? "text-start sticky-col sticky-name" : i === 8 ? "text-start" : "", text: t })))),
           h("tbody", {}, rows.map(x => h("tr", {},
-            h("td", { class: "mono", text: x.cuenta }),
-            h("td", { class: "text-start name-cell", title: x.nombre, text: x.nombre }),
-            h("td", { class: x.c === "NP" || Number(x.c) < 6 ? "text-danger fw-bold" : "fw-semibold", text: x.c || "—" }),
+            h("td", { class: "mono sticky-col cuenta-cell", text: x.cuenta }),
+            h("td", { class: "text-start name-cell sticky-col sticky-name", title: x.nombre, text: x.nombre }),
+            h("td", { class: x.c === "NP" || Number(x.c) < 6 ? "text-danger fw-bold" : "fw-semibold", title: x.sinNota ? `Sin calificación en ${x.gradeLabel}` : x.gradeLabel, text: x.c || "—" }),
             h("td", { text: x.a === null ? "—" : `${x.a}%` }),
             h("td", { text: Psi.TAREAS[x.t] }),
             h("td", { text: x.d || "—" }),
@@ -1780,6 +2020,7 @@ const Admin = {
     };
     tareasSel.addEventListener("change", draw);
     extra.addEventListener("change", draw);
+    fuenteSel.addEventListener("change", draw);
     draw();
 
     const copy = h("button", { class: "btn btn-success", type: "button" }, icon("clipboard", "me-1"), "Copiar JS");
@@ -1800,18 +2041,20 @@ const Admin = {
       size: "modal-xl",
       body: h("div", {},
         h("div", { class: "row g-2 align-items-end mb-3" },
-          h("div", { class: "col-12 col-md-4" }, h("div", { class: "small text-body-secondary", text: "Grupo PSI · periodo" }), h("div", { class: "fw-semibold mono", text: `${g.psi ? g.psi.grupo : "—"} · ${g.psi ? g.psi.periodo : g.group.ciclo}` })),
-          h("div", { class: "col-12 col-md-4" }, h("label", { class: "form-label small mb-1", for: "psi-tareas", text: "«Entrega tareas» según" }), tareasSel),
-          h("div", { class: "col-12 col-md-4" }, h("div", { class: "form-check" }, extra, h("label", { class: "form-check-label small", for: "psi-extra", text: "Sugerir actividad extracurricular a destacados (≥ 9)" })))),
-        h("div", { class: "row g-2 mb-3" },
+          h("div", { class: "col-12 col-md-3" }, h("div", { class: "small text-body-secondary", text: "Grupo PSI · periodo" }), h("div", { class: "fw-semibold mono", text: `${g.psi ? g.psi.grupo : "—"} · ${g.psi ? g.psi.periodo : g.group.ciclo}` })),
+          h("div", { class: "col-12 col-md-5" }, h("label", { class: "form-label small mb-1", for: "psi-fuente", text: "Calificación a exportar (Avance)" }), fuenteSel),
+          h("div", { class: "col-12 col-md-4" }, h("label", { class: "form-label small mb-1", for: "psi-tareas", text: "«Entrega tareas» según" }), tareasSel)),
+        h("div", { class: "row g-2 align-items-end mb-3" },
           h("div", { class: "col-6 col-md-3" }, h("label", { class: "form-label small mb-1", for: "psi-fecha", text: "Fecha de registro" }), fecha),
           h("div", { class: "col-6 col-md-3" }, h("label", { class: "form-label small mb-1", for: "psi-tipo", text: "Tipo de registro" }), tipo),
+          h("div", { class: "col-12 col-md-6" }, h("div", { class: "form-check" }, extra, h("label", { class: "form-check-label small", for: "psi-extra", text: "Sugerir actividad extracurricular a destacados (≥ 9)" })))),
+        h("div", { class: "row g-2 mb-3" },
           h("div", { class: "col-12 col-md-6" }, h("label", { class: "form-label small mb-1", for: "psi-obs", text: "Observaciones generales (editable)" }), obsTxt),
           h("div", { class: "col-12" }, h("label", { class: "form-label small mb-1", for: "psi-acc", text: "Acciones a realizar (editable)" }), accTxt)),
         body,
         h("details", { class: "mt-3" }, h("summary", { class: "small text-body-secondary", text: "Ver código y reglas" }),
           h("ul", { class: "small mt-2" },
-            h("li", { text: "Avance: promedio actual redondeado (5–10); NP si nunca se presentó." }),
+            h("li", { text: "Avance: la calificación elegida arriba (entero sin redondear, 5–10); NP si nunca se presentó; vacío si el alumno no tiene calificación en ese parcial." }),
             h("li", { text: "Asistencias: >3 faltas → «Más de tres faltas»; 3 faltas seguidas al final → «Dejó de asistir»; 0 asistencias → «Nunca se presentó»." }),
             h("li", { text: "Tareas: ≥ 8 SI · 5–7.9 OCASIONALMENTE · < 5 NO." }),
             h("li", { text: "Dificultades: Psicoemocional si tus comentarios lo mencionan; Académico si promedio < 6 o no entrega tareas." }),
@@ -2135,7 +2378,7 @@ const Admin = {
     content.replaceChildren(...kids(
       di === -1 ? h("div", { class: "alert alert-info py-2 small" }, icon("info-circle", "me-1"), `Aún no hay columna del ${Fmt.date(date + "T12:00:00")} en ${g.group.sheet}; se creará al guardar.`) : null,
       h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch roll-table" },
-        h("thead", {}, h("tr", {}, h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start", text: "Nombre" }), h("th", { text: OPTIONS.map(o => o.k).join(" · ") }))),
+        h("thead", {}, h("tr", {}, h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start sticky-col sticky-name", text: "Nombre" }), h("th", { text: OPTIONS.map(o => o.k).join(" · ") }))),
         tbody)),
       h("p", { class: "small text-body-secondary mt-2 mb-0", text: "Se guarda en la hoja Reporte_ y en Attendance Log. Toca otra vez para desmarcar." })
     ));
@@ -2167,7 +2410,8 @@ const Admin = {
       if (next) { next.focus(); next.select(); }
     };
 
-    const draw = (q = "") => {
+    const draw = (q = Admin._capQuery || "") => {
+      Admin._capQuery = q;
       tbody.replaceChildren(...g.students
         .filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q))
         .map(s => {
@@ -2214,7 +2458,7 @@ const Admin = {
     draw();
 
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
-      Admin.searchBox("Buscar…", draw),
+      Admin.searchBox("Buscar…", draw, Admin._capQuery || ""),
       h("button", { class: "btn btn-sm btn-outline-success", type: "button", title: "Descargar Excel con las calificaciones actuales", onclick: () => Admin.gradesTemplate() }, icon("file-earmark-spreadsheet", "me-1"), "Plantilla Excel"),
       h("label", { class: "btn btn-sm btn-success mb-0", title: "Subir el Excel llenado" }, icon("upload", "me-1"), "Importar Excel",
         h("input", { type: "file", accept: ".xlsx", class: "d-none", onchange: e => { const f = e.target.files[0]; e.target.value = ""; if (f) Admin.importGrades(f); } })),
@@ -2224,7 +2468,7 @@ const Admin = {
     content.replaceChildren(...kids(
       h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch" },
         h("thead", {}, h("tr", {},
-          h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start", text: "Nombre" }),
+          h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start sticky-col sticky-name", text: "Nombre" }),
           comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
             c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo !== "manual" ? " · auto" : Number(c.maximo) !== 10 ? ` · 0–${c.maximo}` : ""}` }))),
           h("th", { dataset: { comp: "final" }, text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", text: "Entera" }))),
@@ -2828,10 +3072,14 @@ const Admin = {
     const body = h("div");
     UI.loading(body);
     UI.modal({ title: [icon("person-vcard", "me-2"), "Ficha ", h("span", { class: "mono", text: cuenta })], body, size: "modal-xl" });
+    // Ficha en caché (15 min): se muestra al instante y se actualiza en segundo plano.
+    const cached = Cache.get("p:" + cuenta);
+    if (cached) Admin.drawProfile(body, cached.d);
     try {
       const p = await Api.call("studentProfile", { cuenta }, "admin");
-      Admin.drawProfile(body, p);
-    } catch (error) { if (error.code !== "AUTH") body.replaceChildren(UI.empty("exclamation-octagon", error.message)); }
+      Cache.set("p:" + cuenta, p, Cache.TTL_PROFILE_MS);
+      if (!cached || JSON.stringify(cached.d) !== JSON.stringify(p)) Admin.drawProfile(body, p);
+    } catch (error) { if (error.code !== "AUTH" && !cached) body.replaceChildren(UI.empty("exclamation-octagon", error.message)); }
   },
 
   /**
@@ -2880,6 +3128,39 @@ const Admin = {
       const gr = groups.find(x => x.idCurso === selected);
       if (!gr) { detail.replaceChildren(); return; }
 
+      // Pasar asistencia desde la ficha: fecha + marca (crea la columna si es nueva)
+      const pad2 = v => String(v).padStart(2, "0");
+      const nowD = new Date();
+      const todayKey = `${nowD.getFullYear()}-${pad2(nowD.getMonth() + 1)}-${pad2(nowD.getDate())}`;
+      const markDate = h("input", { type: "date", class: "form-control form-control-sm w-auto", value: todayKey, max: todayKey, "aria-label": "Fecha para pasar asistencia" });
+      const markOpts = [
+        { v: "Asistencia", k: "✓", cls: "success" },
+        (Admin.boot && Admin.boot.useRetardo) ? { v: "Retardo", k: "R", cls: "warning" } : null,
+        { v: "Falta", k: "✗", cls: "danger" },
+        { v: "Justificante", k: "J", cls: "info" }
+      ].filter(Boolean);
+      const saveMark = async (dateKey, status, btn) => {
+        if (!dateKey) return UI.toast("warning", "Elige una fecha.");
+        if (dateKey > todayKey) return UI.toast("warning", "No se puede pasar lista de una fecha futura.");
+        try {
+          const r = await UI.busy(btn, () => Api.call("saveRollCall", { idCurso: gr.idCurso, date: dateKey, marks: [{ cuenta: p.cuenta, status }] }, "admin"));
+          const hadAtt = !!gr.attendance;
+          const isNew = hadAtt && !gr.attendance.dates.some(d => d.key === dateKey);
+          Admin.applyRollMark(gr.idCurso, p.cuenta, dateKey, status, gr.attendance);
+          UI.toast("success", `${dateKey}: ${Parts.statusInfo(status).label}. ${r.message}`);
+          if (!hadAtt) Admin.openProfile(p.cuenta);
+          else { drawCards(); if (isNew) drawDetail(); }
+        } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
+      };
+      const markBar = h("div", { class: "att-markbar d-flex flex-wrap align-items-center gap-2 mb-2" },
+        h("span", { class: "small fw-semibold" }, icon("list-check", "me-1"), "Pasar asistencia:"),
+        markDate,
+        markOpts.map(o => h("button", {
+          type: "button", class: `btn btn-sm btn-outline-${o.cls}`,
+          onclick: e => saveMark(markDate.value, o.v, e.currentTarget)
+        }, `${o.k} ${o.v === "Justificante" ? "Justif." : o.v}`)),
+        h("span", { class: "small text-body-secondary", text: "Si la fecha aún no tiene columna, se crea al guardar." }));
+
       const gradesTable = gr.components.length
         ? h("table", { class: "table table-sm table-cch mb-0" },
             h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calif." }))),
@@ -2922,14 +3203,16 @@ const Admin = {
           h("div", { class: "fw-semibold me-auto" }, icon("journal-text", "me-1"), gr.label), statusSel, remove),
         section("Asistencia", "calendar-check",
           gr.attendance && gr.attendance.dates.length ? [
-            Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta, async d => {
-              const r = await Api.call("saveRollCall", { idCurso: gr.idCurso, date: d.key, marks: [{ cuenta: p.cuenta, status: "Justificante" }] }, "admin");
-              UI.toast("success", `${d.label}: falta justificada. ${r.message}`);
-              gr.attendance.counts.falta = Math.max(0, gr.attendance.counts.falta - 1);
-              if (Admin.group && Admin.group.group.id === gr.idCurso) Admin.loadGroup();
+            markBar,
+            Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta, null, async (d, status) => {
+              const r = await Api.call("saveRollCall", { idCurso: gr.idCurso, date: d.key, marks: [{ cuenta: p.cuenta, status }] }, "admin");
+              Admin.applyRollMark(gr.idCurso, p.cuenta, d.key, status, gr.attendance);
+              drawCards();
+              UI.toast("success", `${d.label}: ${Parts.statusInfo(status).label}. ${r.message}`);
+              return gr.attendance.counts;
             }),
-            gr.attendance.counts.falta ? h("div", { class: "small text-body-secondary mt-1" }, icon("hand-index", "me-1"), "Toca una ✗ para justificarla.") : null
-          ] : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros." })),
+            h("div", { class: "small text-body-secondary mt-1" }, icon("hand-index", "me-1"), "Toca una fecha para cambiar su marca (✓ ✗ J). Para justificar una falta, elige J.")
+          ] : h("div", {}, markBar, h("p", { class: "small text-body-secondary mb-0", text: "Sin registros en este grupo." }))),
         h("div", { class: "row g-3" },
           h("div", { class: "col-12 col-lg-6" }, section("Calificaciones", "bar-chart", gradesTable)),
           h("div", { class: "col-12 col-lg-6" }, section("Proyectos", "people", ...projects))));
