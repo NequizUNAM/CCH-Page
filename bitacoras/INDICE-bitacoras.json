@@ -1,0 +1,25 @@
+{
+  "base_fields": [
+    "id",
+    "fecha",
+    "titulo",
+    "tipo",
+    "texto",
+    "asistentes",
+    "acuerdos",
+    "pendientes",
+    "hitos",
+    "evidencias"
+  ],
+  "projects": [],
+  "root": "Bitacoras/",
+  "rule": "Los proyectos se registran desde Mantenimiento; este índice se actualiza automáticamente.",
+  "updated": "2026-11-19",
+  "version": 1,
+  "configCiclo": {
+    "ciclo": "20271",
+    "siguiente": 1,
+    "usados": [],
+    "historial": {}
+  }
+}

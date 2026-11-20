@@ -1,0 +1,953 @@
+{
+    "documento_1": {
+        "titulo": "Protocolo de Equivalencias para el Ingreso y la Promoción de los Profesores Ordinarios de Carrera del Colegio de Ciencias y Humanidades (2020)",
+        "rubros_produccion_academica": [
+            {
+                "rubro": "I",
+                "nombre": "Trabajos de Apoyo a la Docencia",
+                "descripcion": "Actividades que redunden en la optimización del proceso de enseñanza-aprendizaje.",
+                "perfil_asociado": "Obligatorio mínimo 50% del puntaje total para profesores Asociados.",
+                "actividades": [
+                    {
+                        "nombre": "Compilación de lecturas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Examen extraordinario",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Guía de lectura",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Lectura con fines didácticos",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Material educativo de audio",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Organización de actividades académicas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Secuencia didáctica",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Visitas guiadas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Actividades Creativas",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Actualización de paquete didáctico",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Adaptación de equipo o programas de cómputo para la enseñanza",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Antología",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Apoyos bibliográficos, hemerográficos, filmográficos, cibergráficos para un curso",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Artículo académico",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Asesoría para alumnos orientada a mejorar la calidad del aprendizaje y el egreso",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Banco de datos meteorológicos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Banco de información para una asignatura",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Banco de reactivos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Colaborador de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Comité académico local para la evaluación de las guías de exámenes extraordinarios",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Cursos especiales o extracurriculares para alumnos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Desarrollo de un tema con fines didácticos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Dirección de obra de teatro de carácter didáctico",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Diseño y seguimiento de actividades experimentales o virtuales aplicables en los laboratorios",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Ensayo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Estrategia didáctica",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Glosario de términos por asignatura o área de conocimientos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Guía para examen extraordinario",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Infografía o infograma",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Impartición de cursos en línea para alumnos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Material audiovisual",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Material didáctico con uso de software",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Monografía",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Paquete didáctico",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Prácticas de campo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Programas de cómputo para la enseñanza",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Programa operativo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Revisión técnica de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Tutoría para alumnos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Video educativo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Actividades experimentales para reforzar aprendizajes curriculares en SILADIN",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Apoyo a la instrumentación de los programas de estudio",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Asesoría para alumnos orientada a mejorar la calidad del aprendizaje y el egreso (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Coordinador de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Cuaderno de trabajo",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Curso curricular o no curricular en línea",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Dirección de obra de teatro de carácter didáctico (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Diseño y elaboración de materiales didácticos interactivos para el Portal Académico",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Diseño y seguimiento de actividades experimentales o virtuales aplicables en los laboratorios (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Examen diagnóstico académico (EDA)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Formación personalizada de profesores",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Libro de texto",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Manual de prácticas de laboratorio",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Material didáctico con uso de software (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Monografía (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Organización de actividades académicas (Nacional/Internacional)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Paquete didáctico (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Paquete para la evaluación de un curso",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Paquete para la evaluación extraordinaria de un curso",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Programa de cómputo para la enseñanza (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Programa operativo (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Programa permanente de atención al rezago escolar",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Propuesta educativa",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Seguimiento, análisis y preparación grupal de la experiencia docente",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Traducción de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Tutoría para alumnos (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            },
+            {
+                "rubro": "II",
+                "nombre": "Trabajos de Investigación",
+                "descripcion": "Estudios e investigaciones sobre enseñanza-aprendizaje, ciencias, humanidades o formación.",
+                "actividades": [
+                    {
+                        "nombre": "Compilación de lecturas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Cursos recibidos",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Participación en jornadas académicas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Artículo académico",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Colaboración en el desarrollo de estudios e investigaciones",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Conferencias o videoconferencias",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Dirección de grupo de trabajo con alumnos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Estudio sobre la docencia",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Reporte de investigación (incluyendo avances)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Dirección de grupos de trabajo de alumnos",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Evaluación de un programa de estudios",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Evaluación del plan de estudios",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Propuesta educativa",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Reporte de investigación",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Reporte de validación",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            },
+            {
+                "rubro": "III",
+                "nombre": "Trabajos en la Formación de Profesores",
+                "descripcion": "Actualización disciplinaria, pedagógica y didáctica de los docentes.",
+                "actividades": [
+                    {
+                        "nombre": "Compilación de lecturas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Cursos recibidos",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Participación en jornadas académicas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Acreditación de Diplomado",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Apoyos bibliográficos, hemerográficos, filmográficos, cibergráficos para un curso",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Asesoría para profesores",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Asesorías didáctico-disciplinarias individualizadas para profesores",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Boletín informativo digital o impreso",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Colaborador de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Compilación de lecturas",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Compilador de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Conferencias o videoconferencias",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Cursos para la MADEMS",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Cursos para profesores",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Desarrollo de un tema con fines didácticos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Director o asesor de tesis",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Diseño de un curso para profesores",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Ensayo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Estancias (cortas)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Examen de conocimientos y habilidades disciplinarias para la docencia",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Formador de asesores en línea",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Glosario de términos por asignatura o área de conocimientos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Guía de estudios para el examen de conocimientos y habilidades disciplinarias",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Participación en la elaboración y publicación de una revista",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Coordinador de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Diseño, organización, realización y evaluación de un diplomado",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Estancias (continuas)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Formación de profesores",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Formador de asesores",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Formador de profesores en actividades experimentales/SILADIN",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Guía para el profesor",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Impartición de un diplomado",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Libro para la actualización de profesores",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Participación en la elaboración y publicación de una revista (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Traducción de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            },
+            {
+                "rubro": "IV",
+                "nombre": "Trabajos de Dirección de Grupos Académicos",
+                "descripcion": "Planeación, organización, coordinación y supervisión de proyectos institucionales y grupos.",
+                "actividades": [
+                    {
+                        "nombre": "Comisiones académicas",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Coordinación de grupos de trabajo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Dirección de grupos de trabajo con alumnos",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Participación en grupos de trabajo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Coordinación de grupos de trabajo (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Dirección de grupos de trabajo con alumnos (Nivel C)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Programa de fortalecimiento a la calidad del egreso (PROFOCE)",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            },
+            {
+                "rubro": "V",
+                "nombre": "Trabajos de Difusión y Extensión Cultural",
+                "descripcion": "Divulgación de la cultura, ciencia, humanidades y artes.",
+                "actividades": [
+                    {
+                        "nombre": "Charlas de divulgación",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Cursos especiales o extracurriculares para alumnos",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Jurado en actividades académicas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Lectura con fines didácticos",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Organización de actividades académicas (locales)",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Presentación de un libro o revista",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Relator",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Reseña bibliográfica o videográfica",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Sinodal de examen de grado",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Artículo de divulgación",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Asesorías a los alumnos para la presentación de trabajos en actividades académicas",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Charlas de divulgación (conjunto)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Colaborador de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Compilador de libro",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Conferencias o videoconferencias",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Cursos especiales o extracurriculares para alumnos (40 hrs o más)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Ensayo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Organización de actividades académicas (generales)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Participación en la elaboración y publicación de una revista",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Ponencia",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Seminarios o talleres extracurriculares para alumnos monitores o formadores",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Traducción de artículo o ensayo",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Coordinador de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Organización de actividades académicas (nacionales/internacionales)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Participación en la elaboración y publicación de una revista (con artículos propios)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Seminarios o talleres extracurriculares para alumnos (con réplica)",
+                        "nivel": "C",
+                        "puntos": 150
+                    },
+                    {
+                        "nombre": "Traducción de libro",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            },
+            {
+                "rubro": "VI",
+                "nombre": "Trabajos de Participación Universitaria Honoraria",
+                "descripcion": "Cargos de representación y jurados en comisiones universitarias.",
+                "actividades": [
+                    {
+                        "nombre": "Funcionario o integrante de la comisión organizadora de elecciones",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Participación en jornadas académicas",
+                        "nivel": "A",
+                        "puntos": 25
+                    },
+                    {
+                        "nombre": "Cargos honoríficos (Consejos, Comisiones Dictaminadoras)",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Jurado calificador",
+                        "nivel": "B",
+                        "puntos": 50
+                    },
+                    {
+                        "nombre": "Cargos honoríficos (Comisión Dictaminadora periodo completo)",
+                        "nivel": "C",
+                        "puntos": 150
+                    }
+                ]
+            }
+        ],
+        "puntajes_totales_por_categoria": {
+            "Asociado A": {
+                "puntos_totales": 100,
+                "min_apoyo_docencia_pct": 50
+            },
+            "Asociado B": {
+                "puntos_totales": 200,
+                "min_apoyo_docencia_pct": 50
+            },
+            "Asociado C": {
+                "puntos_totales": 250,
+                "min_apoyo_docencia_pct": 50
+            },
+            "Titular A": {
+                "puntos_totales": 300,
+                "min_apoyo_investigacion_pct": 50,
+                "min_formacion_profesores_pct": 25
+            },
+            "Titular B": {
+                "puntos_totales": 350,
+                "min_apoyo_investigacion_pct": 42.85,
+                "min_direccion_grupos_pct": 14.28,
+                "min_formacion_profesores_pct": 14.28
+            },
+            "Titular C": {
+                "puntos_totales": 400,
+                "min_apoyo_investigacion_pct": 50,
+                "min_direccion_grupos_pct": 12.5,
+                "min_formacion_profesores_pct": 12.5
+            }
+        }
+    },
+    "documento_2": {
+        "titulo": "Instructivo de Asignación de Horarios del Colegio de Ciencias y Humanidades (2023)",
+        "horas_permanentes_plantel": {
+            "Azcapotzalco": 8784,
+            "Naucalpan": 8452,
+            "Vallejo": 8856,
+            "Oriente": 8924,
+            "Sur": 9576
+        },
+        "criterios_lista_jerarquizada": [
+            {
+                "orden": 1,
+                "criterio": "Categoría y nivel",
+                "descripcion": "Asignatura B Definitivo, Asignatura A Definitivo, Asignatura A Interino."
+            },
+            {
+                "orden": 2,
+                "criterio": "Trayectoria profesional",
+                "desglose_puntos": {
+                    "Licenciatura": 24,
+                    "Especialidad": 12,
+                    "Maestrante (100% créditos)": 15,
+                    "Maestría": 30,
+                    "Maestría PNPC/CONAHCYT": 36,
+                    "Doctorante (candidato a doctor)": 20,
+                    "Doctorado": 40,
+                    "Doctorado PNPC/CONAHCYT": 46,
+                    "Diplomado (min 120 hrs, 1 por año)": 8,
+                    "Formación docente CISE": 6,
+                    "PROFORED": 5,
+                    "PAAS": 6,
+                    "Cursos acreditados (afines, 1 pt por cada 20 hrs, max 80 hrs/año)": 1,
+                    "Cursos de idiomas en el extranjero (min 120 hrs, 1 por año)": 8,
+                    "Ponencia o conferencia en eventos académicos (max 1 por semestre)": 2
+                }
+            },
+            {
+                "orden": 3,
+                "criterio": "Actividades de trabajo de apoyo a la docencia, formación de profesores, grupos de trabajo y participación honoraria",
+                "desglose_puntos": {
+                    "Asesoría para alumnos (max 2 por año)": "2 puntos por semestre",
+                    "Asesorías para presentación de trabajos en actividades académicas (max 2 al año)": "2 puntos por informe",
+                    "Asesoría orientada a mejorar calidad de aprendizaje y egreso (max 2 al año)": "2 puntos por semestre",
+                    "Examen extraordinario (constancia y modelo, max 6 por año)": "0.25 puntos por examen",
+                    "Cursos impartidos a profesores en la UNAM (max 40 hrs/año)": "4 puntos por cada 20 horas",
+                    "Participación en grupos de trabajo institucionales (con dictamen)": "4 puntos por año",
+                    "Guía para examen extraordinario avalada": "2 puntos",
+                    "Guía para el profesor, libro o paquete didáctico avalados y publicados": "6 puntos",
+                    "Programa operativo avalado": "2 puntos por semestre",
+                    "Tutoría para alumnos (PIT, max 2 grupos/año)": "2 puntos por grupo",
+                    "Cargos honoríficos (Comisión Dictaminadora, Consejos, min 85% asistencia)": "6 puntos por año",
+                    "Jurado calificador (Concursos definitividad / ingreso)": "6 puntos",
+                    "Jurado calificador (Comisiones editoriales / estímulos / premios / pares / software / otras dependencias)": "4 puntos (o 6 para comisiones de proyectos/informes)",
+                    "Participación en proyectos experimentales SILADIN (max 1 por semestre)": "2 puntos",
+                    "Participación en Programa Jóvenes hacia la Investigación": "3 puntos por año",
+                    "Participación en concursos con alumnos (Olimpiadas, Robótica, Matemáticas, Ferias, max 2 eventos/año)": "2 puntos por evento",
+                    "Artículo académico publicado (max 2 por año)": "2 puntos",
+                    "Artículos de investigación/divulgación con ISSN/ISBN/NIP (max 2 por año)": "4 puntos",
+                    "Coordinación de proyectos institucionales (INFOCAB, PAPIME)": "4 puntos por año",
+                    "Participación en proyectos institucionales (INFOCAB, PAPIME)": "2 puntos por año"
+                }
+            },
+            {
+                "orden": 4,
+                "criterio": "Antigüedad en la UNAM",
+                "detalle": "1 punto por cada año de labores."
+            },
+            {
+                "orden": 5,
+                "criterio": "Actividades complementarias no incluidas en III y IV",
+                "detalle": "Nivel A: 1 punto | Nivel B: 2 puntos | Nivel C: 3 puntos"
+            },
+            {
+                "orden": 6,
+                "criterio": "Egresados de la UNAM"
+            },
+            {
+                "orden": 7,
+                "criterio": "Perfiles profesiográficos aprobados por el H. Consejo Técnico"
+            }
+        ]
+    }
+}
