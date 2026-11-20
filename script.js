@@ -67,7 +67,11 @@ const Session = {
     try { sessionStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(this.data)); } catch (e) { /* solo en memoria */ }
   },
   get(key) { return this.data[key] || null; },
-  set(key, value) { this.data[key] = value; this.save(); },
+  set(key, value) {
+    this.data[key] = value;
+    this.save();
+    if (key === "admin" || key === "student") ApiQueue.kick();
+  },
   clear(key) { if (key) delete this.data[key]; else this.data = {}; this.save(); }
 };
 
@@ -163,6 +167,7 @@ const Api = {
     // petición (doble clic en Recargar, abrir la misma ficha dos veces…).
     const dedupKey = READ_ACTIONS.has(action) ? `${auth || ""}|${action}|${JSON.stringify(params)}` : null;
     if (dedupKey && Api._pending.has(dedupKey)) return Api._pending.get(dedupKey);
+    if (!READ_ACTIONS.has(action)) return ApiQueue.enqueue(action, params, auth);
     const promise = Api._call(action, params, auth);
     if (dedupKey) {
       Api._pending.set(dedupKey, promise);
@@ -171,7 +176,7 @@ const Api = {
     }
     return promise;
   },
-  async _call(action, params = {}, auth = null) {
+  async _call(action, params = {}, auth = null, requestId = "") {
     const token = auth === "admin" ? Session.get("admin")
       : auth === "student" ? (Session.get("student") || {}).token
       : undefined;
@@ -185,20 +190,30 @@ const Api = {
       response = await fetch(ApiUrl.get(), {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(Object.assign({ action, token }, params)),
+        body: JSON.stringify(Object.assign({}, params, { action, token, ...(requestId ? { requestId } : {}) })),
         signal: controller.signal
       });
     } catch (error) {
-      throw new Error(error.name === "AbortError" ? "El servidor tardó demasiado en responder."
+      const failure = new Error(error.name === "AbortError" ? "El servidor tardó demasiado en responder."
         : !ApiUrl.get() ? error.message : "No fue posible conectar con el servidor.");
+      failure.code = error.name === "AbortError" ? "NETWORK" : (!ApiUrl.get() ? "" : "NETWORK");
+      throw failure;
     } finally {
       clearTimeout(timer);
     }
 
-    if (!response.ok) throw new Error(`El servidor respondió con error ${response.status}.`);
+    if (!response.ok) {
+      const error = new Error(`El servidor respondió con error ${response.status}.`);
+      if (response.status >= 500) error.code = "NETWORK";
+      throw error;
+    }
 
     let result;
-    try { result = await response.json(); } catch (e) { throw new Error("La respuesta del servidor no es válida."); }
+    try { result = await response.json(); } catch (e) {
+      const error = new Error("La respuesta del servidor no es válida.");
+      error.code = "NETWORK";
+      throw error;
+    }
 
     if (auth === "admin" && !READ_ACTIONS.has(action)) Cache.invalidate(action, params);
 
@@ -209,6 +224,200 @@ const Api = {
       throw error;
     }
     return result;
+  }
+};
+
+/* ============================================================
+   COLA FIFO DE ESCRITURAS
+   Las lecturas permanecen paralelas; las escrituras se persisten y
+   procesan una por una para evitar colisiones y permitir reintentos.
+   ============================================================ */
+const ApiQueue = {
+  DB_NAME: "cch-request-queue",
+  STORE_NAME: "requests",
+  RETRY_MS: 1500,
+  MAX_RETRY_MS: 30000,
+  db: null,
+  jobs: [],
+  waiters: new Map(),
+  ready: null,
+  running: false,
+  retryTimer: null,
+  warned: new Set(),
+
+  init() {
+    if (this.ready) return this.ready;
+    this.ready = new Promise(resolve => {
+      if (!window.indexedDB) {
+        UI.toast("warning", "IndexedDB no está disponible; las escrituras se encolarán solo mientras esta página permanezca abierta.");
+        resolve();
+        return;
+      }
+      const request = indexedDB.open(this.DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains(this.STORE_NAME)) {
+          request.result.createObjectStore(this.STORE_NAME, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = () => {
+        this.db = request.result;
+        const read = this.db.transaction(this.STORE_NAME, "readonly").objectStore(this.STORE_NAME).getAll();
+        read.onsuccess = () => {
+          this.jobs = (read.result || []).sort((a, b) => a.createdAt - b.createdAt);
+          this.render();
+          resolve();
+          this.kick();
+        };
+        read.onerror = () => {
+          UI.toast("danger", "No se pudo leer la cola local de solicitudes.");
+          resolve();
+        };
+      };
+      request.onerror = () => {
+        UI.toast("warning", "No se pudo abrir IndexedDB; las escrituras se encolarán solo mientras esta página permanezca abierta.");
+        resolve();
+      };
+    });
+    return this.ready;
+  },
+
+  async persist(job) {
+    if (!this.db) return;
+    await new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.STORE_NAME, "readwrite");
+      tx.objectStore(this.STORE_NAME).put(job);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error("No se pudo guardar la solicitud en IndexedDB."));
+      tx.onabort = () => reject(tx.error || new Error("No se pudo guardar la solicitud en IndexedDB."));
+    });
+  },
+
+  async remove(job) {
+    if (!this.db) return;
+    await new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.STORE_NAME, "readwrite");
+      tx.objectStore(this.STORE_NAME).delete(job.id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error("No se pudo retirar la solicitud de IndexedDB."));
+    });
+  },
+
+  async enqueue(action, params, auth) {
+    await this.init();
+    const id = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID()
+      : window.crypto && window.crypto.getRandomValues
+        ? Array.from(window.crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16)).join("")
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const student = Session.get("student") || {};
+    const job = {
+      id, action, params, auth,
+      owner: auth === "student" ? student.cuenta : auth,
+      createdAt: Date.now(), attempts: 0, warned: false
+    };
+    await this.persist(job);
+    this.jobs.push(job);
+    const promise = new Promise((resolve, reject) => this.waiters.set(id, { resolve, reject }));
+    this.render();
+    this.kick();
+    return promise;
+  },
+
+  hasCredentials(job) {
+    if (job.auth === "admin") return !!Session.get("admin");
+    if (job.auth === "student") {
+      const student = Session.get("student") || {};
+      return !!student.token && !!job.owner && student.cuenta === job.owner;
+    }
+    return true;
+  },
+
+  kick() {
+    if (this.running || !this.jobs.length) return;
+    clearTimeout(this.retryTimer);
+    this.drain();
+  },
+
+  async drain() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      while (this.jobs.length) {
+        const job = this.jobs[0];
+        if (!this.hasCredentials(job)) break;
+        try {
+          const result = await Api._call(job.action, job.params, job.auth, job.id);
+          try { await this.remove(job); }
+          catch (storageError) { UI.toast("danger", `La solicitud se completó, pero no se pudo retirar de la cola local: ${storageError.message}`); }
+          this.jobs.shift();
+          const waiter = this.waiters.get(job.id);
+          if (waiter && waiter.resolve) waiter.resolve(result);
+          else UI.toast("success", `Solicitud «${job.action}» sincronizada.`);
+          this.waiters.delete(job.id);
+          this.render();
+        } catch (error) {
+          if (error.code === "AUTH") {
+            this.running = false;
+            this.render();
+            return;
+          }
+          if (error.code === "NETWORK") {
+            job.attempts++;
+            try { await this.persist(job); }
+            catch (storageError) { UI.toast("danger", `No se pudo actualizar el estado de la cola local: ${storageError.message}`); }
+            this.render();
+            const delay = Math.min(this.RETRY_MS * Math.pow(2, Math.min(job.attempts - 1, 5)), this.MAX_RETRY_MS);
+            this.running = false;
+            this.retryTimer = setTimeout(() => this.kick(), delay);
+            return;
+          }
+          try { await this.remove(job); }
+          catch (storageError) { UI.toast("danger", `No se pudo retirar la solicitud fallida de la cola local: ${storageError.message}`); }
+          this.jobs.shift();
+          const waiter = this.waiters.get(job.id);
+          if (waiter && waiter.reject) waiter.reject(error);
+          else if (error.code !== "AUTH") UI.toast("danger", `No se completó «${job.action}»: ${error.message}`);
+          this.waiters.delete(job.id);
+          this.render();
+        }
+      }
+    } finally {
+      this.running = false;
+      this.render();
+    }
+  },
+
+  render() {
+    const button = $("sync-status");
+    if (!button) return;
+    const count = this.jobs.length;
+    button.classList.toggle("d-none", !count);
+    button.replaceChildren(
+      h("span", { class: "spinner-border spinner-border-sm", role: "status", "aria-hidden": "true" }),
+      ` ${count} pendiente${count === 1 ? "" : "s"}`
+    );
+    button.title = count ? "Ver solicitudes guardadas en la cola de sincronización" : "";
+    button.setAttribute("aria-label", `${count} solicitudes pendientes de sincronización`);
+    if (count) this.checkAge();
+  },
+
+  checkAge() {
+    const now = Date.now();
+    this.jobs.forEach(job => {
+      if (!job.warned && now - job.createdAt >= 5 * 60 * 1000) {
+        job.warned = true;
+        this.warned.add(job.id);
+        this.persist(job).catch(error => UI.toast("danger", error.message));
+        UI.toast("warning", "Hay una solicitud pendiente desde hace más de cinco minutos. Se conservará y se reintentará al recuperar la conexión.", 9000);
+      }
+    });
+  },
+
+  showDetails() {
+    const list = h("ul", { class: "mb-0" }, this.jobs.map(job => h("li", {}, `${job.action} · ${new Date(job.createdAt).toLocaleTimeString("es-MX")}`)));
+    UI.modal({
+      title: [icon("arrow-repeat", "me-2"), "Cola de sincronización"],
+      body: h("div", {}, h("p", { class: "small text-body-secondary", text: "Los guardados y eliminaciones se procesan en orden. Las consultas continúan en paralelo." }), list)
+    });
   }
 };
 
@@ -333,13 +542,11 @@ const Parts = {
   attendanceStrip(cuenta, dates, faltas, onJustify, onMark) {
     const cell = h("td", { class: "sticky-col cuenta-cell", text: cuenta });
     Parts.applyFaltas(cell, faltas);
-    const useRetardo = !!(Admin.boot && Admin.boot.useRetardo);
     const MARK_OPTS = [
       { v: "Asistencia", k: "✓", cls: "success" },
-      useRetardo ? { v: "Retardo", k: "R", cls: "warning" } : null,
       { v: "Falta", k: "✗", cls: "danger" },
       { v: "Justificante", k: "J", cls: "info" }
-    ].filter(Boolean);
+    ];
     // onMark(d, status): editor para cambiar la marca de una fecha (desde la
     // ficha). Sin onMark queda el comportamiento anterior: solo las faltas se
     // pueden tocar y solo para justificarlas (onJustify). Sin ninguno es lectura.
@@ -1010,6 +1217,7 @@ const App = {
     $("home-link").addEventListener("click", e => { e.preventDefault(); App.route(); });
     $("btn-admin").addEventListener("click", App.openAdmin);
     $("btn-logout").addEventListener("click", App.logout);
+    $("sync-status").addEventListener("click", () => ApiQueue.showDetails());
     $("btn-prefs").addEventListener("click", App.openPrefs);
     $("admin-login").addEventListener("submit", App.submitAdminLogin);
     $("student-login").addEventListener("submit", Student.login);
@@ -1026,6 +1234,9 @@ const App = {
       App.sessionExpired("admin", "Tu sesión de administrador expiró. Vuelve a entrar.");
     });
     App.renderQr();
+    ApiQueue.init();
+    window.addEventListener("online", () => ApiQueue.kick());
+    window.setInterval(() => ApiQueue.checkAge(), 15000);
 
     // Al cruzar el tamaño celular ↔ computadora se redibuja la pestaña del panel
     if (Mobile.query) Mobile.query.addEventListener("change", () => {
@@ -1146,6 +1357,11 @@ const App = {
   },
 
   async logout() {
+    await ApiQueue.init();
+    if (ApiQueue.jobs.length) {
+      UI.toast("warning", "Hay solicitudes guardándose o esperando conexión. Espera a que se sincronicen antes de cerrar sesión.");
+      return;
+    }
     if (Admin.dirty && Admin.dirty.size && !(await UI.confirm("Tienes calificaciones sin guardar. ¿Salir de todos modos?", { okText: "Salir", danger: true }))) return;
     const tokens = [Session.get("admin"), (Session.get("student") || {}).token].filter(Boolean);
     tokens.forEach(token => Api.call("logout", { token }).catch(() => {}));
@@ -2320,13 +2536,11 @@ const Admin = {
     // Estado actual de esa fecha (si ya existe la columna)
     const dates = g.attendance ? g.attendance.dates : [];
     const di = dates.findIndex(d => d.key === date);
-    const useRetardoFlag = !!(Admin.boot && Admin.boot.useRetardo);
     const original = {};
     g.students.forEach(s => {
       const v = di === -1 ? "" : (s.statuses[di] || "");
       const key = Fmt.normalize(v);
-      original[s.cuenta] = key === "asistencia" || (key === "retardo" && !useRetardoFlag) ? "Asistencia"
-        : key === "retardo" ? "Retardo"
+      original[s.cuenta] = key === "asistencia" ? "Asistencia"
         : key === "falta" ? "Falta"
         : key.startsWith("justific") ? "Justificante" : "";
     });
@@ -2337,21 +2551,19 @@ const Admin = {
     const mobile = Mobile.is();
     const size = mobile ? "btn-lg" : "btn-sm";
 
-    const useRetardo = useRetardoFlag;
     const OPTIONS = [
       { v: "Asistencia", k: "✓", cls: "success" },
-      useRetardo ? { v: "Retardo", k: "R", cls: "warning" } : null,
       { v: "Falta", k: "✗", cls: "danger" },
       { v: "Justificante", k: "J", cls: "info" }
-    ].filter(Boolean);
+    ];
 
     const counter = h("span", { class: "small text-body-secondary" });
     const saveBtn = h("button", { class: `btn ${mobile ? "btn-primary flex-grow-1" : "btn-sm btn-primary"}`, type: "button" });
     const refresh = () => {
       const changed = g.students.filter(s => marks[s.cuenta] !== original[s.cuenta]).length;
-      const c = { Asistencia: 0, Retardo: 0, Falta: 0, Justificante: 0, "": 0 };
+      const c = { Asistencia: 0, Falta: 0, Justificante: 0, "": 0 };
       g.students.forEach(s => { c[marks[s.cuenta]]++; });
-      counter.textContent = `✓ ${c.Asistencia}${useRetardo ? ` · R ${c.Retardo}` : ""} · ✗ ${c.Falta} · J ${c.Justificante} · sin marcar ${c[""]}`;
+      counter.textContent = `✓ ${c.Asistencia} · ✗ ${c.Falta} · J ${c.Justificante} · sin marcar ${c[""]}`;
       saveBtn.replaceChildren(icon("save", "me-1"), `Guardar (${changed})`);
       saveBtn.disabled = !changed;
     };
@@ -3199,6 +3411,7 @@ const Admin = {
     }));
 
     // ---------- Detalle del grupo elegido ----------
+    const profileAttendance = h("div", { class: "d-flex align-items-center gap-2 flex-wrap" });
     const drawDetail = () => {
       UI.disposePopovers(detail);
       const gr = groups.find(x => x.idCurso === selected);
@@ -3210,11 +3423,10 @@ const Admin = {
       const todayKey = `${nowD.getFullYear()}-${pad2(nowD.getMonth() + 1)}-${pad2(nowD.getDate())}`;
       const markDate = h("input", { type: "date", class: "form-control form-control-sm w-auto", value: todayKey, max: todayKey, "aria-label": "Fecha para pasar asistencia" });
       const markOpts = [
-        { v: "Asistencia", k: "✓", cls: "success" },
-        (Admin.boot && Admin.boot.useRetardo) ? { v: "Retardo", k: "R", cls: "warning" } : null,
-        { v: "Falta", k: "✗", cls: "danger" },
-        { v: "Justificante", k: "J", cls: "info" }
-      ].filter(Boolean);
+        { v: "Asistencia", k: "✓", cls: "success", label: "Asistencia" },
+        { v: "Falta", k: "✗", cls: "danger", label: "Falta" },
+        { v: "Justificante", k: "J", cls: "info", label: "Justificante" }
+      ];
       const saveMark = async (dateKey, status, btn) => {
         if (!dateKey) return UI.toast("warning", "Elige una fecha.");
         if (dateKey > todayKey) return UI.toast("warning", "No se puede pasar lista de una fecha futura.");
@@ -3228,15 +3440,6 @@ const Admin = {
           else { drawCards(); if (isNew) drawDetail(); }
         } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
       };
-      const markBar = h("div", { class: "att-markbar d-flex flex-wrap align-items-center gap-2 mb-2" },
-        h("span", { class: "small fw-semibold" }, icon("list-check", "me-1"), "Pasar asistencia:"),
-        markDate,
-        markOpts.map(o => h("button", {
-          type: "button", class: `btn btn-sm btn-outline-${o.cls}`,
-          onclick: e => saveMark(markDate.value, o.v, e.currentTarget)
-        }, `${o.k} ${o.v === "Justificante" ? "Justif." : o.v}`)),
-        h("span", { class: "small text-body-secondary", text: "Si la fecha aún no tiene columna, se crea al guardar." }));
-
       const gradesTable = gr.components.length
         ? h("table", { class: "table table-sm table-cch mb-0" },
             h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calif." }))),
@@ -3246,11 +3449,16 @@ const Admin = {
               h("tr", { class: "fw-bold" }, h("td", { class: "text-start", text: "Promedio actual" }), h("td", {}), h("td", { text: Fmt.grade(gr.final) }))))
         : h("p", { class: "small text-body-secondary mb-0", text: "Sin ponderaciones." });
 
-      const projects = gr.projects.length ? gr.projects.map(pj => h("div", { class: "mini-card" },
-        h("div", { class: "d-flex justify-content-between" }, h("b", { text: pj.nombre }),
-          pj.team && pj.team.calificacion !== null ? h("span", { class: "badge text-bg-success", text: Fmt.grade(pj.team.calificacion) }) : h("span", { class: "badge text-bg-light border", text: pj.team ? "por calificar" : "sin equipo" })),
-        pj.team ? h("div", { class: "small text-body-secondary", text: `${pj.team.nombre}: ${pj.team.members.map(m => (m.nombre || m.cuenta).split(" ").slice(0, 2).join(" ")).join(", ")}` }) : null,
-        pj.team && pj.team.stars ? h("div", { class: "mt-1" }, pj.rubros.map(r => h("div", { class: "rubric-row small" }, h("span", { text: r }), Parts.starsReadonly(pj.team.stars[r] || 0)))) : null))
+      const projects = gr.projects.length ? gr.projects.map(pj => {
+        const grade = pj.team && pj.team.calificacion !== null
+          ? h("span", { class: "badge text-bg-success", text: Fmt.grade(pj.team.calificacion) })
+          : h("span", { class: "badge text-bg-light border", text: pj.team ? "por calificar" : "sin equipo" });
+        return h("details", { class: "mini-card profile-project" },
+          h("summary", { class: "d-flex justify-content-between align-items-center gap-2" },
+            h("b", { text: pj.nombre }), grade),
+          pj.team ? h("div", { class: "small text-body-secondary mt-2", text: `${pj.team.nombre}: ${pj.team.members.map(m => (m.nombre || m.cuenta).split(" ").slice(0, 2).join(" ")).join(", ")}` }) : null,
+          pj.team && pj.team.stars ? h("div", { class: "mt-1" }, pj.rubros.map(r => h("div", { class: "rubric-row small" }, h("span", { text: r }), Parts.starsReadonly(pj.team.stars[r] || 0)))) : null);
+      })
         : [h("p", { class: "small text-body-secondary mb-0", text: "Sin proyectos." })];
 
       const remove = h("button", {
@@ -3289,13 +3497,23 @@ const Admin = {
         rk.reasons.length ? h("span", { text: rk.reasons.join(" · ") }) : null,
         h("span", { class: "text-body-secondary", text: `Promedio ${Fmt.grade(gr.final)} · ${rk.pct === null ? "—" : `${rk.pct}%`} asistencia · ${gr.attendance && gr.attendance.counts ? gr.attendance.counts.falta : "—"} faltas` }),
         sug.s ? h("span", { class: "ms-auto badge text-bg-dark", text: `PSI: ${sug.s}${sug.r !== "0" ? ` · riesgo ${Psi.RIESGO[sug.r][0].toLowerCase()}` : ""}` }) : null);
+      profileAttendance.replaceChildren(
+        h("div", { class: "d-flex align-items-center gap-2" },
+          h("span", { class: "small fw-semibold text-body-secondary", text: "Fecha" }),
+          markDate),
+        ...markOpts.map(o => h("button", {
+          type: "button",
+          class: `btn btn-sm btn-outline-${o.cls}`,
+          title: o.label,
+          "aria-label": o.label,
+          onclick: e => saveMark(markDate.value, o.v, e.currentTarget)
+        }, o.k)));
       detail.replaceChildren(
         attention,
         h("div", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" },
           h("div", { class: "fw-semibold me-auto" }, icon("journal-text", "me-1"), gr.label), statusSel, remove),
         section("Asistencia", "calendar-check",
           gr.attendance && gr.attendance.dates.length ? [
-            markBar,
             Parts.attendanceStrip(p.cuenta, gr.attendance.dates, gr.attendance.counts.falta, null, async (d, status) => {
               const r = await Api.call("saveRollCall", { idCurso: gr.idCurso, date: d.key, marks: [{ cuenta: p.cuenta, status }] }, "admin");
               Admin.applyRollMark(gr.idCurso, p.cuenta, d.key, status, gr.attendance);
@@ -3304,10 +3522,10 @@ const Admin = {
               return gr.attendance.counts;
             }),
             h("div", { class: "small text-body-secondary mt-1" }, icon("hand-index", "me-1"), "Toca una fecha para cambiar su marca (✓ ✗ J). Para justificar una falta, elige J.")
-          ] : h("div", {}, markBar, h("p", { class: "small text-body-secondary mb-0", text: "Sin registros en este grupo." }))),
+          ] : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros en este grupo." })),
         h("div", { class: "row g-3" },
-          h("div", { class: "col-12 col-lg-6" }, section("Calificaciones", "bar-chart", gradesTable)),
-          h("div", { class: "col-12 col-lg-6" }, section("Proyectos", "people", ...projects))));
+          h("div", { class: "col-12 col-lg-6" }, collapsible("Ponderación y calificaciones", "bar-chart", false, gradesTable)),
+          h("div", { class: "col-12 col-lg-6" }, collapsible("Proyectos", "people", false, ...projects))));
     };
 
     // ---------- Comentarios ----------
@@ -3360,14 +3578,19 @@ const Admin = {
         h("div", { class: "me-auto" },
           h("div", { class: "fs-5 fw-semibold lh-sm", text: p.nombres.join(" / ") || "(sin nombre)" }),
           h("div", { class: "small text-body-secondary" }, h("span", { class: "mono", text: p.cuenta }), ` · ${p.correos.join(", ") || "sin correo"}`)),
+        profileAttendance,
         groups.length > 1 ? h("span", { class: "badge rel-same" }, icon("people-fill"), ` ${groups.length} grupos este ciclo`) : null,
         p.history && p.history.length ? h("span", { class: "badge rel-prev" }, icon("clock-history"), ` ${p.history.length} ciclo(s) antes`) : null,
         p.nombres.length > 1 ? h("span", { class: "badge text-bg-warning", text: "nombres distintos" }) : null),
       groups.length ? cardsRow : h("div", { class: "alert alert-light border small", text: "No está en ningún grupo activo." }),
       detail,
       h("div", { class: "row g-3 mt-1" },
-        h("div", { class: "col-12 col-lg-6" }, collapsible(`Comentarios (${p.comments.length})`, "chat-left-text", true, commentsBox,
-          h("div", { class: "row g-2" }, h("div", { class: "col-12" }, text), h("div", { class: "col-8" }, course), h("div", { class: "col-4 text-end" }, add)))),
+        h("div", { class: "col-12" }, collapsible(`Comentarios (${p.comments.length})`, "chat-left-text", true,
+          h("div", { class: "row g-2 align-items-end mb-3" },
+            h("div", { class: "col-12 col-md-6" }, text),
+            h("div", { class: "col-12 col-md-2" }, course),
+            h("div", { class: "col-12 col-md-2 text-center" }, add)),
+          commentsBox)),
         h("div", { class: "col-12 col-lg-6" },
           collapsible("Evidencias", "cloud-arrow-up", false, ...evidences),
           collapsible("Inscripciones", "diagram-3", false, h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))),

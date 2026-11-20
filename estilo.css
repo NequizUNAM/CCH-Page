@@ -71,6 +71,7 @@ body {
 .app-nav .navbar-brand i { color: var(--cy); }
 .app-nav #btn-admin { background: var(--grad); border: 0; color: #fff; font-weight: 600; }
 .app-nav #btn-admin:hover { filter: brightness(1.1); }
+#sync-status { white-space: nowrap; }
 
 /* ---------- 4. Bienvenida (estilo «gate» del examen) ---------- */
 .welcome-hero {
@@ -456,6 +457,13 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .profile-collapse > summary::-webkit-details-marker { display: none; }
 .profile-collapse > summary::before { content: "\25b8  "; }
 .profile-collapse[open] > summary::before { content: "\25be  "; }
+.profile-project { margin-bottom: .5rem; }
+.profile-project summary { cursor: pointer; list-style: none; }
+.profile-project summary::-webkit-details-marker { display: none; }
+.profile-project summary::before { content: "\25b8  "; margin-right: .25rem; }
+.profile-project[open] summary::before { content: "\25be  "; }
+.profile-attendance,
+.att-markbar { align-items: center; }
 
 /* Captura: Final, Estricta y Entera fijas a la derecha al desplazar. */
 .table-cch .cap-final, .table-cch .cap-strict, .table-cch .cap-entera { min-width: 4.5rem; }

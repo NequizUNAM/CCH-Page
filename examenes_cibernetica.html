@@ -208,6 +208,8 @@
     .tt-in.sm { width:2.1rem; height:2rem; }
     .jcode { background:#0f172a; color:#e2e8f0; border-radius:12px; padding:.75rem .9rem; font:600 .92rem/1.45 'Courier New',monospace; margin:.5rem 0; white-space:pre; overflow-x:auto; user-select:none; }
     .fc-wrap { overflow-x:auto; } .fc { max-width:100%; height:auto; }
+    .scratch-wrap { overflow-x:auto; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; margin:.6rem 0; }
+    .scratch-svg { display:block; max-width:100%; height:auto; }
 </style>
 </head>
 <body>
@@ -1562,13 +1564,12 @@ function procCheck(q, P, ans) {
    ========================================================================== */
 const SECS_J = [
   { id: 'pro', t: 'El problema y la metodología de solución', d: 'Elige la respuesta correcta.', ic: 'bi-lightbulb-fill', c: '#7c3aed' },
-  { id: 'alg', t: 'Algoritmos, diagramas de flujo y pseudocódigo', d: 'Observa cada diagrama o pseudocódigo. En las preguntas abiertas escribe solo el número.', ic: 'bi-diagram-2-fill', c: '#0891b2' },
-  { id: 'exp', t: 'Operadores y expresiones en Java', d: 'Evalúa cada expresión como lo haría Java. Escribe solo el resultado.', ic: 'bi-calculator-fill', c: '#d97706' },
-  { id: 'cic', t: 'Estructuras repetitivas (ciclos)', d: 'Contadores, acumuladores, banderas y ciclos for, while y do-while.', ic: 'bi-arrow-repeat', c: '#16a34a' },
-  { id: 'jav', t: 'Lenguajes de programación y el entorno de Java', d: 'Elige la respuesta correcta.', ic: 'bi-cup-hot-fill', c: '#e11d48' },
-  { id: 'cod', t: 'Codificación en Java: datos, entrada y condicionales', d: 'Lee cada fragmento de código y elige o escribe lo que se pide.', ic: 'bi-code-slash', c: '#2563eb' }
+  { id: 'alg', t: 'Algoritmos, diagramas de flujo y pseudocódigo', d: 'Observa diagramas, bloques Scratch y pseudocódigo; responde según se indique.', ic: 'bi-diagram-2-fill', c: '#0891b2' },
+  { id: 'exp', t: 'Expresiones aritméticas y lógica', d: 'Evalúa expresiones y operadores siguiendo la jerarquía lógica.', ic: 'bi-calculator-fill', c: '#d97706' },
+  { id: 'cic', t: 'Scratch, vectores y estructuras repetitivas', d: 'Ciclos, contadores, acumuladores, banderas y acceso a listas.', ic: 'bi-arrow-repeat', c: '#16a34a' }
 ];
 const intRule = { re: /[^0-9-]/g, ic: 'bi-123', im: 'text', up: true, max: 8, txt: 'Responde <b>solo con el número entero</b>, sin espacios (puede llevar signo −).', warn: 'Solo se permiten números y el signo menos.' };
+const textRule = { re: /[^A-ZÁÉÍÓÚÑ0-9 .¿?¡!_-]/gi, ic: 'bi-text-left', im: 'text', up: true, max: 120, txt: 'Escribe el texto solicitado, sin respuestas adicionales.', warn: 'Usa letras, números y espacios.' };
 const decRule = { re: /[^0-9.\-]/g, ic: 'bi-123', im: 'decimal', up: true, max: 10, txt: 'Responde <b>solo con el número</b>. Si el resultado es de tipo <b>double</b>, escribe el punto decimal (por ejemplo <span class="mono">4.0</span> o <span class="mono">2.5</span>).', warn: 'Solo se permiten números, punto decimal y signo menos.' };
 const boolRule = { re: /[^A-Z]/g, ic: 'bi-toggle-on', im: 'text', up: true, max: 5, txt: 'Responde <b>true</b> o <b>false</b>.', warn: 'Escribe true o false.' };
 const jcode = s => `<pre class="jcode">${esc(s)}</pre>`;
@@ -1738,6 +1739,137 @@ function fcLoop(p) {               // Inicio → Leer → inicialización → ¿
 }
 const jtrunc = (a, b) => Math.trunc(a / b);
 const jdec = x => Number.isInteger(x) ? x.toFixed(1) : String(+x.toFixed(6));
+function buildP2Unit3(tipo, seed) {
+  const rnd = mulberry32((seed ^ ({ A: 0x1B873593, B: 0xCC9E2D51, C: 0x27D4EB2F }[tipo])) >>> 0);
+  const qs = [];
+  const push = q => { qs.push(q); return q; };
+
+  /* Bloque I: fundamentos y metodología EPS */
+  push(mcQ('pro', '¿Cuál describe mejor un problema determinístico?', 'Calcular el área de un triángulo a partir de una base y una altura conocidas.', ['Predecir cuántos alumnos entrarán al laboratorio.', 'Lanzar dos dados al azar.', 'Generar un enemigo en una coordenada aleatoria.'], rnd, 'Comprender'));
+  push(mcQ('pro', '¿Cuál es el orden correcto de la metodología de solución de problemas?', 'Planteamiento/análisis → diseño → prueba de escritorio → redacción final y depuración.', ['Diseño → prueba → análisis → redacción final.', 'Redacción final → prueba → análisis → diseño.', 'Prueba de escritorio → diseño → planteamiento → redacción final.'], rnd, 'Comprender'));
+  push(mcQ('pro', 'Un algoritmo solicita cinco calificaciones, las suma y divide entre cinco sin decisiones ni repeticiones dinámicas. ¿Qué estructura usa?', 'Secuencial.', ['Condicional múltiple', 'Probabilística', 'Cíclica'], rnd, 'Comprender'));
+  push(mcQ('pro', '¿Qué caracteriza a una variable bandera (flag)?', 'Guarda Verdadero/Falso para indicar si ocurrió un evento.', ['Cuenta ocurrencias de uno en uno.', 'Acumula siempre valores numéricos.', 'Guarda obligatoriamente el nombre del jugador.'], rnd, 'Recordar'));
+  push(mcQ('pro', 'En el análisis EPS del riego automático, ¿qué es la entrada principal?', 'El porcentaje de humedad de la tierra.', ['El texto “Encendida” o “Apagada”.', 'La operación humedad < 30.', 'El estado final de la bomba.'], rnd, 'Analizar'));
+
+  /* Bloque II: expresiones y lógica */
+  push(openQ('exp', 'Evalúa: <span class="mono">resultado ← 20 - 12 / 4 * 2 + 5 MOD 2</span>. Escribe solo el resultado.', '15', intRule, 'num', 'Aplicar')).hlp = 'ari';
+  push(mcQ('exp', 'En Scratch, el bloque módulo (17, 5) devuelve…', '2; permite detectar pares, impares y múltiplos.', ['3; calcula cocientes enteros.', '3.4; realiza divisiones decimales.', '0; reinicia acumuladores.'], rnd, 'Comprender'));
+  push(mcQ('exp', '¿Qué operador Scratch representa la conjunción AND?', 'el bloque «y» entre dos condiciones.', ['el bloque «o» entre dos condiciones.', 'el bloque «no» alrededor de una condición.', 'el bloque «preguntar y esperar».'], rnd, 'Recordar'));
+  push(mcQ('exp', 'Con torta = Verdadero, refresco = Verdadero y lloviendo = Verdadero, ¿qué se imprime?', 'Me quedo en casa.', ['Salgo a comprar.', 'No lloviendo.', 'Verdadero.'], rnd, 'Aplicar'));
+  push(mcQ('exp', 'Con A = Verdadero, B = Falso y C = Verdadero: <span class="mono">(NO A O B) Y C</span> vale…', 'Falso.', ['Verdadero.', 'Nulo.', 'No es posible evaluarla.'], rnd, 'Aplicar'));
+  push(mcQ('exp', '¿Qué expresión permite aprobar por promedio y asistencia, o por ganar el concurso?', '(promedio >= 6.0 Y asistencia >= 80) O concurso == Verdadero', ['(promedio >= 6.0 O asistencia >= 80) Y concurso', 'NO (promedio >= 6.0 Y asistencia >= 80) O concurso', 'promedio >= 6.0 Y asistencia >= 80 Y NO concurso'], rnd, 'Analizar'));
+  push(mcQ('exp', 'Con x = 8, y = 3 y escudo = Falso, ¿qué vale <span class="mono">NO escudo O (x < 5)</span>?', 'Verdadero.', ['Falso.', '0.', 'No definido.'], rnd, 'Aplicar'));
+  push(mcQ('exp', '¿Qué instrucción calcula correctamente la raíz positiva <span class="mono">x = (-b + RAIZ(b^2 - 4ac))/(2a)</span>?', 'x ← (-b + RAIZ(b ^ 2 - 4 * a * c)) / (2 * a)', ['x ← -b + RAIZ(b ^ 2 - 4 * a * c) / 2 * a', 'x ← RAIZ(-b + b ^ 2 - 4 * a * c)', 'x ← (-b + b ^ 2 - 4 * a * c) / RAIZ(2 * a)'], rnd, 'Crear'));
+  push(mcQ('exp', '¿Qué tipo primitivo debe almacenar el estado vivo/eliminado de un personaje?', 'Lógico (booleano).', ['Entero', 'Real', 'Caracter'], rnd, 'Comprender'));
+
+  /* Bloque III: símbolos y trazado de diagramas */
+  push(mcQ('alg', '¿Qué símbolo representa una decisión que divide el flujo en Sí/No?', 'Rombo.', ['Rectángulo', 'Óvalo', 'Paralelogramo'], rnd, 'Recordar'));
+  push(mcQ('alg', '¿Qué regla es obligatoria en una decisión estructurada?', 'Debe tener una entrada y dos salidas claramente etiquetadas.', ['Debe tener tres entradas y una salida.', 'Las flechas pueden cruzarse sin sentido.', 'Debe contener obligatoriamente un ciclo.'], rnd, 'Comprender'));
+  push(mcQ('alg', '¿Cómo se distingue visualmente una estructura cíclica?', 'Una flecha regresa desde un proceso hacia un rombo de decisión.', ['Tres óvalos aparecen consecutivamente.', 'El rombo tiene cuatro salidas.', 'Los rectángulos no tienen flechas de salida.'], rnd, 'Comprender'));
+  push(mcQ('alg', 'Un diagrama continúa arriba en la misma hoja. ¿Qué conector se usa?', 'Conector de misma página.', ['Conector fuera de página.', 'Terminal adicional.', 'Línea de flujo sin flecha.'], rnd, 'Recordar'));
+  push(mcQ('alg', `Identifica cada nodo del diagrama.<div class="my-2 fc-wrap">${scratchFlowSVG()}</div>`, '1 terminal, 2 entrada/salida, 3 proceso, 4 decisión, 5 línea de flujo.', ['1 proceso, 2 terminal, 3 decisión, 4 entrada/salida, 5 conector.', 'Todos son procesos.', '1 decisión, 2 terminal, 3 entrada/salida, 4 proceso, 5 conector.'], rnd, 'Analizar'));
+  push(openQ('alg', `Si pts = 50, ¿qué mensaje sigue el diagrama?<div class="my-2 fc-wrap">${scratchFlowSVG()}</div>`, 'NIVEL 2', textRule, 'exact', 'Aplicar')).hlp = 'fc';
+  push(mcQ('alg', '¿Qué tipo de estructura condicional representa el diagrama anterior?', 'Condicional doble: Si–Entonces–SiNo.', ['Condicional simple.', 'Condicional múltiple sin SiNo.', 'Ciclo para.'], rnd, 'Comprender'));
+
+  /* Bloque IV: Scratch, ciclos y vector */
+  push(mcQ('cic', 'Con pasos = 1 y el ciclo por siempre sumando 2, ¿qué valor mueve el personaje en la tercera iteración?', '5 pasos.', ['3 pasos', '7 pasos', '1 paso'], rnd, 'Aplicar'));
+  push(mcQ('cic', '¿Por qué un bloque por siempre puede bloquear cálculos sin condición de parada?', 'Crea un ciclo infinito que impide continuar hacia las siguientes instrucciones.', ['Detiene automáticamente el programa al primer cálculo.', 'Solo puede sumar números enteros.', 'Cambia todas las variables a cero.'], rnd, 'Comprender'));
+  push(mcQ('cic', 'En <span class="mono">Para i ← 10 Hasta 1 Con Paso -1</span>, ¿cuál es el límite?', 'i debe llegar a 1 (condición i >= 1).', ['i comienza en 1.', 'El paso modifica i sumando 10.', 'No existe condición de parada.'], rnd, 'Comprender'));
+  push(mcQ('cic', '¿Cuál es la diferencia central entre Mientras y Hacer-Mientras?', 'Hacer-Mientras ejecuta el cuerpo al menos una vez antes de evaluar la condición.', ['Mientras siempre ejecuta dos veces.', 'Hacer-Mientras no usa condición.', 'No existe diferencia.'], rnd, 'Comprender'));
+  push(mcQ('cic', `El vector Monedas contiene 10, 25 y 15 y el sprite inicia en x = -100.<div class="my-2">${scratchVectorSVG()}</div>¿Cuál será la X final?`, '50', ['0', '35', '150'], rnd, 'Aplicar')).hlp = 'loop';
+  push(mcQ('cic', `Observa el vector Monedas y responde cuánto suma “decir (total)”.<div class="my-2">${scratchVectorSVG()}</div>`, '50; i es el índice o contador de acceso.', ['35; i guarda el valor de cada moneda.', '15; i cuenta las repeticiones.', '60; i es una bandera lógica.'], rnd, 'Analizar'));
+  push(mcQ('cic', '¿Qué representa el pseudocódigo equivalente al recorrido del vector base 0?', 'Para i desde 0 hasta 2 se suman Monedas[i] y se incrementa posX.', ['Se recorren los elementos de 1 hasta 3 multiplicados por i.', 'Solo se procesa el primer elemento.', 'Se reinicia Monedas en cada vuelta.'], rnd, 'Crear'));
+
+  /* Bloque V: equivalencias entre paradigmas */
+  push(mcQ('alg', '¿Qué equivale al bloque Scratch «por siempre»?', 'Mientras (Verdadero) Hacer.', ['Repetir 10 veces.', 'Si–Entonces–SiNo.', 'Escribir mensaje.'], rnd, 'Comprender'));
+  push(mcQ('alg', '¿Qué equivale al bloque «repetir (10) veces»?', 'Para i ← 1 Hasta 10 Con Paso 1.', ['Repetir hasta que se cumpla la condición.', 'Mientras (Verdadero).', 'Leer dato.'], rnd, 'Comprender'));
+  push(mcQ('alg', `Conecta cada nodo con su equivalente.<div class="my-2">${scratchConnectionSVG()}</div>`, '1-B, 2-D, 3-A, 4-C.', ['1-A, 2-C, 3-B, 4-D.', '1-D, 2-B, 3-C, 4-A.', '1-C, 2-A, 3-D, 4-B.'], rnd, 'Analizar'));
+  push(mcQ('alg', '¿Qué representa el nodo 3 “elemento (i) de [Vector]”?', 'valor ← Vector[i - 1] cuando Scratch usa índices desde 1.', ['Una decisión condicional.', 'Una entrada desde teclado.', 'Un ciclo infinito.'], rnd, 'Analizar'));
+  push(mcQ('alg', '¿Qué equivale al bloque Scratch “preguntar [Dato?] y esperar”?', 'Leer dato mediante un paralelogramo de entrada.', ['Mientras (Verdadero) Hacer.', 'Repetir hasta que termine.', 'Una salida en pantalla.'], rnd, 'Comprender'));
+
+  /* Bloque VI: prueba de escritorio y diseño */
+  push(mcQ('alg', '¿Cuál es el propósito principal de una prueba de escritorio?', 'Simular paso a paso el algoritmo y registrar las variables para detectar errores lógicos.', ['Decorarlo con colores.', 'Convertir automáticamente pseudocódigo a Scratch.', 'Eliminar contadores.'], rnd, 'Comprender'));
+  push(mcQ('alg', 'Para c = 1 hasta 4, suma solo los pares. ¿Qué suma queda al final?', '6.', ['0', '4', '10'], rnd, 'Aplicar'));
+  push(mcQ('alg', '¿Cuál es la corrección al pseudocódigo donde suma empieza en 10 y se sobrescribe con calificacion?', 'Inicializar suma = 0 y usar suma ← suma + calificacion.', ['Conservar suma = 10 y imprimir calificacion.', 'Eliminar el ciclo y leer una sola nota.', 'Asignar promedio ← calificacion.'], rnd, 'Analizar'));
+  push(mcQ('alg', '¿Qué diferencia existe entre contador y acumulador?', 'El contador cambia por una cantidad fija; el acumulador suma valores variables.', ['Ambos siempre aumentan de uno en uno.', 'El contador guarda texto y el acumulador banderas.', 'No existe diferencia.'], rnd, 'Comprender'));
+  push(openQ('alg', 'V = [4, 6, 2, 8]. Recorre de 0 a 3 y acumula solo elementos mayores que 4. ¿Qué imprime acum?', '14', intRule, 'num', 'Analizar')).hlp = 'pseudo';
+  push(mcQ('alg', `Con llaves = 2 y alarmaActiva = Verdadero, ¿qué bloque ejecuta la agrupación?<div class="my-2">${scratchNestedSVG()}</div>`, 'Acceso denegado.', ['Puerta abierta.', 'Ninguna acción.', 'Se abre y se activa la alarma.'], rnd, 'Analizar'));
+  push(mcQ('alg', '¿Qué estructura completa el algoritmo que pide N y calcula su tabla del 1 al 10 solo si N > 0?', 'Si (N > 0) Entonces + Para i ← 1 hasta 10 + SiNo + mensaje.', ['Un Mientras infinito sin condición.', 'Solo un Para sin validar N.', 'Una decisión que imprime todos los resultados sin ciclo.'], rnd, 'Crear'));
+  return qs;
+}
+/* Representaciones accesibles y responsivas de vectores, bloques Scratch y diagramas del segundo parcial */
+function scratchVectorSVG() {
+  return `<div class="scratch-wrap"><svg class="scratch-svg" viewBox="0 0 680 285" width="680" role="img" aria-label="Bloques Scratch y vector Monedas con desplazamiento en el eje X">
+    <defs><marker id="sv-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 1 L10 5 L0 9z" fill="#1d4ed8"/></marker></defs>
+    <g transform="translate(10,10)" font-family="Segoe UI,Arial">
+      <rect x="0" y="0" width="320" height="265" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="160" y="22" text-anchor="middle" font-size="12" font-weight="800" fill="#0f172a">Bloques Scratch</text>
+      <rect x="12" y="35" width="296" height="28" rx="12" fill="#ffbf00"/><text x="24" y="54" font-size="11" font-weight="700" fill="#fff">al hacer clic en bandera</text>
+      <rect x="12" y="68" width="296" height="28" rx="12" fill="#ff8c1a"/><text x="24" y="87" font-size="11" font-weight="700" fill="#fff">dar a [total] el valor (0)</text>
+      <rect x="12" y="101" width="296" height="28" rx="12" fill="#4c97ff"/><text x="24" y="120" font-size="11" font-weight="700" fill="#fff">fijar x a (-100)</text>
+      <rect x="12" y="134" width="296" height="28" rx="12" fill="#ff8c1a"/><text x="24" y="153" font-size="11" font-weight="700" fill="#fff">dar a [i] el valor (1)</text>
+      <rect x="12" y="167" width="296" height="70" rx="12" fill="#ffab19"/><text x="24" y="188" font-size="11" font-weight="700" fill="#fff">repetir (3) veces</text>
+      <rect x="28" y="194" width="264" height="30" rx="10" fill="#4c97ff"/><text x="40" y="214" font-size="10.5" font-weight="700" fill="#fff">mover (50) pasos</text>
+      <rect x="28" y="231" width="264" height="28" rx="10" fill="#ff8c1a"/><text x="40" y="250" font-size="10" font-weight="700" fill="#fff">sumar a [total] (elemento (i) de [Monedas])</text>
+    </g>
+    <g transform="translate(350,10)" font-family="Segoe UI,Arial">
+      <rect x="0" y="0" width="320" height="105" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="160" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#0f172a">Vector Monedas · longitud 3</text>
+      ${[['10','Scratch 1 | Pos 0'],['25','Scratch 2 | Pos 1'],['15','Scratch 3 | Pos 2']].map((v,i)=>`<g transform="translate(${20+i*100},34)"><rect width="80" height="38" rx="5" fill="#fff7ed" stroke="#f97316" stroke-width="2"/><text x="40" y="25" text-anchor="middle" font-size="15" font-weight="800" fill="#9a3412">${v[0]}</text><text x="40" y="58" text-anchor="middle" font-size="9.5" fill="#475569">${v[1]}</text></g>`).join('')}
+    </g>
+    <g transform="translate(350,140)" font-family="Segoe UI,Arial">
+      <rect x="0" y="0" width="320" height="135" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+      <text x="160" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#1e3a8a">Desplazamiento en el eje X</text>
+      <line x1="20" y1="82" x2="300" y2="82" stroke="#64748b" stroke-width="2"/>
+      <line x1="160" y1="40" x2="160" y2="115" stroke="#94a3b8" stroke-dasharray="4 3"/>
+      <text x="164" y="48" font-size="10" fill="#475569">x = 0</text>
+      <circle cx="55" cy="82" r="9" fill="#2563eb"/><text x="55" y="112" text-anchor="middle" font-size="10" fill="#1e40af">Inicio (-100)</text>
+      <line x1="68" y1="82" x2="245" y2="82" stroke="#1d4ed8" stroke-width="2" marker-end="url(#sv-arrow)"/>
+      <text x="160" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#1e3a8a">+50 pasos × 3 veces</text>
+      <circle cx="255" cy="82" r="9" fill="#059669"/><text x="255" y="112" text-anchor="middle" font-size="10" font-weight="800" fill="#065f46">Final (?)</text>
+    </g>
+  </svg></div>`;
+}
+
+function scratchFlowSVG() {
+  return `<div class="scratch-wrap"><svg class="scratch-svg" viewBox="0 0 420 320" width="420" role="img" aria-label="Diagrama de flujo con entrada, proceso, decisión y salida">
+    <defs><marker id="sf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 1 L10 5 L0 9z" fill="#1e293b"/></marker></defs>
+    <rect x="130" y="6" width="110" height="30" rx="15" fill="#dbeafe" stroke="#2563eb"/><text x="185" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a8a">Inicio</text>
+    <path d="M185 36V56" stroke="#1e293b" marker-end="url(#sf-arrow)"/>
+    <polygon points="130,58 255,58 238,90 113,90" fill="#fef3c7" stroke="#d97706"/><text x="184" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Leer pts</text>
+    <path d="M185 90V112" stroke="#1e293b" marker-end="url(#sf-arrow)"/>
+    <rect x="110" y="112" width="150" height="32" fill="#e0e7ff" stroke="#4f46e5"/><text x="185" y="132" text-anchor="middle" font-size="11" font-weight="700" fill="#312e81">bonus ← pts + 50</text>
+    <path d="M185 144V168" stroke="#1e293b" marker-end="url(#sf-arrow)"/>
+    <polygon points="185,168 258,202 185,236 112,202" fill="#fce7f3" stroke="#db2777"/><text x="185" y="206" text-anchor="middle" font-size="11" font-weight="700" fill="#831843">bonus ≥ 100</text>
+    <path d="M112 202H62V246" stroke="#1e293b" fill="none" marker-end="url(#sf-arrow)"/><text x="82" y="195" font-size="10" font-weight="800" fill="#dc2626">NO</text>
+    <polygon points="24,246 112,246 102,272 14,272" fill="#fef3c7" stroke="#d97706"/><text x="63" y="263" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Reintenta</text>
+    <path d="M258 202H312V246" stroke="#1e293b" fill="none" marker-end="url(#sf-arrow)"/><text x="278" y="195" font-size="10" font-weight="800" fill="#059669">SÍ</text>
+    <polygon points="274,246 360,246 350,272 264,272" fill="#fef3c7" stroke="#d97706"/><text x="312" y="263" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Nivel 2</text>
+    <path d="M62 272V292H128M312 272V292H242" stroke="#1e293b" fill="none" marker-end="url(#sf-arrow)"/>
+    <rect x="130" y="278" width="110" height="28" rx="14" fill="#dbeafe" stroke="#2563eb"/><text x="185" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a8a">Fin</text>
+  </svg></div>`;
+}
+
+function scratchConnectionSVG() {
+  return `<div class="scratch-wrap"><svg class="scratch-svg" viewBox="0 0 680 275" width="680" role="img" aria-label="Conexión entre bloques Scratch, pseudocódigo y diagrama">
+    <text x="125" y="16" text-anchor="middle" font-size="11" font-weight="800" fill="#1e3a8a">BLOQUES SCRATCH</text><text x="535" y="16" text-anchor="middle" font-size="11" font-weight="800" fill="#1e3a8a">PSEUDOCÓDIGO / DIAGRAMA</text>
+    ${[['por siempre','B','Mientras (Verdadero) Hacer'],['si… entonces… si no','D','Si … Entonces … SiNo'],['elemento (i) de [Vector]','A','valor ← Vector[i - 1]'],['preguntar y esperar','C','Leer dato']].map((n,i)=>`<g transform="translate(10,${28+i*58})"><rect width="210" height="40" rx="9" fill="${i===1?'#ffab19':i===2?'#ff661a':i===3?'#5cb1d6':'#ffab19'}"/><text x="12" y="25" font-size="10.5" font-weight="700" fill="#fff">${n[0]}</text><circle cx="232" cy="20" r="9" fill="#fff" stroke="#0f172a" stroke-width="2"/><text x="232" y="24" text-anchor="middle" font-size="10" font-weight="800">${i+1}</text></g><g transform="translate(425,${28+i*58})"><circle cx="-22" cy="20" r="9" fill="#fff" stroke="#0f172a"/><text x="-22" y="24" text-anchor="middle" font-size="10" font-weight="800">${n[1]}</text><rect width="245" height="44" rx="6" fill="${n[1]=='C'?'#fef3c7':'#1e293b'}"/><text x="10" y="20" font-size="10.5" font-weight="700" fill="${n[1]=='C'?'#92400e':'#38bdf8'}">${n[2]}</text></g>`).join('')}
+  </svg></div>`;
+}
+
+function scratchNestedSVG() {
+  return `<div class="scratch-wrap"><svg class="scratch-svg" viewBox="0 0 640 125" width="640" role="img" aria-label="Bloques Scratch anidados con operador lógico y">
+    <rect x="10" y="8" width="610" height="110" rx="8" fill="#ffab19" stroke="#cf8b17"/>
+    <text x="20" y="27" font-size="12" font-weight="800" fill="#fff">si</text>
+    <rect x="44" y="12" width="180" height="22" rx="11" fill="#40bf4a"/><text x="134" y="27" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">(llaves) = (2)</text>
+    <text x="234" y="27" font-size="11" font-weight="800" fill="#fff">y</text>
+    <rect x="256" y="12" width="260" height="22" rx="11" fill="#40bf4a"/><text x="386" y="27" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">no &lt;alarmaActiva = Verdadero&gt;</text>
+    <text x="530" y="27" font-size="11" font-weight="800" fill="#fff">entonces</text>
+    <rect x="34" y="41" width="210" height="20" rx="3" fill="#9966ff"/><text x="44" y="55" font-size="10.5" font-weight="700" fill="#fff">decir "Puerta abierta"</text>
+    <text x="20" y="78" font-size="12" font-weight="800" fill="#fff">si no</text>
+    <rect x="34" y="86" width="210" height="18" rx="3" fill="#9966ff"/><text x="44" y="99" font-size="10.5" font-weight="700" fill="#fff">decir "Acceso denegado"</text>
+  </svg></div>`;
+}
 function buildP2(tipo, seed) {
   const rnd = mulberry32((seed ^ ({ A: 0x1B873593, B: 0xCC9E2D51, C: 0x27D4EB2F }[tipo])) >>> 0), qs = [], push = q => { qs.push(q); return q; };
   const R = (a, b) => a + Math.floor(rnd() * (b - a + 1)), T = k => BANKJ[k][tipo];
@@ -1818,7 +1950,7 @@ function buildP2(tipo, seed) {
    ========================================================================== */
 const EXAMS = {
   1: { titulo: 'Primer parcial', secs: [...SECS1, ...SECS2, ...SECS_NEW], build: buildP1 },     // unificado: sistemas numéricos, compuertas, tablas, Karnaugh y circuitos
-  2: { titulo: 'Segundo parcial', secs: SECS_J, build: buildP2 }                               // Unidad 3: metodología de solución de problemas y Java
+  2: { titulo: 'Segundo parcial', secs: SECS_J, build: buildP2Unit3 }                          // Unidad 3: metodología, pseudocódigo, Scratch y vectores
 };
 /* Elige k preguntas repartidas por sección (proporcional, mínimo 1 por sección) y conserva el orden original. Es determinista con la semilla. */
 function pickQs(qs, k, rnd) {
@@ -1832,11 +1964,33 @@ function pickQs(qs, k, rnd) {
   return qs.filter((q, i) => keep.has(i));
 }
 /* n = preguntas habilitadas (sin contar el bonus). Las mismas n preguntas salen siempre para la misma semilla. */
-const buildExam = (parcial, tipo, seed, n) => {
+const buildExam = (parcial, tipo, seed, n, edits = QUESTION_EDITS) => {
   const all = EXAMS[parcial].build(tipo, seed), base = all.filter(q => !q.bonus), bonus = all.filter(q => q.bonus);
   const qs = pickQs(base, effN(n, base.length), mulberry32((seed ^ 0x5DEECE66) >>> 0)).concat(bonus);
-  qs.forEach((q, i) => q.id = i + 1); return qs;
+  qs.forEach((q, i) => q.id = i + 1); return prepareQuestionEdits(qs, edits);
 };
+function questionEditKey(q) {
+  const source = JSON.stringify([q.sec, q.html, q.opts.map(String).sort()]);
+  const hash = seed => { let value = seed; for (let i = 0; i < source.length; i++) { value ^= source.charCodeAt(i); value = Math.imul(value, 16777619); } return (value >>> 0).toString(16).padStart(8, '0'); };
+  return hash(2166136261) + hash(2654435761);
+}
+const escapeQuestionText = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])).replace(/\r?\n/g, '<br>');
+function prepareQuestionEdits(questions, edits = {}) {
+  questions.forEach(q => {
+    if (q.kind !== 'mc') return;
+    const sources = q.opts.map(String), key = questionEditKey({ sec: q.sec, html: q.html, opts: sources });
+    q.editKey = key; q.editSources = sources; q.editOriginalHtml = q.html; q.editOverride = edits[key] || null;
+    const edit = q.editOverride;
+    if (!edit) return;
+    if (typeof edit.prompt === 'string') q.html = escapeQuestionText(edit.prompt);
+    const optionEdits = new Map((edit.options || []).map(item => [String(item.source), item.text]));
+    q.opts = sources.map(source => optionEdits.has(source) ? escapeQuestionText(optionEdits.get(source)) : source);
+    const correct = sources.indexOf(String(edit.correctSource));
+    if (correct >= 0) q.correct = correct;
+  });
+  return questions;
+}
+const questionEditKeys = (parcial, tipo, seed, n) => buildExam(parcial, tipo, seed, n, {}).filter(q => q.kind === 'mc').map(q => q.editKey);
 function gradeQ(q, v) {
   if (v === undefined || v === null || v === '') return false;
   if (q.kind === 'mc') return +v === q.correct;
@@ -1903,6 +2057,7 @@ const limiteMs = () => (S.cierre || S.start + CFG.DURACION_MIN * 60000) - CFG.PE
 let CLK = false;       // ¿el administrador activó el cronómetro visible? (por defecto NO)
 const applyClock = () => { const t = $('#timer'); if (t) t.classList.toggle('d-none', !CLK); };
 let S = null, EXAM = [], timerId = null, away = false, examActive = false, ADMIN = null;
+var QUESTION_EDITS = {};
 try { const l = (LS.get(LAST) || '').split(':'); S = l.length === 2 ? loadLocal(l[0], l[1]) : JSON.parse(LS.get(KEY) || 'null'); } catch (e) { S = null; }
 const save = () => { if (S) { LS.set(skey(S.parcial, S.cuenta), JSON.stringify(S)); LS.set(LAST, S.parcial + ':' + S.cuenta); } };
 const clearState = () => { if (S) LS.del(skey(S.parcial, S.cuenta)); S = null; LS.del(LAST); LS.del(KEY); };
@@ -2012,7 +2167,7 @@ $('#form-datos').addEventListener('submit', async e => {
   if (!$('#d-ok').checked) { err.textContent = 'Marca la casilla para confirmar que leíste las reglas.'; err.hidden = false; return; }
   const btn = $('#btn-comenzar'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando…';
   const r = $('#d-ok') && randBytes(), tipo = 'ABC'[r[1] % 3], seed = r[0] >>> 0, inicio = new Date().toISOString();
-  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
+  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), questionKeys: questionEditKeys(PARCIAL, tipo, seed, PREGN), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-play-circle-fill me-1"></i>Comenzar examen';
   if (!res.ok) {
     if (res.code === 'duplicado') showAlert('Examen ya respondido', `El examen del <b>${EXAMS[PARCIAL].titulo}</b> ya fue respondido anteriormente con el número de cuenta <b>${esc(cuenta)}</b>. No es posible presentarlo de nuevo.<br><small class="text-muted">Si crees que es un error, habla con tu profesor(a).</small>`);
@@ -2024,10 +2179,10 @@ $('#form-datos').addEventListener('submit', async e => {
   }
   if (res.resumed) {          // el servidor ya tenía este examen en curso: se continúa con el mismo tipo, reloj y respuestas
     const pr = res.progreso || {}, loc = loadLocal(PARCIAL, cuenta), mismo = loc && !loc.fin && (loc.seed >>> 0) === (res.seed >>> 0);
-    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid };
+    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
     save(); startExam(true); if (res.cerrar) { toast('Tu profesor(a) cerró tu examen: tus respuestas se enviaron.', 'bi-lock-fill', 5000); finish('admin'); } return;
   }
-  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid };
+  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
   save(); startExam(false);
 });
 
@@ -2097,6 +2252,7 @@ function questionsHTML(exam, secs, opt = {}) {
 
 /* ===== 3. Examen ===== */
 function startExam(resume) {
+  QUESTION_EDITS = S.questionEdits || {};
   EXAM = buildExam(S.parcial, S.tipo, S.seed, S.n);
   $('#bar-titulo').textContent = `Cibernética 1 · ${EXAMS[S.parcial].titulo}`;
   $('#bar-alumno').textContent = `${S.nombre} · ${S.cuenta} · Gpo. ${S.grupo}`;

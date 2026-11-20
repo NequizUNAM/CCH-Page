@@ -12,8 +12,8 @@ document.body.insertAdjacentHTML('beforeend', '<div id="scr-admin" class="screen
 /* ==========================================================================
    PANEL DEL ADMINISTRADOR
    ========================================================================== */
-const AD = { tab: 'resumen', par: '0', rows: [], cfg: null, q: '', pvP: 1, pvT: 'A', pvSeed: 20250101 };
-const ADTABS = [['resumen', 'bi-bar-chart-line-fill', 'Resumen'], ['met', 'bi-clipboard-data-fill', 'Métricas'], ['res', 'bi-table', 'Resultados'], ['alu', 'bi-person-lines-fill', 'Por alumno'], ['clv', 'bi-key-fill', 'Contraseñas'], ['prev', 'bi-eye-fill', 'Vista previa']];
+const AD = { tab: 'resumen', par: '0', rows: [], cfg: null, q: '', pvP: 1, pvT: 'A', pvSeed: 20250101, qeP: 1, qeT: 'A', qeSeed: 20250101, qeKey: '', questionSnapshots: {}, questionSnapshotErrors: {}, questionSnapshotLoading: '' };
+const ADTABS = [['resumen', 'bi-bar-chart-line-fill', 'Resumen'], ['met', 'bi-clipboard-data-fill', 'Métricas'], ['res', 'bi-table', 'Resultados'], ['alu', 'bi-person-lines-fill', 'Por alumno'], ['clv', 'bi-key-fill', 'Contraseñas'], ['prev', 'bi-eye-fill', 'Vista previa'], ['questions', 'bi-pencil-square', 'Editar preguntas']];
 async function openAdmin() { show('admin'); await loadAdmin(); }
 /* El panel se actualiza como máximo cada minuto (también con F5): mientras, se muestran los últimos datos guardados en este equipo. */
 const AD_WAIT = 60000, ADK = 'eq_adm_' + (CFG.MATERIA || 'cib');
@@ -46,7 +46,7 @@ async function loadAdmin(force) {
 function adminLogout() { ADMIN = null; try { parent.postMessage({ cchExam: 'logout' }, location.origin); } catch (e) { } }
 $('#ad-refresh').onclick = () => loadAdmin(false);
 function renderTabs() { $('#ad-tabs').innerHTML = ADTABS.map(([k, ic, n]) => `<li class="nav-item"><button class="nav-link ${AD.tab === k ? 'active' : ''}" data-adtab="${k}"><i class="bi ${ic} me-1"></i>${n}</button></li>`).join(''); }
-function renderAdmin() { renderTabs(); ({ resumen: adResumen, met: adMetricas, res: adResultados, alu: adAlumno, clv: adClaves, prev: adPrev })[AD.tab](); }
+function renderAdmin() { renderTabs(); ({ resumen: adResumen, met: adMetricas, res: adResultados, alu: adAlumno, clv: adClaves, prev: adPrev, questions: adQuestions })[AD.tab](); }
 document.addEventListener('click', e => { const t = e.target.closest('[data-adtab]'); if (t) { AD.tab = t.dataset.adtab; renderAdmin(); } });
 const parBtns = () => `<div class="d-flex flex-wrap gap-2 mb-3">${[['0', 'Todos'], ['1', 'Parcial 1'], ['2', 'Parcial 2']].map(([k, n]) => `<button class="btn-chip ${AD.par === k ? 'on' : ''}" data-adpar="${k}">${n}</button>`).join('')}</div>`;
 document.addEventListener('click', e => { const t = e.target.closest('[data-adpar]'); if (t) { AD.par = t.dataset.adpar; renderAdmin(); } });
@@ -189,9 +189,92 @@ async function saveClave(p) {
 }
 document.addEventListener('keydown', e => { const i = e.target.closest && e.target.closest('[data-clave-input]'); if (i && e.key === 'Enter') { e.preventDefault(); saveClave(+i.dataset.claveInput); } });
 function adPrev() {
-  const secs = EXAMS[AD.pvP].secs, ex = buildExam(AD.pvP, AD.pvT, AD.pvSeed, effN(AD.cfg && AD.cfg['preguntas' + AD.pvP], availOf(AD.pvP))), { html } = questionsHTML(ex, secs, { p: 'pv', key: true });
+  const edits = ((AD.cfg || {}).questionEdits || {})[AD.pvP] || {};
+  const secs = EXAMS[AD.pvP].secs, ex = buildExam(AD.pvP, AD.pvT, AD.pvSeed, effN(AD.cfg && AD.cfg['preguntas' + AD.pvP], availOf(AD.pvP)), edits), { html } = questionsHTML(ex, secs, { p: 'pv', key: true });
   $('#ad-body').innerHTML = `<div class="nav-card mb-3"><div class="d-flex flex-wrap gap-2 align-items-center"><b class="me-2"><i class="bi bi-eye-fill me-1 text-primary"></i>Vista previa con respuestas</b>${[1, 2].map(p => `<button class="btn-chip ${AD.pvP === p ? 'on' : ''}" data-pvp="${p}">Parcial ${p}</button>`).join('')}${['A', 'B'].map(t => `<button class="btn-chip ${AD.pvT === t ? 'on' : ''}" style="--c:#0891b2" data-pvt="${t}">Tipo ${t}</button>`).join('')}<button class="btn btn-outline-secondary btn-sm rounded-pill fw-bold ms-auto" data-pvnew><i class="bi bi-shuffle me-1"></i>Otra muestra al azar</button></div><div class="small text-muted mt-2">Así lo ve un alumno (${ex.length} preguntas); la respuesta correcta aparece marcada. No se guarda nada.</div></div><div style="max-width:860px;margin:auto">${html}</div>`;
 }
+function questionPlain(value) {
+  const node = document.createElement('div');
+  node.innerHTML = String(value || '');
+  return String(node.textContent || '').replace(/\s+/g, ' ').trim();
+}
+function questionEditorList() {
+  return prepareQuestionEdits(EXAMS[AD.qeP].build(AD.qeT, AD.qeSeed), (((AD.cfg || {}).questionEdits || {})[AD.qeP] || {})).filter(q => q.kind === 'mc');
+}
+function adQuestions() {
+  const list = questionEditorList(), selected = list.find(q => q.editKey === AD.qeKey) || list[0];
+  AD.qeKey = selected ? selected.editKey : '';
+  const edits = (((AD.cfg || {}).questionEdits || {})[AD.qeP] || {});
+  const types = CFG.MATERIA === 'est' ? ['A', 'B'] : ['A', 'B', 'C'];
+  $('#ad-body').innerHTML = `<div class="nav-card mb-3">
+    <div class="d-flex flex-wrap align-items-end gap-2">
+      <label class="small fw-bold">Parcial<select class="form-select form-select-sm" data-qe-partial>${[1, 2].map(p => `<option value="${p}" ${p === AD.qeP ? 'selected' : ''}>${EXAMS[p].titulo}</option>`).join('')}</select></label>
+      <label class="small fw-bold">Tipo<select class="form-select form-select-sm" data-qe-type>${types.map(t => `<option ${t === AD.qeT ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="small fw-bold flex-grow-1">Pregunta de la muestra<select class="form-select form-select-sm" data-qe-question>${list.map(q => `<option value="${q.editKey}" ${q.editKey === AD.qeKey ? 'selected' : ''}>${esc(q.sec)} · ${esc(questionPlain(q.html).slice(0, 100) || 'Pregunta con contenido gráfico')}</option>`).join('')}</select></label>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-qe-sample><i class="bi bi-shuffle me-1"></i>Otra muestra</button>
+    </div>
+    <div class="small text-muted mt-2">Se muestran solo preguntas de opción múltiple. Las preguntas con datos aleatorios se editan para la variante de esta muestra. Cambios guardados aplican a nuevos intentos; los que ya están en curso conservan sus preguntas.</div>
+    <div class="small text-muted">Ediciones guardadas en este parcial: ${Object.keys(edits).length}</div>
+  </div>`;
+  if (!selected) {
+    $('#ad-body').insertAdjacentHTML('beforeend', '<div class="alert alert-info">No hay preguntas de opción múltiple en esta muestra.</div>');
+    return;
+  }
+  $('#ad-body').insertAdjacentHTML('beforeend', `<div class="nav-card">
+    <div class="mb-3"><label class="form-label fw-bold" for="qe-prompt">Enunciado</label><textarea class="form-control" id="qe-prompt" rows="3" maxlength="1200">${esc(questionPlain(selected.html))}</textarea></div>
+    <div class="vstack gap-2">${selected.opts.map((option, i) => `<label class="small fw-bold">Opción ${'ABCD'[i] || i + 1}<textarea class="form-control mt-1" data-qe-option="${i}" rows="2" maxlength="500">${esc(questionPlain(option))}</textarea></label>`).join('')}</div>
+    <div class="mt-3"><label class="form-label fw-bold" for="qe-correct">Respuesta correcta</label><select class="form-select" id="qe-correct">${selected.opts.map((option, i) => `<option value="${i}" ${i === selected.correct ? 'selected' : ''}>Opción ${'ABCD'[i] || i + 1} · ${esc(questionPlain(option).slice(0, 120))}</option>`).join('')}</select></div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-3"><button class="btn btn-primary" type="button" data-qe-save><i class="bi bi-save me-1"></i>Guardar pregunta</button>${selected.editOverride ? '<button class="btn btn-outline-danger" type="button" data-qe-reset>Restablecer original</button>' : ''}<span class="small text-muted ms-auto" id="qe-status" aria-live="polite"></span></div>
+  </div>`);
+}
+document.addEventListener('change', e => {
+  if (e.target.matches('[data-qe-partial]')) { AD.qeP = +e.target.value; AD.qeKey = ''; adQuestions(); }
+  if (e.target.matches('[data-qe-type]')) { AD.qeT = e.target.value; AD.qeKey = ''; adQuestions(); }
+  if (e.target.matches('[data-qe-question]')) { AD.qeKey = e.target.value; adQuestions(); }
+});
+document.addEventListener('click', async e => {
+  if (e.target.closest('[data-qe-sample]')) { AD.qeSeed = randBytes()[0] >>> 0; AD.qeKey = ''; adQuestions(); return; }
+  const save = e.target.closest('[data-qe-save]');
+  const reset = e.target.closest('[data-qe-reset]');
+  if (!save && !reset) return;
+  const question = questionEditorList().find(q => q.editKey === AD.qeKey);
+  if (!question) return;
+  const status = $('#qe-status'), button = save || reset;
+  if (reset && !confirm('¿Restablecer esta pregunta y su respuesta correcta al contenido original?')) return;
+  const correct = $('#qe-correct');
+  let edit;
+  if (save) {
+    const promptValue = $('#qe-prompt').value.trim();
+    const promptNow = questionPlain(question.html), promptBase = questionPlain(question.editOriginalHtml);
+    if (!promptValue) { status.textContent = 'Escribe el enunciado.'; return; }
+    const prompt = promptValue === promptNow ? (question.editOverride ? question.editOverride.prompt : null) : promptValue === promptBase ? null : promptValue;
+    const oldOptions = new Map(((question.editOverride && question.editOverride.options) || []).map(item => [item.source, item.text]));
+    const options = question.editSources.map((source, i) => {
+      const value = $(`[data-qe-option="${i}"]`).value.trim(), current = questionPlain(question.opts[i]);
+      if (!value) return null;
+      const text = value === current ? (oldOptions.has(source) ? oldOptions.get(source) : null) : value === questionPlain(source) ? null : value;
+      return text === null ? null : { source, text };
+    }).filter(Boolean);
+    if (question.editSources.some((_, i) => !$(`[data-qe-option="${i}"]`).value.trim())) { status.textContent = 'No dejes opciones vacías.'; return; }
+    if (new Set(question.editSources.map((_, i) => $(`[data-qe-option="${i}"]`).value.trim())).size !== question.editSources.length) { status.textContent = 'Cada opción debe ser diferente.'; return; }
+    edit = { prompt, sources: question.editSources, options, correctSource: question.editSources[Number(correct.value)] };
+  }
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+  const response = await adApi('admin_savequestion', { parcial: AD.qeP, key: question.editKey, reset: !!reset, ...(edit || {}) });
+  if (response.ok) {
+    AD.cfg.questionEdits = AD.cfg.questionEdits || { 1: {}, 2: {} };
+    AD.cfg.questionEdits[AD.qeP] = AD.cfg.questionEdits[AD.qeP] || {};
+    if (reset) delete AD.cfg.questionEdits[AD.qeP][question.editKey];
+    else AD.cfg.questionEdits[AD.qeP][question.editKey] = edit;
+    toast(reset ? 'Pregunta restablecida.' : 'Pregunta guardada.', 'bi-check-circle-fill');
+    adQuestions();
+  } else {
+    button.disabled = false;
+    button.innerHTML = reset ? 'Restablecer original' : '<i class="bi bi-save me-1"></i>Guardar pregunta';
+    status.textContent = response.msg || 'No se pudo guardar la pregunta.';
+  }
+});
 document.addEventListener('click', e => {
   const p = e.target.closest('[data-pvp]'); if (p) { AD.pvP = +p.dataset.pvp; adPrev(); }
   const t = e.target.closest('[data-pvt]'); if (t) { AD.pvT = t.dataset.pvt; adPrev(); }
@@ -251,7 +334,28 @@ function adAlumno() {
   if (!L.length) { $('#ad-body').innerHTML = parBtns() + grpBtns + nav + '<div class="alert alert-info">No hay exámenes entregados con ese filtro.</div>'; aluBind(); return; }
   const r = L[AD.ai];
   if (!r.resp) { $('#ad-body').innerHTML = parBtns() + grpBtns + nav + '<div class="alert alert-warning">Para ver lo que contestó cada alumno actualiza el script de Apps Script (nueva versión de la implementación): el panel necesita la columna «Respuestas».</div>'; aluBind(); return; }
-  let ex; try { ex = buildExam(+r.parcial, r.tipo, +r.seed, +r.total); } catch (e) { ex = null; }
+  const snapshotKey = aluKey(r);
+  if (!Object.prototype.hasOwnProperty.call(AD.questionSnapshots, snapshotKey)) {
+    if (AD.questionSnapshotLoading !== snapshotKey) {
+      AD.questionSnapshotLoading = snapshotKey;
+      adApi('admin_qedits', { parcial: +r.parcial, cuenta: r.cuenta }).then(response => {
+        if (response.ok) AD.questionSnapshots[snapshotKey] = parseProc(response.questionEdits);
+        else AD.questionSnapshotErrors[snapshotKey] = response.msg || 'No se pudo recuperar la versión de preguntas.';
+        if (AD.questionSnapshotLoading === snapshotKey) AD.questionSnapshotLoading = '';
+        const current = aluList()[AD.ai];
+        if (AD.tab === 'alu' && current && aluKey(current) === snapshotKey) adAlumno();
+      });
+    }
+    if (AD.questionSnapshotErrors[snapshotKey]) {
+      $('#ad-body').innerHTML = parBtns() + grpBtns + nav + `<div class="alert alert-danger">${esc(AD.questionSnapshotErrors[snapshotKey])}</div>`;
+      aluBind();
+      return;
+    }
+    $('#ad-body').innerHTML = parBtns() + grpBtns + nav + '<div class="nav-card text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando la versión de preguntas de este examen…</div>';
+    aluBind();
+    return;
+  }
+  let ex; try { ex = buildExam(+r.parcial, r.tipo, +r.seed, +r.total, AD.questionSnapshots[snapshotKey]); } catch (e) { ex = null; }
   if (!ex || !ex.length) { $('#ad-body').innerHTML = parBtns() + grpBtns + nav + '<div class="alert alert-danger">No se pudo reconstruir el examen de este alumno (falta su semilla).</div>'; aluBind(); return; }
   const ans = parseResp(r.resp, ex), PR = parseProc(r.proc), det = String(r.det || ''), secs = EXAMS[r.parcial].secs;
   const SEC = {}, OPS = {}; let html = '', last = '', shown = 0;

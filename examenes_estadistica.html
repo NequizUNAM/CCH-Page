@@ -904,11 +904,33 @@ function pickQs(qs, k, rnd) {
   return qs.filter((q, i) => keep.has(i));
 }
 /* n = preguntas habilitadas (sin contar el bonus). Las mismas n preguntas salen siempre para la misma semilla. */
-const buildExam = (parcial, tipo, seed, n) => {       // sin hoja de procedimiento: solo se valida el resultado
+const buildExam = (parcial, tipo, seed, n, edits = QUESTION_EDITS) => {       // sin hoja de procedimiento: solo se valida el resultado
   const all = EXAMS[parcial].build(tipo, seed).map(q => { delete q.pf; return q; }), base = all.filter(q => !q.bonus), bonus = all.filter(q => q.bonus);
   const qs = pickQs(base, effN(n, base.length), mulberry32((seed ^ 0x5DEECE66) >>> 0)).concat(bonus);
-  qs.forEach((q, i) => q.id = i + 1); return qs;
+  qs.forEach((q, i) => q.id = i + 1); return prepareQuestionEdits(qs, edits);
 };
+function questionEditKey(q) {
+  const source = JSON.stringify([q.sec, q.html, q.opts.map(String).sort()]);
+  const hash = seed => { let value = seed; for (let i = 0; i < source.length; i++) { value ^= source.charCodeAt(i); value = Math.imul(value, 16777619); } return (value >>> 0).toString(16).padStart(8, '0'); };
+  return hash(2166136261) + hash(2654435761);
+}
+const escapeQuestionText = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])).replace(/\r?\n/g, '<br>');
+function prepareQuestionEdits(questions, edits = {}) {
+  questions.forEach(q => {
+    if (q.kind !== 'mc') return;
+    const sources = q.opts.map(String), key = questionEditKey({ sec: q.sec, html: q.html, opts: sources });
+    q.editKey = key; q.editSources = sources; q.editOriginalHtml = q.html; q.editOverride = edits[key] || null;
+    const edit = q.editOverride;
+    if (!edit) return;
+    if (typeof edit.prompt === 'string') q.html = escapeQuestionText(edit.prompt);
+    const optionEdits = new Map((edit.options || []).map(item => [String(item.source), item.text]));
+    q.opts = sources.map(source => optionEdits.has(source) ? escapeQuestionText(optionEdits.get(source)) : source);
+    const correct = sources.indexOf(String(edit.correctSource));
+    if (correct >= 0) q.correct = correct;
+  });
+  return questions;
+}
+const questionEditKeys = (parcial, tipo, seed, n) => buildExam(parcial, tipo, seed, n, {}).filter(q => q.kind === 'mc').map(q => q.editKey);
 function gradeQ(q, v) {
   if (v === undefined || v === null || v === '') return false;
   if (q.kind === 'mc') return +v === q.correct;
@@ -972,6 +994,7 @@ const limiteMs = () => (S.cierre || S.start + CFG.DURACION_MIN * 60000) - CFG.PE
 let CLK = false;       // ¿el administrador activó el cronómetro visible? (por defecto NO)
 const applyClock = () => { const t = $('#timer'); if (t) t.classList.toggle('d-none', !CLK); };
 let S = null, EXAM = [], timerId = null, away = false, examActive = false, ADMIN = null;
+var QUESTION_EDITS = {};
 try { const l = (LS.get(LAST) || '').split(':'); S = l.length === 2 ? loadLocal(l[0], l[1]) : JSON.parse(LS.get(KEY) || 'null'); } catch (e) { S = null; }
 const save = () => { if (S) { LS.set(skey(S.parcial, S.cuenta), JSON.stringify(S)); LS.set(LAST, S.parcial + ':' + S.cuenta); } };
 const clearState = () => { if (S) LS.del(skey(S.parcial, S.cuenta)); S = null; LS.del(LAST); LS.del(KEY); };
@@ -1081,7 +1104,7 @@ $('#form-datos').addEventListener('submit', async e => {
   if (!$('#d-ok').checked) { err.textContent = 'Marca la casilla para confirmar que leíste las reglas.'; err.hidden = false; return; }
   const btn = $('#btn-comenzar'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando…';
   const r = randBytes(), tipo = (r[1] & 1) ? 'B' : 'A', seed = r[0] >>> 0, inicio = new Date().toISOString();
-  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
+  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), questionKeys: questionEditKeys(PARCIAL, tipo, seed, PREGN), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-play-circle-fill me-1"></i>Comenzar examen';
   if (!res.ok) {
     if (res.code === 'duplicado') showAlert('Examen ya respondido', `El examen del <b>${EXAMS[PARCIAL].titulo}</b> ya fue respondido anteriormente con el número de cuenta <b>${esc(cuenta)}</b>. No es posible presentarlo de nuevo.<br><small class="text-muted">Si crees que es un error, habla con tu profesor(a).</small>`);
@@ -1093,10 +1116,10 @@ $('#form-datos').addEventListener('submit', async e => {
   }
   if (res.resumed) {          // el servidor ya tenía este examen en curso: se continúa con el mismo tipo, reloj y respuestas
     const pr = res.progreso || {}, loc = loadLocal(PARCIAL, cuenta), mismo = loc && !loc.fin && (loc.seed >>> 0) === (res.seed >>> 0);
-    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid };
+    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
     save(); startExam(true); if (res.cerrar) { toast('Tu profesor(a) cerró tu examen: tus respuestas se enviaron.', 'bi-lock-fill', 5000); finish('admin'); } return;
   }
-  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid };
+  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
   save(); startExam(false);
 });
 
@@ -1280,6 +1303,7 @@ function questionsHTML(exam, secs, opt = {}) {
 
 /* ===== 3. Examen ===== */
 function startExam(resume) {
+  QUESTION_EDITS = S.questionEdits || {};
   EXAM = buildExam(S.parcial, S.tipo, S.seed, S.n);
   $('#bar-titulo').textContent = `Estadística · ${EXAMS[S.parcial].titulo}`;
   $('#bar-alumno').textContent = `${S.nombre} · ${S.cuenta} · Gpo. ${S.grupo}`;

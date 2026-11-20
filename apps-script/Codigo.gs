@@ -337,7 +337,24 @@ function handleRequest_(params, method) {
     if (route.auth === "admin") requireAdmin_(params.token);
     if (route.auth === "student") ctx.cuenta = requireStudent_(params.token);
 
-    const run = () => route.fn(params, ctx) || {};
+    const requestId = cleanText_(params.requestId).slice(0, 100);
+    const run = () => {
+      if (!requestId || method !== "POST") return route.fn(params, ctx) || {};
+      const cache = CacheService.getScriptCache();
+      const owner = route.auth === "student" ? ctx.cuenta : route.auth;
+      const key = `web_idem_${action}_${requestId}_${owner}`;
+      const previous = cache.get(key);
+      if (previous) return JSON.parse(previous);
+      const result = route.fn(params, ctx) || {};
+      const serialized = JSON.stringify(result);
+      if (serialized.length <= 90000) {
+        try { cache.put(key, serialized, 21600); }
+        catch (cacheError) { console.error(`No se pudo guardar la clave idempotente para ${action}: ${cacheError.message}`); }
+      } else {
+        console.warn(`Respuesta demasiado grande para guardar la clave idempotente de ${action}.`);
+      }
+      return result;
+    };
     const result = route.lock ? withScriptLock_(run) : run();
 
     return jsonResponse_(Object.assign({ status: "success" }, result));
