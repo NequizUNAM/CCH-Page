@@ -976,7 +976,7 @@ const MSG = {
   ocupado: 'El servidor está atendiendo a muchos alumnos a la vez. Espera unos segundos y vuelve a pulsar el botón.',
   sesion: 'Este examen se continuó en otro dispositivo, por eso esta sesión se cerró.'
 };
-const DEV = (() => { let d = LS.get('eq_dev'); if (!d) { d = [...randBytes()].map(x => x.toString(36)).join(''); LS.set('eq_dev', d); } return d; })();   // identifica este equipo para el límite de intentos
+const DEV = (() => { let d = LS.get('eq_est_dev'); if (!d) { d = [...randBytes()].map(x => x.toString(36)).join(''); LS.set('eq_est_dev', d); } return d; })();   // dispositivo separado para Estadística
 
 /* ===== Estado local ===== */
 const KEY = 'eq_est_state_v1', LAST = 'eq_est_last';

@@ -2009,7 +2009,7 @@ var api = async function (action, data = {}) {
   if (!CFG.ENDPOINT) return { ok: false, code: 'config' };
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 30000);
   try {
-    const r = await fetch(CFG.ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, ...data }), signal: ctl.signal });
+    const r = await fetch(CFG.ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, materia: 'cib', ...data }), signal: ctl.signal });
     const j = await r.json(); if (j && j.t) SKEW = j.t - Date.now(); return j;
   } catch (e) { return { ok: false, code: 'red' }; } finally { clearTimeout(to); }
 }
@@ -2039,7 +2039,7 @@ const MSG = {
   ocupado: 'El servidor está atendiendo a muchos alumnos a la vez. Espera unos segundos y vuelve a pulsar el botón.',
   sesion: 'Este examen se continuó en otro dispositivo, por eso esta sesión se cerró.'
 };
-const DEV = (() => { let d = LS.get('eq_dev'); if (!d) { d = [...randBytes()].map(x => x.toString(36)).join(''); LS.set('eq_dev', d); } return d; })();   // identifica este equipo para el límite de intentos
+const DEV = (() => { let d = LS.get('eq_cib_dev'); if (!d) { d = [...randBytes()].map(x => x.toString(36)).join(''); LS.set('eq_cib_dev', d); } return d; })();   // dispositivo separado para Cibernética
 
 /* ===== Estado local ===== */
 const KEY = 'eq_cib1_state_v2', LAST = 'eq_cib1_last';
