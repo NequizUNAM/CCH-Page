@@ -2092,12 +2092,104 @@ function showAlert(title, html, ic = 'bi-exclamation-octagon-fill', col = '#dc26
 
 /* Resultados que no alcanzaron a enviarse (se reintentan solos) */
 const QKEY = 'eq_cib1_pending';
-function queueResult(r) { let q = []; try { q = JSON.parse(LS.get(QKEY) || '[]'); } catch (e) { } if (!q.some(x => x.cuenta === r.cuenta && x.parcial === r.parcial)) q.push(r); LS.set(QKEY, JSON.stringify(q)); }
-async function flushQueue() {
-  let q = []; try { q = JSON.parse(LS.get(QKEY) || '[]'); } catch (e) { } if (!q.length || !CFG.ENDPOINT) return;
-  const keep = []; for (const r of q) { const x = await api('submit', r); if (!x.ok && x.code !== 'duplicado' && x.code !== 'sesion') keep.push(r); }
-  LS.set(QKEY, JSON.stringify(keep));
-}
+const ResultQueue = {
+  dbName: 'eq_cib_result_queue',
+  storeName: 'results',
+  db: null, ready: null, jobs: [], running: false, timer: null,
+  key(r) { return r && r.sid ? `cib:${r.sid}` : `cib:${r.parcial}:${r.cuenta}:${r.fecha || r.inicio}`; },
+  init() {
+    if (this.ready) return this.ready;
+    this.ready = new Promise(resolve => {
+      if (!window.indexedDB) { resolve(); return; }
+      const req = indexedDB.open(this.dbName, 1);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(this.storeName)) req.result.createObjectStore(this.storeName, { keyPath: 'key' }); };
+      req.onerror = () => resolve();
+      req.onsuccess = () => {
+        this.db = req.result;
+        const tx = this.db.transaction(this.storeName, 'readonly');
+        const read = tx.objectStore(this.storeName).getAll();
+        read.onsuccess = () => {
+          this.jobs = (read.result || []).sort((a, b) => a.createdAt - b.createdAt);
+          let legacy = [];
+          try { legacy = JSON.parse(LS.get(QKEY) || '[]'); } catch (e) { legacy = []; }
+          if (legacy.length) {
+            Promise.all(legacy.map(r => this.persist({ key: this.key(r), result: r, attempts: 0, createdAt: Date.now() }))).then(() => {
+              LS.del(QKEY); this.reload().then(() => { resolve(); this.kick(); });
+            }).catch(() => { resolve(); this.kick(); });
+          } else { resolve(); this.kick(); }
+        };
+        read.onerror = () => resolve();
+      };
+    });
+    return this.ready;
+  },
+  persist(job) {
+    if (!this.db) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).put(job);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  },
+  remove(job) {
+    if (!this.db) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).delete(job.key);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  },
+  reload() {
+    if (!this.db) return Promise.resolve();
+    return new Promise(resolve => {
+      const read = this.db.transaction(this.storeName, 'readonly').objectStore(this.storeName).getAll();
+      read.onsuccess = () => { this.jobs = (read.result || []).sort((a, b) => a.createdAt - b.createdAt); resolve(); };
+      read.onerror = () => resolve();
+    });
+  },
+  async enqueue(r) {
+    await this.init();
+    const job = { key: this.key(r), result: r, attempts: 0, createdAt: Date.now() };
+    await this.persist(job);
+    await this.reload();
+    if (!this.jobs.some(x => x.key === job.key)) this.jobs.push(job);
+    this.jobs.sort((a, b) => a.createdAt - b.createdAt);
+    this.kick();
+  },
+  kick() {
+    if (!this.running && this.jobs.length) this.drain();
+  },
+  async drain() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      while (this.jobs.length) {
+        const job = this.jobs[0];
+        const r = await api('submit', Object.assign({}, job.result, { requestId: job.key }));
+        if (r.ok) {
+          await this.remove(job); this.jobs.shift();
+          if (S && S.result && this.key(S.result) === job.key) { S.sent = true; S.status = 'ok'; SEND.n = 0; save(); renderFin(); }
+        } else if (r.code === 'duplicado' || r.code === 'sesion') {
+          await this.remove(job); this.jobs.shift();
+          if (S && S.result && this.key(S.result) === job.key) { S.status = 'dup'; save(); renderFin(); }
+        } else {
+          job.attempts++; await this.persist(job);
+          SEND.hadRetry = true;
+          const delays = [3000, 5000, 8000, 12000, 15000];
+          const delay = delays[Math.min(job.attempts - 1, delays.length - 1)] + Math.round(Math.random() * 1500);
+          if (S && S.result && this.key(S.result) === job.key) { S.status = 'retry'; save(); renderFin(); }
+          this.running = false; clearTimeout(this.timer); this.timer = setTimeout(() => this.kick(), delay); return;
+        }
+      }
+    } finally {
+      this.running = false;
+    }
+  }
+};
+async function queueResult(r) { await ResultQueue.enqueue(r); }
+async function flushQueue() { await ResultQueue.init(); ResultQueue.kick(); }
+addEventListener('online', () => { clearTimeout(ResultQueue.timer); ResultQueue.running = false; ResultQueue.kick(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue(); });
 
 /* ===== 1. Contraseña ===== */
 $('#ver-clave').onclick = () => { const i = $('#clave'); i.type = i.type === 'password' ? 'text' : 'password'; };
@@ -2423,16 +2515,12 @@ function setStatus() {
 const SEND = { t: null, n: 0, hadRetry: false, busy: false };
 async function sendResult(st) {
   if (!st || !st.result || st.sent || st.status === 'dup' || SEND.busy) return;
-  clearTimeout(SEND.t); SEND.busy = true;
   if (st.status !== 'retry') st.status = 'pend'; if (st === S) setStatus();
-  const r = await api('submit', st.result); SEND.busy = false;
-  if (r.ok) { st.sent = true; st.status = 'ok'; SEND.n = 0; }
-  else if (r.code === 'duplicado') { st.status = 'dup'; if (st === S) { showAlert('Examen ya respondido', 'Este examen <b>ya fue respondido anteriormente</b> con ese número de cuenta, por eso <b>no se guardó</b> este intento.'); } }
-  else if (r.code === 'sesion') { st.status = 'dup'; if (st === S) showAlert('Sesión cerrada', 'Este examen se continuó en otro dispositivo con tu número de cuenta, por eso este envío no se guardó.'); }
-  else { st.status = 'retry'; SEND.hadRetry = true; const w = [3000, 5000, 8000, 12000][SEND.n] || 15000; SEND.n++; SEND.t = setTimeout(() => sendResult(st), w + Math.random() * 1500); }
+  await queueResult(st.result);
+  if (st.status === 'pend') SEND.busy = false;
   if (st === S) { save(); renderFin(); }
 }
-$('#btn-reenviar').onclick = () => { clearTimeout(SEND.t); sendResult(S); };
+$('#btn-reenviar').onclick = () => { ResultQueue.kick(); sendResult(S); };
 $('#btn-terminar').onclick = () => { clearState(); SS.del('eq_sess'); location.reload(); };
 /* ===== Bloqueos: copiar, pegar, cortar, clic derecho, arrastrar, imprimir, atajos ===== */
 const lockUI = () => !document.body.classList.contains('modo-panel');   // el administrador conserva copiar/pegar

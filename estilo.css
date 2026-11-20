@@ -464,6 +464,8 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .profile-project[open] summary::before { content: "\25be  "; }
 .profile-attendance,
 .att-markbar { align-items: center; }
+.profile-enrollments { max-width: 100%; }
+.profile-enrollments .badge { white-space: normal; text-align: center; }
 
 /* Captura: Final, Estricta y Entera fijas a la derecha al desplazar. */
 .table-cch .cap-final, .table-cch .cap-strict, .table-cch .cap-entera { min-width: 4.5rem; }

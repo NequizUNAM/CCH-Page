@@ -3524,8 +3524,8 @@ const Admin = {
             h("div", { class: "small text-body-secondary mt-1" }, icon("hand-index", "me-1"), "Toca una fecha para cambiar su marca (✓ ✗ J). Para justificar una falta, elige J.")
           ] : h("p", { class: "small text-body-secondary mb-0", text: "Sin registros en este grupo." })),
         h("div", { class: "row g-3" },
-          h("div", { class: "col-12 col-lg-6" }, collapsible("Ponderación y calificaciones", "bar-chart", false, gradesTable)),
-          h("div", { class: "col-12 col-lg-6" }, collapsible("Proyectos", "people", false, ...projects))));
+          h("div", { class: "col-12 col-lg-6" }, section("Ponderación y calificaciones", "bar-chart", gradesTable)),
+          h("div", { class: "col-12 col-lg-6" }, section("Proyectos", "people", ...projects))));
     };
 
     // ---------- Comentarios ----------
@@ -3578,6 +3578,13 @@ const Admin = {
         h("div", { class: "me-auto" },
           h("div", { class: "fs-5 fw-semibold lh-sm", text: p.nombres.join(" / ") || "(sin nombre)" }),
           h("div", { class: "small text-body-secondary" }, h("span", { class: "mono", text: p.cuenta }), ` · ${p.correos.join(", ") || "sin correo"}`)),
+        p.enrollments.length
+          ? h("div", { class: "profile-enrollments d-flex flex-wrap align-items-center gap-2" },
+              p.enrollments.map((e, i) => h("span", {
+                class: `badge ${i % 3 === 0 ? "rel-same" : i % 3 === 1 ? "rel-prev" : "text-bg-primary"}`,
+                title: `Ciclo ${e.ciclo || "sin ciclo"}`
+              }, `${e.grupo || e.curso} · ${e.ciclo || "s/c"}`)))
+          : null,
         profileAttendance,
         groups.length > 1 ? h("span", { class: "badge rel-same" }, icon("people-fill"), ` ${groups.length} grupos este ciclo`) : null,
         p.history && p.history.length ? h("span", { class: "badge rel-prev" }, icon("clock-history"), ` ${p.history.length} ciclo(s) antes`) : null,
@@ -3593,7 +3600,6 @@ const Admin = {
           commentsBox)),
         h("div", { class: "col-12 col-lg-6" },
           collapsible("Evidencias", "cloud-arrow-up", false, ...evidences),
-          collapsible("Inscripciones", "diagram-3", false, h("div", { class: "d-flex flex-wrap gap-1" }, p.enrollments.map(e => h("span", { class: `badge ${e.activo ? "rel-same" : "text-bg-light border"}`, text: `${e.curso} ${e.grupo} · ${e.ciclo || "s/c"}` })))),
           history))
     ));
   },
