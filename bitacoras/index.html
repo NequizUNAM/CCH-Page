@@ -38,6 +38,17 @@ h3{font-size:15px;color:var(--azul)}
 .confirmacion-dialogo{width:min(440px,100%);padding:22px;background:#fff;border:1px solid var(--borde);border-radius:14px;box-shadow:0 18px 48px rgba(17,24,39,.22)}
 .evidencia-quitar{border:0;background:transparent;color:var(--rojo);font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px}
 .evidencia-quitar:hover{background:#FEF2F2}
+.acciones-proyecto{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn-recarga{width:38px;height:38px;padding:0;display:inline-grid;place-items:center;font-size:18px;line-height:1}
+.btn-recarga.cargando{cursor:wait}
+.edicion-masiva{overflow-x:auto}
+.edicion-masiva table{min-width:760px}
+.edicion-masiva textarea{min-height:90px;resize:vertical}
+.edicion-masiva tr.error-fila{outline:2px solid var(--rojo);outline-offset:-2px}
+.estado-edicion{font-size:12px;font-weight:700;white-space:nowrap}
+.estado-edicion.guardando{color:var(--naranja)}
+.estado-edicion.guardado{color:var(--verde)}
+.estado-edicion.error{color:var(--rojo)}
 
 /* Encabezado */
 header{background:var(--azul);color:#fff;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
@@ -227,6 +238,7 @@ details.menu summary::-webkit-details-marker{display:none}
     <span class="contador cero" id="selContador" style="display:none"></span>
     <span class="sel-flecha" aria-hidden="true">&#9662;</span>
   </button>
+  <button type="button" class="btn blanco btn-recarga" id="btnRecargarProyecto" title="Recargar datos del proyecto" aria-label="Recargar datos del proyecto">&#8635;</button>
   <div id="listaProyectos" class="selector-lista oculto" role="listbox" aria-label="Proyectos">
     <input type="search" id="buscadorProyectos" placeholder="Buscar proyecto por nombre o hashtag…" aria-label="Buscar proyecto" autocomplete="off">
     <div id="opcionesProyectos"></div>
@@ -242,6 +254,9 @@ details.menu summary::-webkit-details-marker{display:none}
     <div id="vista-bitacoras">
       <div class="fila" style="margin-bottom:12px">
         <h2 id="tituloProyecto" style="flex:2">Todas las bitácoras</h2>
+        <div class="acciones-proyecto">
+          <button type="button" class="btn blanco oculto" id="btnEditarTodo">Editar todo</button>
+        </div>
         <div class="vista-toggle" role="group" aria-label="Vista de bitácoras">
           <button type="button" id="btnVistaBitTarjeta" aria-pressed="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="5" rx="1"/><rect x="1.5" y="9.5" width="13" height="5" rx="1"/></svg>Tarjeta</button>
           <button type="button" id="btnVistaBitTabla" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1"/><line x1="1.5" y1="6" x2="14.5" y2="6"/><line x1="6" y1="1.5" x2="6" y2="14.5"/></svg>Tabla</button>
@@ -396,6 +411,7 @@ const FORMATO_DEFECTO = {
 
 /* ---------- Estado ---------- */
 let estado = { proyectos: PROYECTOS_BASE, sesiones: [], pendientes: [], hitos: [], formatos: {}, puntaje: [], configCiclo: configCicloPorDefecto(), ejemploBorrado: false };
+const PALETA_PROYECTOS = ['#002663','#0B3D91','#7C3AED','#0F766E','#B45309','#BE123C','#1D4ED8','#15803D','#A21CAF','#C2410C'];
 let proyectoSel = 'todos';
 let vistaActual = 'bitacoras';
 /* Vistas Tarjeta/Tabla (v2): la vista elegida se guarda en localStorage y
@@ -1503,7 +1519,9 @@ function abrirLogin(){
         marcarLecturaReciente();
         mostrarCargaPantalla('Cargando proyectos y bitácoras…');
         try {
-          await cargarDatos(); marcarLecturaReciente(); renderTodo(); procesarColaCambios(); avisar('Sesión iniciada.', 'verde');
+          await cargarDatos(); marcarLecturaReciente(); renderTodo(); procesarColaCambios();
+          if(edicionMasivaPausada){ edicionMasivaPausada = false; procesarEdicionMasiva(); }
+          avisar('Sesión iniciada.', 'verde');
         } catch(e){
           renderTodo();
           avisar('Sesión iniciada, pero no se pudieron cargar los datos: ' + e.message, 'rojo');
@@ -1756,7 +1774,76 @@ function renderProyectos(){
   const c = $('#selContador');
   if(act.abiertos){ c.textContent = act.abiertos; c.className = 'contador ' + (act.vencidos ? '' : 'cero'); c.style.display = ''; }
   else { c.textContent = ''; c.style.display = 'none'; }
+  const btnEditar = $('#btnEditarTodo');
+  if(btnEditar) btnEditar.classList.toggle('oculto', proyectoSel === 'todos' || act.cerrado);
   if(selectorAbierto) pintarOpcionesProyecto();
+}
+let recargaHasta = 0, temporizadorRecarga = null;
+function actualizarBotonRecarga(segundos){
+  const boton = $('#btnRecargarProyecto');
+  if(!boton) return;
+  boton.disabled = segundos > 0;
+  boton.textContent = segundos > 0 ? String(segundos) + ' s' : '↻';
+  boton.setAttribute('aria-label', segundos > 0 ? 'Recarga disponible en ' + segundos + ' segundos' : 'Recargar datos del proyecto');
+}
+function iniciarBloqueoRecarga(){
+  if(!TIENE_APPS_SCRIPT) return;
+  recargaHasta = Date.now() + 60000;
+  if(temporizadorRecarga) clearInterval(temporizadorRecarga);
+  actualizarBotonRecarga(60);
+  temporizadorRecarga = setInterval(() => {
+    const restante = Math.max(0, Math.ceil((recargaHasta - Date.now()) / 1000));
+    actualizarBotonRecarga(restante);
+    if(restante === 0){
+      clearInterval(temporizadorRecarga);
+      temporizadorRecarga = null;
+    }
+  }, 1000);
+}
+function fusionarSinSincronizar(remotos, locales, nombre, slug){
+  const conservar = (locales[nombre] || []).filter(x => x.slug === slug && x.sin_sync && !remotos.some(r => r.id === x.id));
+  return remotos.concat(conservar);
+}
+async function recargarProyectoSeleccionado(){
+  if(!TIENE_APPS_SCRIPT){
+    renderTodo();
+    avisar('Los datos locales ya están actualizados.', 'verde');
+    return;
+  }
+  if(Date.now() < recargaHasta) return;
+  if(!sesionAutenticada()){ abrirLogin(); return; }
+  const boton = $('#btnRecargarProyecto');
+  boton.classList.add('cargando');
+  boton.disabled = true;
+  boton.textContent = '…';
+  try{
+    if(proyectoSel === 'todos'){
+      await cargarDatos();
+    }else{
+      const r = await llamar('leerProyecto', { slug: proyectoSel });
+      if(!r || !r.datos) throw new Error('El servidor no devolvió los datos del proyecto.');
+      const b = r.datos.bitacora || {};
+      const sesiones = (b.sesiones || []).map(s => sesionDesdeBackend(s, proyectoSel)).filter(Boolean);
+      const pendientes = (b.pendientes || []).map(p => pendienteDesdeBackend(p, proyectoSel)).filter(Boolean);
+      const hitos = (b.hitos || []).map(h => hitoDesdeBackend(h, proyectoSel)).filter(Boolean);
+      const puntaje = (b.puntaje || []).map(p => Object.assign({ slug: proyectoSel }, p));
+      estado.sesiones = estado.sesiones.filter(x => x.slug !== proyectoSel).concat(
+        fusionarSinSincronizar(sesiones, estado, 'sesiones', proyectoSel));
+      estado.pendientes = estado.pendientes.filter(x => x.slug !== proyectoSel).concat(
+        fusionarSinSincronizar(pendientes, estado, 'pendientes', proyectoSel));
+      estado.hitos = estado.hitos.filter(x => x.slug !== proyectoSel).concat(
+        fusionarSinSincronizar(hitos, estado, 'hitos', proyectoSel));
+      estado.puntaje = estado.puntaje.filter(x => x.slug !== proyectoSel).concat(puntaje);
+      guardar();
+    }
+    renderTodo();
+    avisar('Datos recargados sin recargar la página.', 'verde');
+  }catch(e){
+    avisar('No se pudieron recargar los datos: ' + e.message, 'rojo');
+  }finally{
+    boton.classList.remove('cargando');
+    iniciarBloqueoRecarga();
+  }
 }
 
 /* Paso 11 U1: fila de resumen (KPIs) — lo urgente primero. */
@@ -1863,6 +1950,155 @@ function sesionesFiltradas(){
   }
   return list;
 }
+let modoEdicionMasiva = false, snapshotEdicionMasiva = [], paginaEdicionMasiva = 0;
+const TAMANO_PAGINA_EDICION = 25;
+let colaEdicionMasiva = [], indiceEdicionMasiva = 0, edicionMasivaPausada = false;
+function abrirEdicionMasiva(){
+  if(proyectoSel === 'todos' || proyectoCerrado(proyectoSel)){ avisar('Selecciona un proyecto activo para editar todo.', 'rojo'); return; }
+  snapshotEdicionMasiva = estado.sesiones.filter(s => s.slug === proyectoSel).map(s => JSON.parse(JSON.stringify(s)));
+  paginaEdicionMasiva = 0;
+  modoEdicionMasiva = true;
+  renderTodo();
+}
+function cancelarEdicionMasiva(){
+  modoEdicionMasiva = false;
+  snapshotEdicionMasiva = [];
+  paginaEdicionMasiva = 0;
+  renderTodo();
+}
+function renderEdicionMasiva(cont){
+  const todas = estado.sesiones.filter(s => s.slug === proyectoSel).sort((a,b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const paginas = Math.max(1, Math.ceil(todas.length / TAMANO_PAGINA_EDICION));
+  if(paginaEdicionMasiva >= paginas) paginaEdicionMasiva = paginas - 1;
+  const inicio = paginaEdicionMasiva * TAMANO_PAGINA_EDICION;
+  const lista = todas.slice(inicio, inicio + TAMANO_PAGINA_EDICION);
+  let html = '<div class="edicion-masiva"><table><thead><tr><th>Fecha</th><th>Título</th><th>Tipo</th><th>Texto</th><th>Estado</th></tr></thead><tbody>';
+  html += lista.map(s => {
+    return '<tr data-editar-id="' + esc(s.id) + '">' +
+      '<td><input type="datetime-local" data-campo="fecha" value="' + esc(String(s.fecha || '').replace(' ', 'T').slice(0,16)) + '"></td>' +
+      '<td><input type="text" maxlength="200" data-campo="titulo" value="' + esc(s.titulo || '') + '"></td>' +
+      '<td><select data-campo="tipo"><option' + (s.tipo === 'Reunión' ? ' selected' : '') + '>Reunión</option><option' + (s.tipo === 'Sesión' ? ' selected' : '') + '>Sesión</option><option' + (s.tipo === 'Avance' ? ' selected' : '') + '>Avance</option><option' + (s.tipo === 'Nota' ? ' selected' : '') + '>Nota</option></select></td>' +
+      '<td><textarea data-campo="texto">' + esc(s.texto || '') + '</textarea></td>' +
+      '<td><span class="estado-edicion" data-estado>Sin cambios</span></td></tr>';
+  }).join('') + '</tbody></table></div>';
+  html += '<div class="fila" style="margin-top:12px"><button class="btn" id="btnGuardarTodo">Guardar todo</button><button class="btn blanco" id="btnCancelarTodo">Cancelar</button>';
+  if(paginas > 1) html += '<span class="muted">Página ' + (paginaEdicionMasiva + 1) + ' de ' + paginas + '</span><button class="btn blanco chico" id="paginaEditarAnterior"' + (paginaEdicionMasiva === 0 ? ' disabled' : '') + '>Anterior</button><button class="btn blanco chico" id="paginaEditarSiguiente"' + (paginaEdicionMasiva >= paginas - 1 ? ' disabled' : '') + '>Siguiente</button>';
+  html += '</div><div id="resumenEdicionMasiva" class="muted" style="margin-top:8px"></div>';
+  cont.innerHTML = html;
+  $('#btnCancelarTodo').onclick = cancelarEdicionMasiva;
+  $('#btnGuardarTodo').onclick = guardarEdicionMasiva;
+  if($('#paginaEditarAnterior')) $('#paginaEditarAnterior').onclick = () => { paginaEdicionMasiva--; renderTodo(); };
+  if($('#paginaEditarSiguiente')) $('#paginaEditarSiguiente').onclick = () => { paginaEdicionMasiva++; renderTodo(); };
+  cont.querySelectorAll('tr[data-editar-id]').forEach(tr => {
+    tr.querySelectorAll('[data-campo]').forEach(input => input.addEventListener('input', () => {
+      tr.querySelector('[data-estado]').textContent = 'Cambios pendientes';
+      tr.querySelector('[data-estado]').className = 'estado-edicion';
+    }));
+  });
+}
+function validarSesionEditable(s){
+  if(!String(s.titulo || '').trim()) return 'El título no puede estar vacío.';
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(s.fecha || ''))) return 'La fecha no es válida.';
+  if(!['Reunión','Sesión','Avance','Nota'].includes(s.tipo)) return 'El tipo no es válido.';
+  return '';
+}
+function guardarEdicionMasiva(){
+  if(!exigirSesion()) return;
+  const cont = $('#lineaTiempo');
+  const cambios = [];
+  cont.querySelectorAll('tr[data-editar-id]').forEach(tr => {
+    const id = tr.dataset.editarId;
+    const original = snapshotEdicionMasiva.find(s => s.id === id);
+    if(!original) return;
+    const nueva = JSON.parse(JSON.stringify(original));
+    nueva.fecha = tr.querySelector('[data-campo="fecha"]').value;
+    nueva.titulo = tr.querySelector('[data-campo="titulo"]').value.trim();
+    nueva.tipo = tr.querySelector('[data-campo="tipo"]').value;
+    nueva.texto = tr.querySelector('[data-campo="texto"]').value;
+    const estadoOriginal = { fecha:original.fecha.replace(' ', 'T').slice(0,16), titulo:original.titulo || '', tipo:original.tipo || 'Sesión', texto:original.texto || '' };
+    const estadoNuevo = { fecha:nueva.fecha, titulo:nueva.titulo, tipo:nueva.tipo, texto:nueva.texto };
+    if(JSON.stringify(estadoOriginal) !== JSON.stringify(estadoNuevo)){
+      const error = validarSesionEditable(nueva);
+      const filaEstado = tr.querySelector('[data-estado]');
+      if(error){
+        tr.classList.add('error-fila');
+        filaEstado.textContent = error;
+        filaEstado.className = 'estado-edicion error';
+      }else{
+        tr.classList.remove('error-fila');
+        filaEstado.textContent = 'Pendiente';
+        cambios.push({ id, nueva, tr });
+      }
+    }
+  });
+  if(!cambios.length){
+    avisar('No hay sesiones cambiadas y válidas.', '');
+    return;
+  }
+  if(!confirm('¿Guardar ' + cambios.length + ' sesión(es) cambiada(s)?')) return;
+  cambios.forEach(x => {
+    const indice = estado.sesiones.findIndex(s => s.id === x.id);
+    if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(x.nueva));
+  });
+  guardar();
+  colaEdicionMasiva = cambios;
+  indiceEdicionMasiva = 0;
+  edicionMasivaPausada = false;
+  procesarEdicionMasiva();
+}
+async function procesarEdicionMasiva(){
+  if(edicionMasivaPausada) return;
+  while(indiceEdicionMasiva < colaEdicionMasiva.length){
+    const item = colaEdicionMasiva[indiceEdicionMasiva];
+    const filaEstado = item.tr && item.tr.querySelector('[data-estado]');
+    if(filaEstado){ filaEstado.textContent = 'Guardando…'; filaEstado.className = 'estado-edicion guardando'; item.tr.classList.remove('error-fila'); }
+    try{
+      await llamar('editarSesion', { slug: proyectoSel, sesion: item.nueva });
+      if(filaEstado){ filaEstado.textContent = 'Guardado'; filaEstado.className = 'estado-edicion guardado'; }
+      delete item.nueva.sin_sync;
+      const indice = estado.sesiones.findIndex(s => s.id === item.id);
+      if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
+      guardar();
+    }catch(e){
+      item.nueva.sin_sync = true;
+      const indice = estado.sesiones.findIndex(s => s.id === item.id);
+      if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
+      guardar();
+      if(/Token/i.test(e.message || '')){
+        edicionMasivaPausada = true;
+        if(filaEstado){ filaEstado.textContent = 'Pausado · inicia sesión'; filaEstado.className = 'estado-edicion error'; }
+        avisar('La sesión venció. Inicia sesión para reanudar el guardado masivo.', 'rojo');
+        return;
+      }
+      if(filaEstado){ filaEstado.textContent = 'Error — reintentar'; filaEstado.className = 'estado-edicion error'; item.tr.classList.add('error-fila'); }
+      if(!item.tr.querySelector('[data-reintentar]')){
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'btn blanco chico'; btn.dataset.reintentar = '1'; btn.textContent = 'Reintentar';
+        btn.onclick = async () => {
+          if(!sesionAutenticada()){ abrirLogin(); return; }
+          item.nueva.sin_sync = false;
+          try{
+            await llamar('editarSesion', { slug: proyectoSel, sesion: item.nueva });
+            delete item.nueva.sin_sync;
+            btn.remove(); filaEstado.textContent = 'Guardado'; filaEstado.className = 'estado-edicion guardado'; item.tr.classList.remove('error-fila');
+            const indice = estado.sesiones.findIndex(s => s.id === item.id);
+            if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
+            guardar();
+          }catch(e){
+            filaEstado.textContent = /Token/i.test(e.message || '') ? 'Pausado · inicia sesión' : 'Error — reintentar';
+          }
+        };
+        item.tr.lastElementChild.appendChild(document.createElement('br'));
+        item.tr.lastElementChild.appendChild(btn);
+      }
+    }
+    indiceEdicionMasiva++;
+  }
+  const guardadas = colaEdicionMasiva.filter(x => x.nueva && !x.nueva.sin_sync).length;
+  const fallidas = colaEdicionMasiva.length - guardadas;
+  const resumen = $('#resumenEdicionMasiva');
+  if(resumen) resumen.textContent = guardadas + ' guardada(s) · ' + fallidas + ' fallida(s) · sin cambios no enviadas.';
+}
 function renderBitacoras(){
   const pr = estado.proyectos.find(p => p.slug === proyectoSel);
   $('#tituloProyecto').textContent = pr ? etiquetaProyectoSelector(Object.assign({}, pr, {
@@ -1873,6 +2109,7 @@ function renderBitacoras(){
   const list = sesionesFiltradas();
   const cont = $('#lineaTiempo'); cont.innerHTML = '';
   sincronizarToggleBit();
+  if(modoEdicionMasiva){ renderEdicionMasiva(cont); return; }
   if(!list.length){ cont.innerHTML = '<p class="muted">No hay sesiones. Usa «+ Nueva sesión» para crear la primera.</p>'; return; }
   if(vistaBitacoras === 'tabla'){ renderTablaBitacoras(list, cont); return; }
   function lunesDe(iso){
@@ -2845,9 +3082,10 @@ function abrirMantenimiento(){
     '<label for="mProyectoNombre">Nombre del proyecto</label><input id="mProyectoNombre" maxlength="100" placeholder="p. ej. Nuevo proyecto">' +
     '<div class="grid2"><div><label for="mProyectoHashtag">Hashtag generado</label><input id="mProyectoHashtag" readonly aria-label="Hashtag generado automáticamente"></div>' +
     '<div><label for="mProyectoCarpeta">Slug propuesto</label><input id="mProyectoCarpeta" readonly aria-label="Identificador propuesto del proyecto"></div></div>' +
-    '<label for="mProyectoColor">Color</label><input id="mProyectoColor" type="color" value="#002663">' +
+    '<label for="mProyectoColor">Color</label><input id="mProyectoColor" type="color" value="' + esc(colorAleatorioProyecto()) + '">' +
     '<div class="fila" style="margin-top:8px"><button class="btn dorado" id="mAgregarProyecto">Agregar proyecto</button></div>' +
     '<div class="fila" style="margin-top:12px"><button class="btn" id="mCrear">Crear estructura desde cero</button><button class="btn" id="mVerificar">Verificar estructura</button><button class="btn" id="mRespaldar">Respaldar</button></div>' +
+      '<div class="fila" style="margin-top:12px"><button class="btn blanco" id="mColores">Asignar colores distintos a los proyectos</button></div>' +
     '<div class="fila" style="margin-top:12px"><button class="btn blanco" id="mFormato">Cargar formato JSON</button>' +
     '<button class="btn blanco" id="mImportar">Importar respaldo JSON</button>' +
     '<button class="btn peligro" id="mBorrar">Borrar copia local</button></div>' +
@@ -2929,6 +3167,32 @@ function abrirMantenimiento(){
     if(TIENE_APPS_SCRIPT){ try { const r = await llamar('crearEstructura', {}); $('#mResultado').innerHTML = '<p class="aviso verde">Estructura creada en Drive: ' + esc(JSON.stringify(r)) + '</p>'; return; } catch(e){ $('#mResultado').innerHTML = '<p class="aviso rojo">Error: ' + esc(e.message) + '</p>'; return; } }
     $('#mResultado').innerHTML = '<p><strong>Modo local — se crearían:</strong></p><ul style="margin-left:18px">' + estructura.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
   };
+  $('#mColores').onclick = async () => {
+    if(!TIENE_APPS_SCRIPT){
+      const usados = new Set();
+      estado.proyectos.forEach((p,i) => {
+        const disponibles = PALETA_PROYECTOS.filter(c => !usados.has(c));
+        p.color = (disponibles.length ? disponibles : PALETA_PROYECTOS)[i % (disponibles.length || PALETA_PROYECTOS.length)];
+        usados.add(p.color);
+      });
+      guardar(); renderTodo();
+      $('#mResultado').innerHTML = '<p class="aviso verde">Colores distintos asignados en modo local.</p>';
+      return;
+    }
+    try{
+      const r = await llamar('reasignarColores', {});
+      if(r && r.proyectos){
+        r.proyectos.forEach(p => {
+          const local = estado.proyectos.find(x => x.slug === p.slug);
+          if(local) local.color = p.color;
+        });
+        guardar(); renderTodo();
+        $('#mResultado').innerHTML = '<p class="aviso verde">Colores distintos asignados y guardados en el índice y en la hoja Bitacoras.</p>';
+      }
+    }catch(e){
+      $('#mResultado').innerHTML = '<p class="aviso rojo">No se pudieron asignar los colores: ' + esc(e.message) + '</p>';
+    }
+  };
   $('#mVerificar').onclick = async () => {
     if(TIENE_APPS_SCRIPT){
       /* M12: llamar de verdad a verificarEstructura (POST) y mostrar faltantes. */
@@ -2988,13 +3252,26 @@ function slugUnicoLocalProyecto(slugBase, folio){
   } while(existe(slug));
   return slug;
 }
+function colorAleatorioProyecto(){
+  const usados = new Set(estado.proyectos.map(p => String(p.color || '').toUpperCase()));
+  const disponibles = PALETA_PROYECTOS.filter(color => !usados.has(color));
+  const lista = disponibles.length ? disponibles : PALETA_PROYECTOS;
+  return lista[Math.floor(Math.random() * lista.length)];
+}
+function nombreDirectorioProyecto(folio, hashtag){
+  let nombre = String(hashtag || '').replace(/^#/, '').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  if(!nombre) nombre = 'Proyecto';
+  return folio + '-' + nombre;
+}
 async function agregarProyectoDesdeInterfaz(){
   if(!exigirSesion()) return;
   const nombre = $('#mProyectoNombre').value.trim();
   const nombreSlug = slugNombreProyecto(nombre);
   const slug = slugCompletoProyecto(nombre);
   const hashtag = hashtagProyecto(nombreSlug);
-  const color = $('#mProyectoColor').value;
+  const colorElegido = $('#mProyectoColor').value;
+  const color = /^#[0-9a-fA-F]{6}$/.test(colorElegido) ? colorElegido : colorAleatorioProyecto();
   const resultado = $('#mResultado');
   if(!nombre || !slug){ resultado.innerHTML = '<p class="aviso rojo">Escribe un nombre con letras o números para el proyecto.</p>'; return; }
   if(estado.proyectos.some(p => !proyectoCerrado(p) &&
@@ -3016,6 +3293,10 @@ async function agregarProyectoDesdeInterfaz(){
       const folio = folioDe(estado.configCiclo.ciclo, estado.configCiclo.siguiente);
       proyecto.folio = folio;
       proyecto.slug = slugUnicoLocalProyecto(slug, folio);
+      const nombreDirectorio = nombreDirectorioProyecto(folio, hashtag);
+      proyecto.drive_folder = 'Bitacoras/Proyectos/' + nombreDirectorio + '/';
+      proyecto.bitacora_json = proyecto.drive_folder + 'bitacora.json';
+      proyecto.ficha = proyecto.drive_folder + 'ficha.md';
     }
     estado.proyectos = estado.proyectos.concat(proyecto);
     estado.configCiclo = normalizarFolios(estado.proyectos, estado.configCiclo);
@@ -3047,6 +3328,8 @@ function cambiarVista(v){
 $$('.tabs button').forEach(b => b.onclick = () => cambiarVista(b.dataset.vista));
 /* Selector de proyecto con buscador (v3). */
 $('#btnSelectorProyecto').onclick = e => { e.stopPropagation(); alternarSelectorProyecto(); };
+$('#btnRecargarProyecto').onclick = recargarProyectoSeleccionado;
+$('#btnEditarTodo').onclick = abrirEdicionMasiva;
 $('#buscadorProyectos').addEventListener('input', () => { selIndice = -1; pintarOpcionesProyecto(); });
 $('#buscadorProyectos').addEventListener('keydown', e => {
   const n = $$('#opcionesProyectos .sel-opcion').length;

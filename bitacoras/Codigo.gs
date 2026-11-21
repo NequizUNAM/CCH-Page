@@ -120,6 +120,11 @@ var MUSE_SERVICE_ALLOWED_ACTIONS = [
   'guardar', 'verEvidencia', 'registrarPuntaje'
 ];
 
+var PALETA_PROYECTOS = [
+  '#002663', '#0B3D91', '#7C3AED', '#0F766E', '#B45309',
+  '#BE123C', '#1D4ED8', '#15803D', '#A21CAF', '#C2410C'
+];
+
 var ACCIONES_REQUIEREN_PROYECTO_ABIERTO = [
   'guardar', 'guardarSesion', 'editarSesion', 'eliminarSesion',
   'guardarPendiente', 'cerrarPendiente', 'guardarHito', 'editarHito',
@@ -361,6 +366,7 @@ function doPost(e) {
         case 'guardarConfigCiclo': return responder_(guardarConfigCiclo_(datos));
         case 'crearProyecto':    return responder_(crearProyecto_(datos));
         case 'cerrarProyecto':   return responder_(cerrarProyecto_(datos));
+        case 'reasignarColores': return responder_(reasignarColoresProyectos_());
         case 'crearEstructura':  return responder_({ ok: true, accion: 'crearEstructura',
                                        resultado: crearEstructuraDesdeCero() });
         case 'cambiarPassword':  return responder_(cambiarPassword_(datos));
@@ -1464,6 +1470,61 @@ function guardarConfigCiclo_(datos) {
 }
 
 /** Registra un proyecto nuevo en el índice y crea su estructura inicial. */
+function nombreDirectorioProyecto_(folio, hashtag) {
+  var nombre = String(hashtag || '').replace(/^#/, '').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!nombre) nombre = 'Proyecto';
+  return String(folio || '') + '-' + nombre;
+}
+
+function colorAleatorioProyecto_(indice) {
+  var usados = {};
+  (indice.projects || []).forEach(function (p) {
+    if (p && /^#[0-9a-fA-F]{6}$/.test(String(p.color || ''))) {
+      usados[String(p.color).toUpperCase()] = true;
+    }
+  });
+  var disponibles = PALETA_PROYECTOS.filter(function (color) {
+    return !usados[color.toUpperCase()];
+  });
+  var lista = disponibles.length ? disponibles : PALETA_PROYECTOS;
+  return lista[Math.floor(Math.random() * lista.length)];
+}
+
+function reasignarColoresProyectos_() {
+  var root = getOrCreateFolder_();
+  var indice = leerJSON_(root, 'INDICE-bitacoras.json') || indicePorDefecto_();
+  if (!Array.isArray(indice.projects)) indice.projects = [];
+  var usados = {};
+  var disponibles = [];
+  indice.projects.forEach(function (p) {
+    var color = String(p.color || '').toUpperCase();
+    if (/^#[0-9A-F]{6}$/.test(color) && PALETA_PROYECTOS.map(function (x) { return x.toUpperCase(); }).indexOf(color) >= 0) {
+      usados[color] = true;
+    }
+  });
+  PALETA_PROYECTOS.forEach(function (color) {
+    if (!usados[color.toUpperCase()]) disponibles.push(color);
+  });
+  indice.projects.forEach(function (p, i) {
+    var colorAnterior = String(p.color || '').toUpperCase();
+    if (colorAnterior === '#002663' || !/^#[0-9A-F]{6}$/.test(colorAnterior)) {
+      var nuevo = disponibles.shift() || PALETA_PROYECTOS[i % PALETA_PROYECTOS.length];
+      p.color = nuevo;
+      usados[nuevo.toUpperCase()] = true;
+    }
+  });
+  indice.updated = ahoraISO_().slice(0, 10);
+  escribirJSON_(root, 'INDICE-bitacoras.json', indice, true);
+  indice.projects.forEach(function (p) {
+    var fila = proyectoPorSlug_(p.slug);
+    if (fila) asegurarFilaProyecto_(p.slug);
+  });
+  return { ok: true, proyectos: indice.projects };
+}
+
 function crearProyecto_(datos) {
   var entrada = datos.proyecto || {};
   var slug = String(entrada.slug || '').trim();
@@ -1479,16 +1540,15 @@ function crearProyecto_(datos) {
   if (!/^#[A-Za-z][A-Za-z0-9]*$/.test(hashtag) || hashtag.length > 50) {
     return { ok: false, error: 'El hashtag debe iniciar con # y contener letras o números.' };
   }
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-    return { ok: false, error: 'El color debe ser hexadecimal de seis dígitos.' };
-  }
-
   var root = getOrCreateFolder_();
   var libro = getHojaCalculo_(false);
   if (!libro) return { ok: false, error: 'No se encontró la hoja de cálculo Bitacoras; crea o ubica el libro antes de agregar proyectos.' };
   var padreProyectos = carpetaPadreHojaCalculo_(libro);
   var indice = leerJSON_(root, 'INDICE-bitacoras.json') || indicePorDefecto_();
   if (!Array.isArray(indice.projects)) indice.projects = [];
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    color = colorAleatorioProyecto_(indice);
+  }
   var proyectosArchivados = archivarProyectosIniciales_(indice);
   var hashtagNormalizado = hashtag.toLowerCase();
   var duplicado = indice.projects.some(function (p) {
@@ -1514,7 +1574,9 @@ function crearProyecto_(datos) {
   config.usados.push(folio);
   config.siguiente++;
   slug = slugUnicoProyecto_(slug, folio, indice.projects);
+  var nombreDirectorio = nombreDirectorioProyecto_(folio, hashtag);
   var carpeta = buscarCarpeta_(padreProyectos, folio);
+  if (!carpeta) carpeta = buscarCarpeta_(padreProyectos, nombreDirectorio);
   if (carpeta) {
     var bitacoraExistente = leerJSON_(carpeta, 'bitacora.json');
     var correspondeAlProyecto = bitacoraExistente && bitacoraExistente.slug === slug;
@@ -1523,7 +1585,8 @@ function crearProyecto_(datos) {
       return { ok: false, error: 'Ya existe una carpeta con el folio ' + folio + ' asignada a otro proyecto.' };
     }
   }
-  var rutaProyecto = CONFIG.ROOT_FOLDER + '/' + CONFIG.PROJECTS_FOLDER + '/' + folio + '/';
+  var nombreRuta = carpeta ? carpeta.getName() : nombreDirectorio;
+  var rutaProyecto = CONFIG.ROOT_FOLDER + '/' + CONFIG.PROJECTS_FOLDER + '/' + nombreRuta + '/';
 
   var proyecto = {
     slug: slug, hashtag: hashtag, nombre: nombre, color: color,
@@ -1535,7 +1598,7 @@ function crearProyecto_(datos) {
   };
   indice.projects.push(proyecto);
   indice.updated = ahoraISO_().slice(0, 10);
-  carpeta = carpeta || padreProyectos.createFolder(folio);
+  carpeta = carpeta || padreProyectos.createFolder(nombreDirectorio);
   proyecto.drive_folder_id = carpeta.getId();
   escribirJSON_(root, 'INDICE-bitacoras.json', indice, true);
   if (!buscarArchivo_(carpeta, 'bitacora.json')) escribirJSON_(carpeta, 'bitacora.json', bitacoraVacia_(slug), false);

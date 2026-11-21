@@ -502,3 +502,10 @@ Bitacoras/
 - `doPost` acepta el token del body JSON o de `e.parameter.token` como alternativa de integración. El query string puede filtrarse en registros/historiales: no compartas ni registres URLs con el token. `doGet` no valida acciones con este token; la web sigue enviándolo en el body.
 - En `guardar`, Muse sincroniza sin borrar: agrega o fusiona por ID, conserva registros/elementos omitidos y no reemplaza valores anteriores con propiedades ausentes, nulas o vacías. Los registros sin ID o colecciones con tipo inválido se rechazan.
 - `#nuevaBitacora` por WhatsApp solo propone: requiere autorización explícita del usuario aunque Muse tenga el token.
+
+## Cambios nuevos aplicados
+
+- [x] Nombre de carpeta de proyectos nuevos: `CICLO-NN-NombreHashtag`, sin cambiar slug, folio ni índice.
+- [x] Colores distintos por proyecto, con paleta compartida y reasignación desde Mantenimiento.
+- [x] Recarga por proyecto o por todos los proyectos, con bloqueo de 60 segundos y conservación de datos `sin_sync`.
+- [x] Edición masiva de sesiones por proyecto, con paginación de 25, validación, cola secuencial, pausa por sesión vencida y reintento de fallos.

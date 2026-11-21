@@ -221,3 +221,10 @@ Si alguna prueba falla, anotar qué proyecto, qué paso y qué mensaje apareció
 ## Versión
 
 **v6 — 2026-11-19.** Token de servicio Muse almacenado solo como hash con sal, con acciones permitidas explícitas, rechazo por lista permitida y revocación independiente de la sesión web de 6 horas. El libro `Bitacoras` y las carpetas nuevas `CICLO-NN` quedan en `Bitacoras/Proyectos/`. v5 vació el catálogo inicial y ocultó los registros heredados sin borrar sus datos.
+
+### Cambios pendientes aplicados
+
+- Los proyectos nuevos usan carpetas `CICLO-NN-NombreHashtag` dentro de `Bitacoras/Proyectos/`; el slug y el folio no cambian. Las carpetas existentes se conservan.
+- Los proyectos tienen colores distintos de una paleta compartida por página y backend. Desde Mantenimiento se puede reasignar una vez a los proyectos existentes.
+- El selector incluye recarga por proyecto o por todos, con bloqueo de 60 segundos. La recarga conserva registros locales marcados `sin_sync`.
+- En un proyecto específico aparece «Editar todo» para editar hasta 25 sesiones por página, validar, guardar secuencialmente y reintentar fallos.
