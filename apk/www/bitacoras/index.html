@@ -38,17 +38,8 @@ h3{font-size:15px;color:var(--azul)}
 .confirmacion-dialogo{width:min(440px,100%);padding:22px;background:#fff;border:1px solid var(--borde);border-radius:14px;box-shadow:0 18px 48px rgba(17,24,39,.22)}
 .evidencia-quitar{border:0;background:transparent;color:var(--rojo);font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px}
 .evidencia-quitar:hover{background:#FEF2F2}
-.acciones-proyecto{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .btn-recarga{width:38px;height:38px;padding:0;display:inline-grid;place-items:center;font-size:18px;line-height:1}
 .btn-recarga.cargando{cursor:wait}
-.edicion-masiva{overflow-x:auto}
-.edicion-masiva table{min-width:760px}
-.edicion-masiva textarea{min-height:90px;resize:vertical}
-.edicion-masiva tr.error-fila{outline:2px solid var(--rojo);outline-offset:-2px}
-.estado-edicion{font-size:12px;font-weight:700;white-space:nowrap}
-.estado-edicion.guardando{color:var(--naranja)}
-.estado-edicion.guardado{color:var(--verde)}
-.estado-edicion.error{color:var(--rojo)}
 
 /* Encabezado */
 header{background:var(--azul);color:#fff;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
@@ -93,7 +84,7 @@ section.contenido{flex:1;min-width:300px}
 .hashtag-copiar{border:0;background:transparent;color:var(--azul);font:inherit;font-weight:700;padding:3px 5px;border-radius:6px;cursor:pointer}
 .hashtag-copiar:hover{background:#E3EDFB}
 .hashtag-copiar:focus-visible{outline:2px solid var(--azul-claro);outline-offset:2px}
-.modal.modal-amplio{max-width:1000px}
+.modal.modal-amplio{max-width:min(1000px,calc(100vw - 32px))}
 .galeria-encabezado{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .galeria-visor{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;gap:8px;margin:12px 0}
 .galeria-marco{min-height:45vh;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:10px;padding:8px}
@@ -103,7 +94,7 @@ section.contenido{flex:1;min-width:300px}
 .documento-preview{width:100%;height:min(68vh,720px);border:1px solid var(--borde);border-radius:8px;margin:10px 0}
 .lista-documentos-preview{display:grid;gap:8px}
 .lista-documentos-preview .doc-evidencia{max-width:none;width:100%}
-@media (max-width:600px){.galeria-visor{grid-template-columns:34px minmax(0,1fr) 34px;gap:4px}.galeria-nav{width:32px}.galeria-marco{min-height:38vh}.evidencia-accion{padding:5px}}
+@media (max-width:600px){.galeria-visor{grid-template-columns:34px minmax(0,1fr) 34px;gap:4px}.galeria-nav{width:32px}.galeria-marco{min-height:38vh}.evidencia-accion{padding:5px}.modal.modal-amplio{max-width:calc(100vw - 20px)}.modal.modal-amplio{padding:14px}}
 .doc-evidencia{display:flex;align-items:center;gap:8px;border:1px solid var(--borde);border-radius:8px;padding:8px 10px;background:#fff;text-decoration:none;color:var(--texto);max-width:260px;text-align:left}
 .doc-etiqueta{background:var(--azul);color:#fff;font-size:11px;font-weight:700;border-radius:6px;padding:3px 7px;white-space:nowrap}
 .miniaturas figure{margin:0;max-width:260px}
@@ -119,7 +110,7 @@ tr.vencido td{color:var(--rojo);font-weight:600}
 .marca{font-size:11px;line-height:1.3}
 .modal-fondo{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modal-fondo.abierto{display:flex}
-.modal{background:#fff;border-radius:14px;padding:20px;max-width:640px;width:100%;max-height:90vh;overflow:auto}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:640px;width:100%;max-height:90vh;overflow:auto;overscroll-behavior:contain}
 .modal img{max-width:100%;border-radius:8px}
 .oculto{display:none!important}
 .export-estado{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--azul);font-size:13px}
@@ -143,8 +134,9 @@ tr.vencido td{color:var(--rojo);font-weight:600}
 .chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--borde);background:#fff;border-radius:999px;padding:6px 12px;font-weight:600;font-size:13px}
 /* Selector de proyecto con buscador (v3): una fila compacta en lugar de
    la fila de chips; escala a muchos proyectos sin crecer la página. */
-.selector-proyecto{position:relative;padding:12px 18px 0;max-width:460px}
+.selector-proyecto{position:relative;display:flex;align-items:center;gap:8px;padding:12px 18px 0;max-width:520px}
 #btnSelectorProyecto{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--borde);background:#fff;border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px;cursor:pointer;text-align:left}
+#btnSelectorProyecto{flex:1;min-width:0}
 #btnSelectorProyecto .contador{margin-left:auto}
 #btnSelectorProyecto .sel-flecha{color:var(--gris);flex-shrink:0}
 .selector-lista{position:absolute;left:18px;right:18px;top:100%;margin-top:4px;background:#fff;border:1px solid var(--borde);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:30;overflow:hidden}
@@ -193,6 +185,40 @@ details.menu summary::-webkit-details-marker{display:none}
   .toast-sync .fila>*{flex:1}
 }
 .agenda{display:none}
+@media (max-width:760px){
+  .encabezado-bitacoras{align-items:stretch}
+  .encabezado-bitacoras h2{flex-basis:100%}
+  .encabezado-bitacoras .vista-toggle{margin-right:auto}
+  .encabezado-bitacoras #btnExportarProyecto{flex:0 0 auto}
+  section.contenido{min-width:0}
+  .tabs{overflow-x:auto;justify-content:flex-start}
+  .tabs button{min-width:max-content}
+  .resumen{gap:8px;padding-left:12px;padding-right:12px}
+  main{padding:12px}
+  .tabla-scroll,.calendario,.tarjeta{max-width:100%}
+  .tabla-scroll{overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+  .calendario .dia{min-height:54px;padding:4px;font-size:12px}
+  .fila>*{min-width:min(120px,100%)}
+}
+@media (max-width:480px){
+  header{gap:8px;flex-wrap:wrap}
+  header .logo{font-size:15px}
+  header .logo{flex:1 1 100%}
+  header .btn{padding:7px 8px;font-size:12px}
+  .selector-proyecto{padding-left:12px;padding-right:12px}
+  .resumen{grid-template-columns:1fr 1fr}
+  .kpi{padding:9px}
+  .kpi b{font-size:20px}
+  .tabs{padding-left:4px;padding-right:4px}
+  .tabs button{padding:8px 10px;font-size:12px}
+  .vista-toggle button{padding:7px 8px;font-size:12px}
+  .tarjeta{padding:12px}
+  .modal-fondo{padding:10px}
+  .modal{padding:14px;border-radius:12px;max-height:calc(100dvh - 20px)}
+  .modal .fila>*{flex:1 1 100%;min-width:0}
+  .modal input,.modal select,.modal textarea{font-size:16px}
+  .modal .btn{min-height:42px}
+}
 @media (max-width:760px){
   /* Dentro de .tabla-scroll la tabla conserva su formato y se desplaza
      en horizontal, en lugar de romperse en bloques (regla general de móvil). */
@@ -252,14 +278,11 @@ details.menu summary::-webkit-details-marker{display:none}
   <section class="contenido">
     <!-- Vista Bitácoras -->
     <div id="vista-bitacoras">
-      <div class="fila" style="margin-bottom:12px">
-        <h2 id="tituloProyecto" style="flex:2">Todas las bitácoras</h2>
-        <div class="acciones-proyecto">
-          <button type="button" class="btn blanco oculto" id="btnEditarTodo">Editar todo</button>
-        </div>
-        <div class="vista-toggle" role="group" aria-label="Vista de bitácoras">
-          <button type="button" id="btnVistaBitTarjeta" aria-pressed="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="5" rx="1"/><rect x="1.5" y="9.5" width="13" height="5" rx="1"/></svg>Tarjeta</button>
-          <button type="button" id="btnVistaBitTabla" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1"/><line x1="1.5" y1="6" x2="14.5" y2="6"/><line x1="6" y1="1.5" x2="6" y2="14.5"/></svg>Tabla</button>
+      <div class="fila encabezado-bitacoras" style="margin-bottom:12px">
+            <h2 id="tituloProyecto" style="flex:2">Todas las bitácoras</h2>
+            <div class="vista-toggle" role="group" aria-label="Vista de bitácoras">
+              <button type="button" id="btnVistaBitTarjeta" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="5" rx="1"/><rect x="1.5" y="9.5" width="13" height="5" rx="1"/></svg>Tarjeta</button>
+              <button type="button" id="btnVistaBitTabla" aria-pressed="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1"/><line x1="1.5" y1="6" x2="14.5" y2="6"/><line x1="6" y1="1.5" x2="6" y2="14.5"/></svg>Tabla</button>
         </div>
         <button class="btn" id="btnExportarProyecto">Exportar informe</button>
       </div>
@@ -414,12 +437,11 @@ let estado = { proyectos: PROYECTOS_BASE, sesiones: [], pendientes: [], hitos: [
 const PALETA_PROYECTOS = ['#002663','#0B3D91','#7C3AED','#0F766E','#B45309','#BE123C','#1D4ED8','#15803D','#A21CAF','#C2410C'];
 let proyectoSel = 'todos';
 let vistaActual = 'bitacoras';
-/* Vistas Tarjeta/Tabla (v2): la vista elegida se guarda en localStorage y
-   se restaura al abrir. Bitácoras nace en Tarjeta y Pendientes en Tabla,
-   que son sus vistas históricas. */
+/* Vistas Tarjeta/Tabla: la vista elegida se guarda en localStorage y se restaura;
+   Bitácoras y Pendientes usan Tabla como vista inicial. */
 function leerVistaGuardada(clave, defecto){ try { const v = localStorage.getItem(clave); return (v === 'tarjeta' || v === 'tabla') ? v : defecto; } catch(e){ return defecto; } }
 function guardarVista(clave, v){ try { localStorage.setItem(clave, v); } catch(e){} }
-let vistaBitacoras = leerVistaGuardada('bitacoras_vista_bitacoras', 'tarjeta');
+let vistaBitacoras = leerVistaGuardada('bitacoras_vista_bitacoras_v2', 'tabla');
 let vistaPendientes = leerVistaGuardada('bitacoras_vista_pendientes', 'tabla');
 function sincronizarToggleBit(){ const a = $('#btnVistaBitTarjeta'), b = $('#btnVistaBitTabla'); if(!a || !b) return; a.setAttribute('aria-pressed', vistaBitacoras === 'tarjeta' ? 'true' : 'false'); b.setAttribute('aria-pressed', vistaBitacoras === 'tabla' ? 'true' : 'false'); }
 function sincronizarTogglePend(){ const a = $('#btnVistaPendTarjeta'), b = $('#btnVistaPendTabla'); if(!a || !b) return; a.setAttribute('aria-pressed', vistaPendientes === 'tarjeta' ? 'true' : 'false'); b.setAttribute('aria-pressed', vistaPendientes === 'tabla' ? 'true' : 'false'); }
@@ -1520,7 +1542,6 @@ function abrirLogin(){
         mostrarCargaPantalla('Cargando proyectos y bitácoras…');
         try {
           await cargarDatos(); marcarLecturaReciente(); renderTodo(); procesarColaCambios();
-          if(edicionMasivaPausada){ edicionMasivaPausada = false; procesarEdicionMasiva(); }
           avisar('Sesión iniciada.', 'verde');
         } catch(e){
           renderTodo();
@@ -1774,8 +1795,6 @@ function renderProyectos(){
   const c = $('#selContador');
   if(act.abiertos){ c.textContent = act.abiertos; c.className = 'contador ' + (act.vencidos ? '' : 'cero'); c.style.display = ''; }
   else { c.textContent = ''; c.style.display = 'none'; }
-  const btnEditar = $('#btnEditarTodo');
-  if(btnEditar) btnEditar.classList.toggle('oculto', proyectoSel === 'todos' || act.cerrado);
   if(selectorAbierto) pintarOpcionesProyecto();
 }
 let recargaHasta = 0, temporizadorRecarga = null;
@@ -2109,7 +2128,6 @@ function renderBitacoras(){
   const list = sesionesFiltradas();
   const cont = $('#lineaTiempo'); cont.innerHTML = '';
   sincronizarToggleBit();
-  if(modoEdicionMasiva){ renderEdicionMasiva(cont); return; }
   if(!list.length){ cont.innerHTML = '<p class="muted">No hay sesiones. Usa «+ Nueva sesión» para crear la primera.</p>'; return; }
   if(vistaBitacoras === 'tabla'){ renderTablaBitacoras(list, cont); return; }
   function lunesDe(iso){
@@ -2174,18 +2192,20 @@ function renderBitacoras(){
 
 /* ---------- Hitos ---------- */
 function renderHitos(){
-  const lista = estado.hitos.filter(h => proyectoSel === 'todos' || h.slug === proyectoSel).sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)));
-  const hechos = lista.filter(h => h.estado === 'Cerrado').length;
-  const pct = lista.length ? Math.round(hechos / lista.length * 100) : 0;
+  const todos = estado.hitos.filter(h => proyectoSel === 'todos' || h.slug === proyectoSel)
+    .sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)));
+  const lista = todos.filter(h => h.estado !== 'Cerrado');
+  const hechos = todos.length - lista.length;
+  const pct = todos.length ? Math.round(hechos / todos.length * 100) : 0;
   const prH = estado.proyectos.find(x => x.slug === proyectoSel);
   const permitirCrear = proyectoSel === 'todos' ? proyectosActivos().length > 0 : !proyectoCerrado(proyectoSel);
   const botonNuevo = permitirCrear ? '<button class="btn chico dorado" id="btnNuevoHito">+ Hito</button>' : '';
-  if(!lista.length){
+  if(!todos.length){
     $('#panelHitos').innerHTML = '<div class="fila"><h3 style="flex:2">Hitos</h3><span class="muted">Sin hitos</span>' + botonNuevo + '</div>';
     if($('#btnNuevoHito')) $('#btnNuevoHito').onclick = () => { if(exigirSesion()) abrirFormHito(); };
     return;
   }
-  $('#panelHitos').innerHTML = '<details open><summary style="cursor:pointer"><strong>Hitos ' + (prH ? '· ' + esc(prH.hashtag + ' ' + prH.nombre) : '') + '</strong> <span class="muted">' + hechos + ' de ' + lista.length + ' completados (' + pct + '%)</span></summary>' +
+  $('#panelHitos').innerHTML = '<details open><summary style="cursor:pointer"><strong>Hitos ' + (prH ? '· ' + esc(prH.hashtag + ' ' + prH.nombre) : '') + '</strong> <span class="muted">' + hechos + ' de ' + todos.length + ' completados (' + pct + '%)</span></summary>' +
     (botonNuevo ? '<div class="fila" style="margin-top:8px">' + botonNuevo + '</div>' : '') +
     '<div class="barra"><div style="width:' + pct + '%"></div></div>' +
     (lista.length ? '<ul style="margin-left:18px">' + lista.map(h => {
@@ -2194,7 +2214,7 @@ function renderHitos(){
         (soloLectura ? ' <span class="muted">Solo lectura</span>' : ' <button class="btn chico blanco" data-hito-editar="' + esc(h.id) + '">Editar</button>' +
         (h.estado !== 'Cerrado' ? ' <button class="btn chico dorado" data-hito-completar="' + esc(h.id) + '">Completar</button>' : '') +
         ' <button class="btn chico peligro" data-hito-borrar="' + esc(h.id) + '">Borrar</button>') + '</li>';
-    }).join('') + '</ul>' : '<p class="muted">Sin hitos todavía.</p>') + '</details>';
+    }).join('') + '</ul>' : '<p class="muted">No hay hitos pendientes.' + (hechos ? ' Los completados se conservan en el calendario.' : '') + '</p>') + '</details>';
   /* M6: editar / completar / borrar hito (antes no se podía ni completar). */
   $$('#panelHitos [data-hito-completar]').forEach(b => b.onclick = async () => {
     if(!exigirSesion()) return;
@@ -2351,7 +2371,10 @@ async function abrirFormSesion(sesion){
     }
     $('#sTexto').value = textoNuevo;
   };
-  if(sesion) $('#sProyecto').disabled = true;
+  if(sesion){
+    $('#sProyecto').disabled = true;
+    $('#modalContenido').classList.add('modal-amplio');
+  }
   const pintarMiniaturas = () => {
     evidenciasTemp = evidenciasTemp.map((e,i) => normalizarEvidencia(e, i));
     $('#sMiniaturas').innerHTML = evidenciasTemp.map((e,i) => '<figure style="text-align:center">' +
@@ -3329,7 +3352,6 @@ $$('.tabs button').forEach(b => b.onclick = () => cambiarVista(b.dataset.vista))
 /* Selector de proyecto con buscador (v3). */
 $('#btnSelectorProyecto').onclick = e => { e.stopPropagation(); alternarSelectorProyecto(); };
 $('#btnRecargarProyecto').onclick = recargarProyectoSeleccionado;
-$('#btnEditarTodo').onclick = abrirEdicionMasiva;
 $('#buscadorProyectos').addEventListener('input', () => { selIndice = -1; pintarOpcionesProyecto(); });
 $('#buscadorProyectos').addEventListener('keydown', e => {
   const n = $$('#opcionesProyectos .sel-opcion').length;
@@ -3340,8 +3362,8 @@ $('#buscadorProyectos').addEventListener('keydown', e => {
 });
 document.addEventListener('click', e => { if(selectorAbierto && !e.target.closest('#selectorProyecto')) cerrarSelectorProyecto(); });
 /* Interruptor Tarjeta/Tabla (v2): cambia la vista y la guarda. */
-$('#btnVistaBitTarjeta').onclick = () => { vistaBitacoras = 'tarjeta'; guardarVista('bitacoras_vista_bitacoras', 'tarjeta'); renderBitacoras(); };
-$('#btnVistaBitTabla').onclick = () => { vistaBitacoras = 'tabla'; guardarVista('bitacoras_vista_bitacoras', 'tabla'); renderBitacoras(); };
+$('#btnVistaBitTarjeta').onclick = () => { vistaBitacoras = 'tarjeta'; guardarVista('bitacoras_vista_bitacoras_v2', 'tarjeta'); renderBitacoras(); };
+$('#btnVistaBitTabla').onclick = () => { vistaBitacoras = 'tabla'; guardarVista('bitacoras_vista_bitacoras_v2', 'tabla'); renderBitacoras(); };
 $('#btnVistaPendTarjeta').onclick = () => { vistaPendientes = 'tarjeta'; guardarVista('bitacoras_vista_pendientes', 'tarjeta'); renderPendientes(); };
 $('#btnVistaPendTabla').onclick = () => { vistaPendientes = 'tabla'; guardarVista('bitacoras_vista_pendientes', 'tabla'); renderPendientes(); };
 $('#btnLogin').onclick = abrirLogin;

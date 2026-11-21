@@ -474,3 +474,50 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .table-cch .cap-entera { right: 0; }
 .table-cch .cap-strict { right: 4.5rem; }
 .table-cch .cap-final { right: 9rem; }
+
+/* Ajustes responsive comunes para móvil, tablet y WebView Android. */
+.table-wrap { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.modal-dialog-scrollable .modal-content { overscroll-behavior: contain; }
+#adm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+#adm-toolbar > * { min-width: 0; }
+#adm-content, #stu-content, #view-admin, #view-student { min-width: 0; }
+.exam-host { min-width: 0; }
+.exam-frame { width: 100%; max-width: 100%; }
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .container-xl { max-width: 100%; padding-left: 1.25rem; padding-right: 1.25rem; }
+  .group-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .modal-dialog { max-width: min(94vw, 900px); }
+}
+
+@media (max-width: 767.98px) {
+  html, body { overflow-x: hidden; }
+  .container-xl { width: 100%; max-width: 100%; padding-left: .75rem; padding-right: .75rem; }
+  .app-nav .container-xl { flex-wrap: wrap; }
+  .app-nav .navbar-brand { min-width: 0; margin-right: auto; }
+  #view-admin .card-body .form-select { min-width: 0 !important; }
+  #adm-toolbar input[type="search"] { flex: 1 1 100%; min-width: 0; }
+  #adm-toolbar .btn, #adm-toolbar .form-select { min-height: 2.5rem; }
+  .table-wrap { max-width: 100%; }
+  .modal-dialog { width: auto; max-width: none; margin: .5rem; }
+  .modal-dialog-scrollable .modal-content { max-height: calc(100dvh - 1rem); }
+  .modal-dialog-scrollable .modal-body { overflow-y: auto; }
+  .modal-dialog-scrollable .modal-body { padding: .85rem; }
+  .profile-section { padding: .8rem; }
+  .profile-section .table-wrap { margin-left: -.25rem; margin-right: -.25rem; }
+  .exam-host { min-height: 70vh; }
+  .exam-frame { min-height: 70vh; }
+}
+
+@media (max-width: 420px) {
+  .welcome-hero { gap: .75rem !important; }
+  .hero-ico { width: 44px; height: 44px; font-size: 1.25rem; }
+  .app-nav .container-xl { gap: .4rem !important; }
+  .app-nav .navbar-brand span { font-size: .95rem; }
+  .app-nav .btn { padding: .35rem .5rem; }
+  .app-nav #btn-admin .d-none.d-sm-inline { display: none !important; }
+  .group-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roll-savebar { gap: .45rem; padding-left: .6rem; padding-right: .6rem; }
+  .roll-counter { max-width: 48%; }
+  .roll-savebar .btn { min-height: 2.8rem; padding: .35rem .55rem; }
+}
