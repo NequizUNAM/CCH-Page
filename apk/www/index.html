@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#002663">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>CCH Proyectos</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#111827;background:#f8fafc}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#002663 0 220px,#f8fafc 220px)}
+    header{color:#fff;padding:calc(24px + env(safe-area-inset-top)) 20px 26px;text-align:center}
+    header h1{margin:8px 0 4px;font-size:24px}
+    header p{margin:0;opacity:.82}
+    main{width:min(680px,calc(100% - 32px));margin:0 auto;display:grid;gap:14px}
+    .proyecto{display:flex;align-items:center;gap:16px;min-height:112px;padding:18px;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:18px;text-decoration:none;box-shadow:0 10px 30px rgba(15,23,42,.12)}
+    .proyecto:active{transform:scale(.985)}
+    .icono{width:58px;height:58px;flex:0 0 58px;border-radius:16px;display:grid;place-items:center;font-size:28px;color:#fff}
+    .asistencias{background:#002663}
+    .bitacoras{background:#b45309}
+    .texto{min-width:0}
+    .texto strong{display:block;font-size:18px;margin-bottom:4px}
+    .texto span{display:block;color:#64748b;font-size:14px;line-height:1.35}
+    .flecha{margin-left:auto;font-size:24px;color:#94a3b8}
+    footer{text-align:center;color:#64748b;font-size:12px;padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
+  </style>
+</head>
+<body>
+  <header>
+    <div aria-hidden="true">UNAM · CCH</div>
+    <h1>CCH Proyectos</h1>
+    <p>Elige el módulo que deseas usar</p>
+  </header>
+  <main>
+    <a class="proyecto" href="./asistencias/index.html">
+      <span class="icono asistencias" aria-hidden="true">&#127891;</span>
+      <span class="texto"><strong>Asistencias CCH</strong><span>Alumnos, asistencia, calificaciones, equipos y exámenes.</span></span>
+      <span class="flecha" aria-hidden="true">&#8250;</span>
+    </a>
+    <a class="proyecto" href="./bitacoras/index.html">
+      <span class="icono bitacoras" aria-hidden="true">&#128221;</span>
+      <span class="texto"><strong>Bitácoras CCH</strong><span>Sesiones, pendientes, hitos, evidencias y puntaje.</span></span>
+      <span class="flecha" aria-hidden="true">&#8250;</span>
+    </a>
+  </main>
+  <footer>CCH-UNAM · Aplicación móvil</footer>
+</body>
+</html>

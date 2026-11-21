@@ -1,0 +1,141 @@
+{
+  "version": 3,
+  "updated": "2026-11-18",
+  "reglas": [
+    "CamelCase sin espacios y sin acentos",
+    "El primer hashtag manda: proyecto o comando",
+    "Un proyecto nuevo nunca se crea solo: #nuevaBitacora prepara la propuesta y requiere autorizacion explicita de Nequiz, aunque Muse tenga token de servicio",
+    "Si falta el hashtag de proyecto o no esta en el indice, preguntar; no adivinar"
+  ],
+  "comandos": [
+    {
+      "comando": "#nuevaBitacora",
+      "categoria": "Proyectos",
+      "requiere_autorizacion": true,
+      "que_hace": "Prepara un proyecto nuevo: propone hashtag, slug, carpeta en Drive, ficha y plantilla. El token de servicio no sustituye la autorizacion explicita de Nequiz.",
+      "sintaxis": "#nuevaBitacora NombreEnCamelCase",
+      "ejemplo": "#nuevaBitacora ControlDeCalidad"
+    },
+    {
+      "comando": "#listarBitacoras",
+      "categoria": "Proyectos",
+      "requiere_autorizacion": false,
+      "que_hace": "Lista todos los proyectos con su hashtag, slug y pendientes abiertos.",
+      "sintaxis": "#listarBitacoras",
+      "ejemplo": "#listarBitacoras"
+    },
+    {
+      "comando": "#verBitacora",
+      "categoria": "Proyectos",
+      "requiere_autorizacion": false,
+      "que_hace": "Muestra el resumen de un proyecto: sesiones, pendientes abiertos y proximos hitos.",
+      "sintaxis": "#verBitacora #Proyecto",
+      "ejemplo": "#verBitacora #Estadistica2"
+    },
+    {
+      "comando": "#archivarBitacora",
+      "categoria": "Proyectos",
+      "requiere_autorizacion": true,
+      "que_hace": "Pide archivar un proyecto. Solo se archiva con confirmacion de Nequiz.",
+      "sintaxis": "#archivarBitacora #Proyecto",
+      "ejemplo": "#archivarBitacora #MoodleDgtic"
+    },
+    {
+      "comando": "#plantilla",
+      "categoria": "Proyectos",
+      "requiere_autorizacion": false,
+      "que_hace": "Devuelve la plantilla para copiar y llenar de ese proyecto.",
+      "sintaxis": "#plantilla #Proyecto",
+      "ejemplo": "#plantilla #Estadistica2"
+    },
+    {
+      "comando": "#nuevaSesion",
+      "categoria": "Sesiones",
+      "requiere_autorizacion": false,
+      "que_hace": "Crea una sesion/minuta en ese proyecto, con fecha actual por defecto.",
+      "sintaxis": "#Proyecto #nuevaSesion titulo y texto",
+      "ejemplo": "#Estadistica2 #nuevaSesion Revision Unidad 1"
+    },
+    {
+      "comando": "#agregarAcuerdo",
+      "categoria": "Sesiones",
+      "requiere_autorizacion": false,
+      "que_hace": "Agrega un acuerdo a la sesion y lo convierte en pendiente si trae responsable y fecha.",
+      "sintaxis": "#Proyecto #agregarAcuerdo texto - responsable - fecha",
+      "ejemplo": "#Estadistica2 #agregarAcuerdo Revisar ejercicios 5 y 6 - Nequiz - 2026-11-20"
+    },
+    {
+      "comando": "#agregarEvidencia",
+      "categoria": "Sesiones",
+      "requiere_autorizacion": false,
+      "que_hace": "Adjunta una foto o archivo como evidencia a la sesion. La foto va a Evidencias/ en Drive.",
+      "sintaxis": "#Proyecto #agregarEvidencia + foto con pie",
+      "ejemplo": "#CchPage #agregarEvidencia + foto"
+    },
+    {
+      "comando": "#verSesiones",
+      "categoria": "Sesiones",
+      "requiere_autorizacion": false,
+      "que_hace": "Lista las ultimas sesiones de ese proyecto.",
+      "sintaxis": "#verSesiones #Proyecto",
+      "ejemplo": "#verSesiones #CchPage"
+    },
+    {
+      "comando": "#nuevoPendiente",
+      "categoria": "Pendientes",
+      "requiere_autorizacion": false,
+      "que_hace": "Crea un pendiente con responsable y fecha compromiso.",
+      "sintaxis": "#Proyecto #nuevoPendiente texto - responsable - fecha",
+      "ejemplo": "#ControlFacturas #nuevoPendiente Pagar folio F-001 - Nequiz - 2026-11-20"
+    },
+    {
+      "comando": "#verPendientes",
+      "categoria": "Pendientes",
+      "requiere_autorizacion": false,
+      "que_hace": "Lista pendientes abiertos de ese proyecto (o de todos, si no se indica proyecto).",
+      "sintaxis": "#verPendientes #Proyecto",
+      "ejemplo": "#verPendientes #Estadistica2"
+    },
+    {
+      "comando": "#cerrarPendiente",
+      "categoria": "Pendientes",
+      "requiere_autorizacion": false,
+      "que_hace": "Marca un pendiente como hecho, con fecha de cierre. Necesita el ID o el texto exacto del pendiente.",
+      "sintaxis": "#Proyecto #cerrarPendiente ID",
+      "ejemplo": "#Estadistica2 #cerrarPendiente estadistica-2-2026-11-17-001"
+    },
+    {
+      "comando": "#nuevoHito",
+      "categoria": "Pendientes",
+      "requiere_autorizacion": false,
+      "que_hace": "Crea un hito con fecha en ese proyecto.",
+      "sintaxis": "#Proyecto #nuevoHito titulo - fecha",
+      "ejemplo": "#CchPage #nuevoHito Entrega v7.2 - 2026-11-25"
+    },
+    {
+      "comando": "#verHitos",
+      "categoria": "Pendientes",
+      "requiere_autorizacion": false,
+      "que_hace": "Lista los hitos de ese proyecto y su avance.",
+      "sintaxis": "#verHitos #Proyecto",
+      "ejemplo": "#verHitos #CchPage"
+    },
+    {
+      "comando": "#ayuda",
+      "categoria": "Ayuda",
+      "requiere_autorizacion": false,
+      "que_hace": "Devuelve este banco de peticiones, resumido.",
+      "sintaxis": "#ayuda",
+      "ejemplo": "#ayuda"
+    },
+    {
+      "comando": "#ayudaProyecto",
+      "categoria": "Ayuda",
+      "requiere_autorizacion": false,
+      "que_hace": "Devuelve la ficha y los campos propios de ese proyecto.",
+      "sintaxis": "#ayudaProyecto #Proyecto",
+      "ejemplo": "#ayudaProyecto #ControlFacturas"
+    }
+  ],
+  "nota": "v3 (2026-11-18): se quitó #firma."
+}

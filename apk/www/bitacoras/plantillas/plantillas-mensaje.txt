@@ -1,0 +1,78 @@
+# Plantillas para copiar y llenar (WhatsApp / Muse)
+
+Regla: el primer renglón es el hashtag en CamelCase. Copia la plantilla de tu proyecto, llena los vacíos y mándala.
+
+## #Estadistica2
+```
+#Estadistica2
+Sesión:
+Unidad:
+Tema:
+Texto:
+Asistentes:
+Acuerdos:
+-  —  — fecha:
+```
+
+## #Estadistica1
+```
+#Estadistica1
+Sesión:
+Unidad:
+Tema:
+Texto:
+Asistentes:
+Acuerdos:
+-  —  — fecha:
+```
+
+## #CchPage
+```
+#CchPage
+Sesión:
+Grupo:
+Parcial:
+Versión:
+Texto:
+Acuerdos:
+-  —  — fecha:
+```
+
+## #ControlFacturas
+```
+#ControlFacturas
+Sesión:
+Folio:
+Monto:
+Fecha pago:
+SAT:
+Texto:
+Acuerdos:
+-  —  — fecha:
+```
+
+## #AsistenciaCch
+```
+#AsistenciaCch
+Sesión:
+Turno:
+Grupo:
+Texto:
+Acuerdos:
+-  —  — fecha:
+```
+
+## #MoodleDgtic
+```
+#MoodleDgtic
+Sesión:
+Curso:
+Plataforma:
+Tipo:
+Texto:
+Acuerdos:
+-  —  — fecha:
+```
+
+---
+Versión de plantillas: 1 (2026-11-17). Si se agrega un campo nuevo, la plantilla sube a v2 y las sesiones viejas conservan su versión. Los archivos JSON de cada plantilla están en esta misma carpeta `plantillas/`, uno por proyecto.

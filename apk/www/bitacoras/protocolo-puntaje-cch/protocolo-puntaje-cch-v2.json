@@ -1,0 +1,2088 @@
+{
+  "titulo": "Normatividad Unificada CCH — UNAM (Protocolo de Equivalencias 2020 e Instructivo de Asignación de Horarios 2023)",
+  "fecha_generacion": "2026-11-18T23:57:12.420Z",
+  "protocolo_equivalencias_2020": {
+    "publicacion": "Gaceta CCH Suplemento, 17 de enero de 2020 (ISSN 0188-6975)",
+    "valores_nivel": {
+      "A": 25,
+      "B": 50,
+      "C": 150
+    },
+    "total_terminos_glosario": 107,
+    "glosario_completo": [
+      {
+        "id": "gl-001",
+        "name": "Acreditación de Diplomado",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Cumplimiento satisfactorio de la acreditación de un Diplomado presencial, semipresencial o a distancia, en apoyo a la actualización disciplinaria o formación docente, conforme al Plan de Estudios, con duración mínima de 120 horas, avalado por IES afiliada a ANUIES/UDUAL o apoyado por el CFC-CCH. (En Instructivo Horarios 2023 Art. 29-II otorga 8 pts/año si es de especialidad, psicopedagógico o habilidades digitales).",
+        "example": "Diplomado en Línea 'Desarrollo de Habilidades Digitales y Ciencia de Datos para el Bachillerato' (120 hrs) en el Centro de Formación Continua del CCH.",
+        "venue": "Centro de Formación Continua del CCH / DGTIC / Facultades UNAM."
+      },
+      {
+        "id": "gl-002",
+        "name": "Actividades Creativas",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Actividades extra-aula dirigidas a alumnos para fomentar su interés y mejorar su conocimiento acerca de ciencia, tecnología, humanidades, cultura y artes, con base en construcción o manipulación de instrumentos/recursos. Duración mínima de 40 horas. Informe: a) diseño; b) desarrollo; c) evaluación.",
+        "example": "Taller extra-aula de 40 horas de construcción de instrumentos ópticos y prototipos geométricos en el Plantel Vallejo.",
+        "venue": "Secretaría de Servicios de Apoyo al Aprendizaje / Departamentos de Plantel."
+      },
+      {
+        "id": "gl-003",
+        "name": "Actividades Experimentales para Reforzar Aprendizajes Curriculares en el SILADIN",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Conjunto de actividades experimentales diseñadas y adaptadas por uno hasta cuatro profesores. Cada actividad se presenta al menos a 12 grupos curriculares en el SILADIN. Se diseñan al menos 6 actividades por año (3 por semestre). Informe: a) diseño de 6 actividades; b) recursos; c) calendario; d) evaluación conjunta.",
+        "example": "Diseño y presentación de 6 actividades experimentales de análisis químico instrumental en el SILADIN para 14 grupos de Química III.",
+        "venue": "Secretaría Técnica del SILADIN del Plantel y SSAA."
+      },
+      {
+        "id": "gl-004",
+        "name": "Actualización de Paquete Didáctico",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Actualización o adaptación de un paquete didáctico original orientada a mejorar el logro de aprendizajes y vigencia de contenidos. Informe: a) justificación; b) cambios conceptuales/metodológicos; c) cambios en estrategias y recursos; d) nuevas fuentes en APA; e) mejoras en edición; f) paquete de origen como anexo.",
+        "example": "Actualización integral del Paquete Didáctico de Estadística y Probabilidad I incorporando bases de datos actuales y formato APA.",
+        "venue": "Secretaría Académica del Plantel / Seminario de Área."
+      },
+      {
+        "id": "gl-005",
+        "name": "Adaptación de Equipo o Programas de Cómputo para la Enseñanza",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Selección y acoplamiento de equipos o programas de cómputo, de preferencia de uso libre, para apoyo de la enseñanza y aprendizaje (experimentos simulados virtuales, medición computarizada de datos, representación gráfica de modelos matemáticos). Informe: a) manual; b) aprendizajes atendidos; c) aplicaciones didácticas interactivas.",
+        "example": "Acoplamiento de software libre GeoGebra y sensores digitales de movimiento para modelación gráfica en Matemáticas IV.",
+        "venue": "SILADIN / Salas de Cómputo / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-006",
+        "name": "Antología",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Selección de textos o materiales audiovisuales para instrumentación didáctica y logro de aprendizajes de una asignatura o unidad. Incluye: a) portada; b) índice; c) presentación; d) justificación con ficha y sinopsis; e) sugerencias de actividades de aprendizaje.",
+        "example": "Antología comentada de textos filosóficos y documentales digitales sobre ética y ciencia para Filosofía II.",
+        "venue": "Departamento de Materia / Academia Local del Plantel."
+      },
+      {
+        "id": "gl-007",
+        "name": "Apoyo a la Instrumentación de los Programas de Estudio",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Grupo de trabajo convocado por instancia central de Dirección (profesores de distintos planteles) para apoyar instrumentación de Programas de Estudio de un ciclo escolar. Informe: a) diagnóstico; b) valoración de programas; c) inventario de materiales; d) cursos propuestos; e) eventos académicos.",
+        "example": "Comisión institucional interplanteles convocada por DGCCH para la instrumentación didáctica de Cibernética y Computación I y II.",
+        "venue": "Secretaría Académica de la Dirección General del CCH."
+      },
+      {
+        "id": "gl-008",
+        "name": "Apoyos Bibliográficos, Hemerográficos, Filmográficos y Cibergráficos para un Curso (Rubro I)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Recopilación, comprensión, interpretación y aplicación de recursos bibliográficos, hemerográficos, filmográficos, cibergráficos o sitios web vigentes y accesibles al bachillerato. Incluye al menos 10 reseñas críticas, vinculación con programa y fuentes en formato APA.",
+        "example": "Compendio con 12 reseñas críticas de repositorios digitales, simuladores web y bibliografía especializada para Cálculo I.",
+        "venue": "Biblioteca / Mediateca / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-009",
+        "name": "Apoyos Bibliográficos, Hemerográficos, Filmográficos y Cibergráficos para un Curso (Rubro III)",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Recopilación y análisis crítico de recursos bibliográficos, hemerográficos, filmográficos y cibergráficos orientados a la actualización docente y formación de profesores (mínimo 10 reseñas críticas y fuentes APA).",
+        "example": "Guía cibergráfica y filmográfica comentada de recursos didácticos digitales para profesores de Historia Universal.",
+        "venue": "Centro de Formación Continua / Biblioteca del Plantel."
+      },
+      {
+        "id": "gl-010",
+        "name": "Artículo Académico (Rubro I)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Escrito original elaborado hasta por dos profesores, publicado en revista especializada, que aporte ideas o reflexiones sobre la didáctica del área o el aprendizaje en el bachillerato (extensión mínima de 5 cuartillas).",
+        "example": "Artículo 'Estrategias didácticas para la enseñanza de la probabilidad frecuencial en el CCH' publicado en revista arbitrada.",
+        "venue": "Revistas académicas arbitradas (UNAM, Perfiles Educativos, Eutopía)."
+      },
+      {
+        "id": "gl-011",
+        "name": "Artículo Académico (Rubro II)",
+        "rubros": [
+          "II"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Escrito original elaborado hasta por dos profesores, publicado en revista especializada, relacionado con el área de conocimiento o investigación educativa del profesor (extensión mínima de 5 cuartillas).",
+        "example": "Artículo de investigación disciplinaria o educativa de 8 cuartillas publicado en revista indexada de la UNAM.",
+        "venue": "Revistas especializadas arbitradas con ISSN."
+      },
+      {
+        "id": "gl-012",
+        "name": "Artículo de Divulgación",
+        "rubros": [
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Escrito original publicado para aportar conocimientos, experiencias o puntos de vista de interés en cultura, ciencias y humanidades, así como su difusión general o en el Colegio.",
+        "example": "Artículo de divulgación científica sobre criptografía y estadística publicado en suplemento o revista del CCH.",
+        "venue": "Gaceta CCH / Revistas de divulgación científica y cultural."
+      },
+      {
+        "id": "gl-013",
+        "name": "Asesorías a los Alumnos para la Presentación de Trabajos en Actividades Académicas",
+        "rubros": [
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Apoyo sistemático a un grupo de alumnos para elaboración y presentación de trabajos en actividades académicas locales, generales o institucionales. Informe con procedimientos, número de alumnos, resumen y reflexión de logros.",
+        "example": "Asesoría a equipo estudiantil para presentar cartel científico en la Feria de las Ciencias de la UNAM.",
+        "venue": "Coordinación Local de Eventos Académicos / Feria de las Ciencias."
+      },
+      {
+        "id": "gl-014",
+        "name": "Asesoría para Alumnos Orientada a Mejorar la Calidad del Aprendizaje y el Egreso (Nivel B)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Labor de apoyo académico sistemático presencial o semipresencial (mínimo 4 horas semanales durante un semestre) en modalidad curricular o extracurricular, con registro en el PSI y materiales didácticos.",
+        "example": "Programa semestral de asesorías de Matemáticas I-IV dentro del PIA registrado en el Sistema de Seguimiento Integral (PSI).",
+        "venue": "Programa Institucional de Asesorías (PIA) del Plantel y Sistema PSI."
+      },
+      {
+        "id": "gl-015",
+        "name": "Asesoría para Alumnos Orientada a Mejorar la Calidad del Aprendizaje y el Egreso (Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Asesoría sistemática (mínimo 4 horas semanales) realizada durante los dos semestres de un ciclo escolar completo, brindando apoyo a un mínimo de 15 alumnos por semestre con evidencias de seguimiento, mejora y acreditación en el PSI.",
+        "example": "Asesoría anual continua (2 semestres) a 18 alumnos por semestre de Química I y II con índice comprobado de acreditación.",
+        "venue": "Programa Institucional de Asesorías (PIA) / SSAA / Sistema PSI."
+      },
+      {
+        "id": "gl-016",
+        "name": "Asesoría para Profesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Apoyo sistemático a un profesor o grupo de profesores a lo largo de un semestre en: a) instrumentación de Programas de Estudio y b) superación disciplinaria y psicopedagógica, con balance conjunto asesor-asesorado.",
+        "example": "Acompañamiento semestral a profesores de nuevo ingreso en la planeación didáctica de Taller de Cómputo.",
+        "venue": "Secretaría Docente del Plantel / Jefatura de Sección."
+      },
+      {
+        "id": "gl-017",
+        "name": "Asesorías Didáctico-Disciplinarias Individualizadas para Profesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Asesoría semestral impartida a un profesor del Colegio en estudios de Maestría en Docencia para la Educación Media Superior (MADEMS) o posgrado/actualización promovida por la UNAM a nivel bachillerato.",
+        "example": "Asesoría didáctico-disciplinaria semestral a estudiante docente de la MADEMS en el área de Matemáticas.",
+        "venue": "Coordinación MADEMS UNAM / Secretaría Académica."
+      },
+      {
+        "id": "gl-018",
+        "name": "Banco de Datos Meteorológicos",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Presentación organizada de datos de una estación meteorológica que cubra al menos un año de observaciones y registros en formato internacional, con estadísticas anuales, interpretaciones climáticas y bitácora de alumnos.",
+        "example": "Base de datos climatológicos anuales de la Estación Meteorológica del Plantel Sur con análisis estadístico para Geografía y Estadística.",
+        "venue": "Programa de Estaciones Meteorológicas del Bachillerato Universitario (PEMBU)."
+      },
+      {
+        "id": "gl-019",
+        "name": "Banco de Información para una Asignatura",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Selección de mínimo 50 referencias (hemerográficas, bibliográficas, filmográficas, sitios web) realizada por hasta 4 profesores de una asignatura, coadyuvando al logro de aprendizajes, con descripción y formato APA.",
+        "example": "Banco digital de 55 fuentes comentadas en APA para la asignatura de Estadística y Probabilidad II.",
+        "venue": "Secretaría Académica del Plantel / Academia Local."
+      },
+      {
+        "id": "gl-020",
+        "name": "Banco de Reactivos",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Elaboración de reactivos de evaluación, impresos o en línea, organizados conforme a aprendizajes del programa. Incluye mínimo 100 reactivos de diferentes tipos y modalidades clasificados por grado de dificultad e instructivo.",
+        "example": "Banco en línea de 120 reactivos clasificados por nivel cognitivo y dificultad para Matemáticas II.",
+        "venue": "Secretaría Académica / Plataforma de Evaluación del Plantel."
+      },
+      {
+        "id": "gl-021",
+        "name": "Boletín Informativo Digital o Impreso",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Publicación periódica con información actualizada de apoyo a la docencia (reseñas, bibliografía audiovisual, nuevas adquisiciones). Mínimo 3 números en un año elaborados por Consejo Editorial de asignatura/área.",
+        "example": "Edición de 3 números anuales del Boletín Digital del Área de Matemáticas del Plantel Naucalpan.",
+        "venue": "Jefatura de Área / Consejo Editorial Local."
+      },
+      {
+        "id": "gl-022",
+        "name": "Cargos Honoríficos (Anual — Nivel B)",
+        "rubros": [
+          "VI"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Cumplimiento de responsabilidades durante un año con mínimo 85% de asistencia: Consejero Universitario, Académico del Bachillerato, Técnico, Académico por Área, Interno, integrante de Comisión Dictaminadora o Comité Académico CFC.",
+        "example": "Participación anual como Consejero Técnico o Consejero Académico de Área del CCH con >85% de asistencia.",
+        "venue": "Secretaría General UNAM / H. Consejo Técnico CCH / CAB."
+      },
+      {
+        "id": "gl-023",
+        "name": "Cargos Honoríficos (Comisión Dictaminadora 2 años — Nivel C)",
+        "rubros": [
+          "VI"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Integrantes de las Comisiones Dictaminadoras que concluyen satisfactoriamente un periodo de dos años conforme a lo estipulado por el Consejo Académico del Bachillerato (valorado con Nivel C = 150 puntos).",
+        "example": "Conclusión satisfactoria del bienio reglamentario como miembro propietario de la Comisión Dictaminadora del CCH.",
+        "venue": "Consejo Académico del Bachillerato (CAB) / H. Consejo Técnico."
+      },
+      {
+        "id": "gl-024",
+        "name": "Colaboración en el Desarrollo de Estudios e Investigaciones",
+        "rubros": [
+          "II"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Conjunto de actividades formales y sistemáticas que contribuyen al desarrollo, revisión, instrumentación o validación de una investigación, avaladas por el investigador o instancia institucional con informe.",
+        "example": "Colaboración en el procesamiento estadístico y validación de instrumentos de un proyecto INFOCAB o PAPIME.",
+        "venue": "Instancias de Investigación UNAM / DGCCH."
+      },
+      {
+        "id": "gl-025",
+        "name": "Colaborador de Libro",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Profesor(es) que participan en la elaboración de un libro en actividades como redacción, preparación de cuadros estadísticos, selección de imágenes/dibujos propios o corrección de estilo.",
+        "example": "Elaboración de gráficos estadísticos, ejercicios y revisión de estilo para libro institucional del CCH.",
+        "venue": "Comité Editorial del CCH / Dependencia Editora."
+      },
+      {
+        "id": "gl-026",
+        "name": "Comisiones Académicas",
+        "rubros": [
+          "IV"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Cumplimiento de responsabilidades inherentes al nombramiento otorgado por el Director General o Consejo Técnico durante uno o dos semestres, evaluado según informe y contribuciones institucionales.",
+        "example": "Comisión especial designada por el H. Consejo Técnico para revisión de criterios académicos o equivalencias.",
+        "venue": "Dirección General del CCH / H. Consejo Técnico."
+      },
+      {
+        "id": "gl-027",
+        "name": "Comité Académico Local para la Evaluación de las Guías de Exámenes Extraordinarios",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Grupo de profesores convocado por área académica y avalado por el Director del plantel que revisa, corrige y aprueba guías de examen extraordinario con base en una rúbrica durante 1 o 2 años lectivos.",
+        "example": "Integrante del Comité Local de Evaluación de Guías Extraordinarias de Cibernética y Computación en Plantel Oriente.",
+        "venue": "Dirección del Plantel y Jefatura de Área."
+      },
+      {
+        "id": "gl-028",
+        "name": "Compilación de Lecturas (Una Unidad — Nivel A)",
+        "rubros": [
+          "I",
+          "III"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Lecturas de uno o varios autores dirigidas a alumnos o profesores que cubren al menos una unidad de un curso, con índice, presentación, actividades didácticas y fuentes en formato APA.",
+        "example": "Compilación de lecturas y actividades de comprensión sobre historia de la estadística para la Unidad I.",
+        "venue": "Academia de Asignatura / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-029",
+        "name": "Compilación de Lecturas (Curso Completo — Nivel B)",
+        "rubros": [
+          "I",
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Compilación de lecturas estructurada con actividades de instrumentación didáctica y fuentes APA que cubre el total de un curso semestral.",
+        "example": "Compilación integral de lecturas comentadas para todas las unidades de Taller de Lectura y Redacción I.",
+        "venue": "Academia de Asignatura / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-030",
+        "name": "Compilador de Libro",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Encargado de: a) seleccionar; b) organizar; c) presentar y d) publicar un libro con colaboraciones originales sobre una temática determinada. Máximo 2 compiladores.",
+        "example": "Compilación de memorias académicas sobre innovación educativa en el bachillerato universitario.",
+        "venue": "Programa Editorial del CCH / Instituciones Académicas."
+      },
+      {
+        "id": "gl-031",
+        "name": "Conferencia o Videoconferencia",
+        "rubros": [
+          "I",
+          "II",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Exposición de un tema relacionado con la especialidad o interés del Colegio en jornada académica interna o externa. Debe entregarse por escrito en un mínimo de 10 cuartillas.",
+        "example": "Videoconferencia magistral sobre Inteligencia Artificial y Educación Matemática con texto entregado de 12 cuartillas.",
+        "venue": "Jornadas Académicas / Coloquios / Auditorios del CCH."
+      },
+      {
+        "id": "gl-032",
+        "name": "Coordinación de Grupos de Trabajo (Nivel B)",
+        "rubros": [
+          "IV"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Planear, organizar, coordinar, asesorar y supervisar en un semestre (convocado por Dirección) o durante un año las actividades académicas de un grupo de profesores con proyecto explícito y formal.",
+        "example": "Coordinación semestral de grupo local de trabajo docente para diseño de materiales de Matemáticas.",
+        "venue": "Dirección del Plantel / Secretaría Académica."
+      },
+      {
+        "id": "gl-033",
+        "name": "Coordinación de Grupos de Trabajo Institucionales (Nivel C)",
+        "rubros": [
+          "IV"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Coordinación anual de grupo de trabajo enmarcado en los campos aprobados por el Consejo Técnico, con proyecto e informe anual evaluados favorablemente por el Consejo Académico de Área/Depto. y ratificados por el Consejo Técnico.",
+        "example": "Coordinación anual de Seminario Institucional de Formación y Materiales aprobado por el Consejo Técnico.",
+        "venue": "Consejo Académico de Área / H. Consejo Técnico del CCH."
+      },
+      {
+        "id": "gl-034",
+        "name": "Coordinador de Libro",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Profesor(es) (máximo 2) a cargo de: a) organización; b) planeación; c) dirección; d) supervisión de la elaboración de un libro y e) autoría de una de las partes que componen la obra.",
+        "example": "Coordinación general y autoría de capítulo en libro colectivo del Seminario Institucional de Matemáticas.",
+        "venue": "Comité Editorial del CCH / Dirección General."
+      },
+      {
+        "id": "gl-035",
+        "name": "Cuaderno de Trabajo (Una Unidad — Nivel B)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Publicación con actividades teórico-prácticas dosificadas por complejidad sobre una unidad del Programa de Estudio, con guía de uso, estrategias, instrumentos de evaluación, valoración y fuentes APA.",
+        "example": "Cuaderno de trabajo con ejercicios progresivos y rúbricas para la Unidad II de Física I.",
+        "venue": "Secretaría Académica / Comité Editorial del Plantel."
+      },
+      {
+        "id": "gl-036",
+        "name": "Cuaderno de Trabajo (Curso Semestral — Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Cuaderno de trabajo completo con actividades teórico-prácticas dosificadas, estrategias, instrumentos de evaluación y valoración de resultados que atiende un curso semestral completo.",
+        "example": "Cuaderno de trabajo integral para todo el semestre de Matemáticas I con evaluación diagnóstica y sumativa.",
+        "venue": "Secretaría Académica / Comité Editorial del Plantel o DGCCH."
+      },
+      {
+        "id": "gl-037",
+        "name": "Curso Curricular o No Curricular en Línea",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Diseño e impartición de un curso en línea sobre plataforma LMS (máximo 6 profesores) que promueve trabajo individual/colaborativo e investigación. Incluye estructura, actividades interactivas, hipervínculos multimedia, diseño instruccional y URL, con evaluación satisfactoria de Comité de Pares con experto en LMS.",
+        "example": "Curso curricular completo en línea de Estadística y Probabilidad I alojado en Aulas Virtuales CCH con dictamen de Comité de Pares.",
+        "venue": "Aulas Virtuales CCH / SSAA / Comité de Pares."
+      },
+      {
+        "id": "gl-038",
+        "name": "Cursos Especiales o Extracurriculares para Alumnos (<40h Nivel A / ≥40h Nivel B)",
+        "rubros": [
+          "I",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Cursos presenciales o en línea de apoyo en orientación vocacional, regularización, deporte, divulgación científica o idiomas. Informe: planeación, logros, recursos y evaluación individual. Nivel A = 25 pts (<40h); Nivel B = 50 pts (40 horas o más).",
+        "example": "Curso extracurricular en línea de 40 horas de 'Introducción a Python y Análisis de Datos' para alumnos (Nivel B: 50 pts).",
+        "venue": "Secretaría de Servicios Estudiantiles / Difusión Cultural / SILADIN."
+      },
+      {
+        "id": "gl-039",
+        "name": "Cursos para la MADEMS",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Cursos impartidos por un profesor del Colegio en la Maestría en Docencia para la Educación Media Superior (MADEMS), con duración mínima de un semestre, incluyendo planeación, materiales, evaluación y bibliografía.",
+        "example": "Impartición semestral de seminario de didáctica disciplinaria en la MADEMS UNAM.",
+        "venue": "Posgrado MADEMS UNAM (Facultad de Ciencias / FES Acatlán / Iztacala)."
+      },
+      {
+        "id": "gl-040",
+        "name": "Cursos para Profesores (Impartición)",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Cursos presenciales o en línea impartidos a otros profesores (mínimo 20 horas) para formación o actualización docente. Informe: justificación, evaluación reflexiva, programa, materiales, formas de evaluación y concentrado de participantes.",
+        "example": "Impartición de curso intersemestral de 20 horas 'Uso de GeoGebra y RStudio en el Aula' en el CFC-CCH.",
+        "venue": "Centro de Formación Continua del CCH / Secretarías Docentes."
+      },
+      {
+        "id": "gl-041",
+        "name": "Cursos Recibidos",
+        "rubros": [
+          "III"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": true,
+        "definition": "Cursos con mínimo 20 horas de formación pedagógica o actualización de conocimientos acreditados presencialmente o a distancia en UNAM, ANUIES o UDUAL.",
+        "example": "Acreditación de curso de 20 horas sobre evaluación formativa o herramientas digitales en el Centro de Formación Continua CCH.",
+        "venue": "Centro de Formación Continua CCH / DGAPA / DGTIC."
+      },
+      {
+        "id": "gl-042",
+        "name": "Charlas de Divulgación (Individual Nivel A / Ciclo 5 Charlas Nivel B)",
+        "rubros": [
+          "V"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Exposición oral frente a auditorio sobre tema científico, humanístico o cultural con sinopsis mínima de 1 cuartilla (Nivel A: 25 pts). Nivel B (50 pts) cuando se realiza un conjunto de al menos 5 charlas con eje integrador relacionado con un curso e informe.",
+        "example": "Charla magistral o ciclo de 5 charlas sobre aplicaciones de la estadística en la ciencia contemporánea.",
+        "venue": "Departamento de Difusión Cultural / Jornadas Estudiantiles."
+      },
+      {
+        "id": "gl-043",
+        "name": "Desarrollo de un Tema con Fines Didácticos",
+        "rubros": [
+          "I",
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Exposición escrita de un tema del Programa de Estudio dirigida a alumnos o profesores (mínimo 10 cuartillas). Incluye: índice, presentación de aprendizajes, desarrollo, aparato crítico, instrumentación didáctica y fuentes APA.",
+        "example": "Documento didáctico de 14 cuartillas sobre Distribuciones de Probabilidad con secuencias didácticas para Estadística I.",
+        "venue": "Academia de Asignatura / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-044",
+        "name": "Dirección de Grupos de Trabajo con Alumnos (Nivel B)",
+        "rubros": [
+          "II",
+          "IV"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Orientación a un conjunto de alumnos fuera de horario de clases (mínimo 1 semestre) para realizar investigación, diseño de prototipos o estudio prospectivo en SILADIN, Feria de las Ciencias o Jóvenes hacia la Investigación.",
+        "example": "Dirección semestral de equipo de alumnos en proyecto de investigación documental o experimental en el plantel.",
+        "venue": "SILADIN / Programa Jóvenes hacia la Investigación / Feria de las Ciencias."
+      },
+      {
+        "id": "gl-045",
+        "name": "Dirección de Grupos de Trabajo con Alumnos (Comité de Pares — Nivel C)",
+        "rubros": [
+          "II",
+          "IV"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Dirección semestral de investigación o prototipos con alumnos fuera de clase que cuenta con reporte científico completo (APA) y arbitraje positivo o evaluación satisfactoria de un Comité de Pares.",
+        "example": "Dirección de grupo estudiantil en Jóvenes hacia la Investigación con reporte metodológico avalado por Comité de Pares.",
+        "venue": "SILADIN / Comité de Pares / Dirección General CCH."
+      },
+      {
+        "id": "gl-046",
+        "name": "Dirección de Obra de Teatro de Carácter Didáctico (Nivel B / Evento Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Organización y seguimiento con alumnos/profesores que culmina con puesta en escena didáctica ante público externo (Nivel B: 50 pts). Nivel C (150 pts) si incorpora reflexión conjunta y presentación en evento local o general.",
+        "example": "Puesta en escena de obra didáctica sobre historia de la ciencia presentada en encuentro teatral del CCH.",
+        "venue": "Departamento de Difusión Cultural del Plantel."
+      },
+      {
+        "id": "gl-047",
+        "name": "Director o Asesor de Tesis",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Profesor reconocido institucionalmente por facultad o escuela que asesora o dirige actividades académicas hasta la presentación del examen profesional de licenciatura o de grado.",
+        "example": "Dirección de tesis de licenciatura en Matemáticas Aplicadas o de maestría en la MADEMS hasta examen de grado.",
+        "venue": "Facultades y Escuelas de la UNAM / Posgrado MADEMS."
+      },
+      {
+        "id": "gl-048",
+        "name": "Diseño de un Curso para Profesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Planeación de un curso para formación/actualización docente (mínimo 20 horas, máximo 2 diseñadores). Incluye presentación, propósitos, enfoque, contenidos, actividades, evaluación, materiales y fuentes APA, dictaminado por Comité Académico CFC-CCH.",
+        "example": "Diseño aprobado de curso-taller de 20 horas 'Modelación Matemática con Software Libre' para el catálogo del CFC-CCH.",
+        "venue": "Comité Académico del Centro de Formación Continua del CCH."
+      },
+      {
+        "id": "gl-049",
+        "name": "Diseño, Organización, Realización y Evaluación de un Diplomado",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Participación de máximo 4 profesores en concepción, organización, realización y evaluación de un diplomado docente (mínimo 120 horas), presencial, semipresencial o en línea, avalado por IES (ANUIES/UDUAL) y apoyado por el CFC-CCH.",
+        "example": "Diseño y coordinación integral del Diplomado en Línea 'Competencias Digitales y Didáctica de las Ciencias' (120 hrs).",
+        "venue": "Centro de Formación Continua del CCH / Facultades e Institutos UNAM."
+      },
+      {
+        "id": "gl-050",
+        "name": "Diseño y Elaboración de Materiales Didácticos Interactivos para el Portal Académico",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Diseño y elaboración de Objetos de Aprendizaje interactivos basados en Programa de Estudio, enfocados en aprendizajes de difícil comprensión. Cumplen criterios de usabilidad DGTIC y son desarrollados por equipo interdisciplinario coordinado por Departamento de Medios Digitales.",
+        "example": "Objeto de Aprendizaje interactivo publicado en el Portal Académico del CCH sobre Funciones Cuadráticas o Probabilidad Condicional.",
+        "venue": "Departamento de Medios Digitales (DGCCH) / Portal Académico CCH / DGTIC."
+      },
+      {
+        "id": "gl-051",
+        "name": "Diseño y Seguimiento de Actividades Experimentales o Virtuales Aplicables en los Laboratorios",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Diseñar y presentar en grupos curriculares actividades experimentales o apoyadas en TIC (sensores, simuladores virtuales, modelos moleculares/computacionales, animaciones). Nivel B (50 pts) = 4 actividades/año (2/semestre); Nivel C (150 pts) = al menos 6 actividades y evaluación satisfactoria de Comité de Pares.",
+        "example": "Diseño y aplicación curricular de 6 prácticas con simuladores virtuales y sensores digitales en laboratorios de Física/Química (Nivel C: 150 pts).",
+        "venue": "Laboratorios Curriculares / SILADIN / Comité de Pares."
+      },
+      {
+        "id": "gl-052",
+        "name": "Ensayo",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Escrito original individual (mínimo 5 cuartillas) de carácter argumentativo con tesis, argumentos, conclusiones y fuentes APA, publicado en proyecto editorial del Colegio o institución avalada por ANUIES.",
+        "example": "Ensayo argumentativo sobre el Modelo Educativo del CCH y la alfabetización estadística publicado en revista del Colegio.",
+        "venue": "Proyectos Editoriales del CCH / Publicaciones ANUIES."
+      },
+      {
+        "id": "gl-053",
+        "name": "Estancias Cortas (Mínimo 40 horas — Nivel B)",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Conjunto de actividades que el profesor realiza en un seminario o laboratorio de investigación en escuelas, facultades o institutos bajo asesoría de investigadores durante al menos 40 horas, acreditadas con informe avalado.",
+        "example": "Estancia corta de investigación de 45 horas en laboratorio de estadística aplicada de la Facultad de Ciencias UNAM.",
+        "venue": "Facultades, Centros e Institutos de Investigación UNAM."
+      },
+      {
+        "id": "gl-054",
+        "name": "Estancias Continuas (Mínimo 160 horas — Nivel C)",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Incorporación del profesor en tareas de investigación de su disciplina durante un lapso no menor a 160 horas bajo asesoría de investigadores, con informe y constancia oficial de colaboración y aportación individual.",
+        "example": "Estancia continua de 160 horas en el Instituto de Investigaciones en Matemáticas Aplicadas y en Sistemas (IIMAS-UNAM).",
+        "venue": "Institutos y Centros de Investigación de la UNAM."
+      },
+      {
+        "id": "gl-055",
+        "name": "Estrategia Didáctica",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Conjunto estructurado de procedimientos y actividades para orientar enseñanza-aprendizaje de un tema o unidad: contenidos y aprendizajes; apertura, desarrollo y cierre; evaluación diagnóstica, formativa y sumativa. Si es interactiva, usar software libre.",
+        "example": "Estrategia didáctica completa con apertura, desarrollo y cierre e instrumentos de evaluación para Estadística I.",
+        "venue": "Secretaría Académica del Plantel / Seminario Local."
+      },
+      {
+        "id": "gl-056",
+        "name": "Estudio sobre la Docencia",
+        "rubros": [
+          "II"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Trabajo sistemático exploratorio (documental o de campo) sobre práctica docente en aula/laboratorio, problemas de aprendizaje o perfil estudiantil. Incluye marco conceptual, información procesada, conclusiones y fuentes APA.",
+        "example": "Estudio diagnóstico sobre dificultades conceptuales en álgebra y estadística en alumnos de primer ingreso al CCH.",
+        "venue": "Secretaría Académica / Planeación Local del Plantel."
+      },
+      {
+        "id": "gl-057",
+        "name": "Evaluación de un Programa de Estudio",
+        "rubros": [
+          "II"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Investigación educativa colegiada (profesores de distintos planteles convocados por Dirección General y coordinados centralmente) para valorar pertinencia, vigencia y coherencia del Programa de Estudio de una asignatura.",
+        "example": "Informe colegiado interplanteles de evaluación diagnóstica del Programa de Estudio de Estadística y Probabilidad I y II.",
+        "venue": "Dirección General del CCH / Secretaría Académica Central."
+      },
+      {
+        "id": "gl-058",
+        "name": "Evaluación del Plan de Estudios",
+        "rubros": [
+          "II"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Estudio sistemático colegiado de los cinco planteles, convocado y dirigido por Dirección General con aprobación del Consejo Técnico, para fundamentar modificaciones curriculares conforme al Reglamento General de Planes de Estudio.",
+        "example": "Participación en comisión institucional de evaluación integral del Plan de Estudios del Colegio de Ciencias y Humanidades.",
+        "venue": "Dirección General del CCH y H. Consejo Técnico."
+      },
+      {
+        "id": "gl-059",
+        "name": "Examen de Conocimientos y Habilidades Disciplinarias para la Docencia",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Instrumento elaborado colegiadamente por profesores de distintos planteles, coordinado por Secretaría Académica, para valorar conocimientos y habilidades disciplinarias de una asignatura conforme a la guía correspondiente.",
+        "example": "Elaboración colegiada de reactivos y problemas para el Examen de Conocimientos Disciplinarios de Matemáticas.",
+        "venue": "Secretaría Académica de la Dirección General del CCH."
+      },
+      {
+        "id": "gl-060",
+        "name": "Examen Diagnóstico Académico (EDA)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Instrumento de evaluación elaborado por grupo convocado centralmente: tabla de especificaciones; análisis psicométrico estadístico (Iteman: dificultad, discriminación, confiabilidad); examen y aval de Secretaría de Planeación del CCH.",
+        "example": "Diseño, validación psicométrica con Iteman y análisis estadístico del Examen Diagnóstico Académico (EDA) de Matemáticas.",
+        "venue": "Secretaría de Planeación del CCH."
+      },
+      {
+        "id": "gl-061",
+        "name": "Examen Extraordinario",
+        "rubros": [
+          "I"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Instrumento de evaluación elaborado colegiadamente con preguntas/actividades acordes al programa y guía, criterios de calificación y aplicación en periodo de exámenes.",
+        "example": "Elaboración colegiada y aplicación oficial de examen extraordinario de Matemáticas III en periodo ordinario de extraordinarios.",
+        "venue": "Secretaría de Administración Escolar / Jefatura de Área del Plantel."
+      },
+      {
+        "id": "gl-062",
+        "name": "Formación de Profesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Planeación, diseño e impartición de al menos dos módulos o cursos de 40 horas cada uno (80 horas total), secuenciados e integrados, organizados por hasta 8 profesores y avalados institucionalmente.",
+        "example": "Diseño e impartición de programa modular de 80 horas (2 cursos de 40h) sobre Didáctica de la Estadística y Ciencia de Datos.",
+        "venue": "Centro de Formación Continua del CCH / Secretaría Académica."
+      },
+      {
+        "id": "gl-063",
+        "name": "Formación Personalizada de Profesores",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Trabajo realizado durante un año escolar con dos o más profesores de asignatura, incluyendo aspectos disciplinarios/didácticos y observación mutua de clases con informe reflexivo.",
+        "example": "Acompañamiento anual con observación recíproca de clases a tres profesores de asignatura de nuevo ingreso en Matemáticas.",
+        "venue": "Secretaría Docente / Jefatura de Área del Plantel."
+      },
+      {
+        "id": "gl-064",
+        "name": "Formador de Asesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Profesor con al menos 3 años de experiencia en el PIA que capacita durante un año al menos a 3 profesores de nuevo ingreso al PIA, impartiendo curso y dando seguimiento.",
+        "example": "Capacitación anual y seguimiento a cuatro nuevos profesores asesores del Programa Institucional de Asesorías (PIA).",
+        "venue": "Coordinación Central y Local del PIA / Secretaría Académica."
+      },
+      {
+        "id": "gl-065",
+        "name": "Formador de Asesores en Línea",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Trabajo de profesores experimentados para formar a dos o más asesores en línea de un curso con aprobación institucional, entregando planeación, registro de actividad en plataforma y evaluación.",
+        "example": "Formación y acompañamiento en plataforma Moodle de tres asesores en línea para cursos remediales del PAL.",
+        "venue": "Programa de Asesoría en Línea (PAL) / SSAA."
+      },
+      {
+        "id": "gl-066",
+        "name": "Formador de Profesores en Actividades Experimentales en el SILADIN",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Trabajo de formación dirigido a dos o más profesores de asignatura durante un año en actividades experimentales, de laboratorio o de campo en el SILADIN, avalado por SSAA y Secretaría Técnica del SILADIN.",
+        "example": "Formación anual en laboratorio experimental del SILADIN dirigida a profesores de asignatura de Biología y Química.",
+        "venue": "Secretaría Técnica del SILADIN y SSAA."
+      },
+      {
+        "id": "gl-067",
+        "name": "Formador de Tutores",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Profesor con al menos 3 años de experiencia en el Programa Institucional de Tutorías (PIT) que capacita durante un año al menos a 3 profesores de nuevo ingreso al PIT.",
+        "example": "Capacitación anual, seguimiento y curso de inducción impartido a cuatro tutores de nuevo ingreso en el PIT.",
+        "venue": "Coordinación Central y Local del Programa Institucional de Tutorías (PIT)."
+      },
+      {
+        "id": "gl-068",
+        "name": "Funcionario o Integrante de la Comisión Organizadora de Elecciones",
+        "rubros": [
+          "VI"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Participación honoraria como funcionario de casilla o en comisión de vigilancia/apoyo logístico en elecciones de Consejeros Universitarios, Técnicos, Académicos o Internos.",
+        "example": "Participación como presidente o secretario de casilla en elección de Consejeros Técnicos del CCH.",
+        "venue": "Comisión Local de Vigilancia de Elecciones / Dirección del Plantel."
+      },
+      {
+        "id": "gl-069",
+        "name": "Glosario de Términos por Asignatura o Área de Conocimiento",
+        "rubros": [
+          "I",
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Acopio y definición alfabética de conceptos significativos de una asignatura acorde con enfoques disciplinario y didáctico, con justificación, marco teórico, ejemplos y fuentes APA.",
+        "example": "Glosario didáctico ilustrado de conceptos fundamentales de Estadística Descriptiva e Inferencial para bachillerato.",
+        "venue": "Academia de Asignatura / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-070",
+        "name": "Guía de Estudio para el Examen de Conocimientos y Habilidades Disciplinarias",
+        "rubros": [
+          "III"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Documento coordinado por Secretaría Académica (máximo 5 profesores) para apoyar preparación del examen disciplinario de docentes, con actividades semejantes, fuentes APA y rúbrica.",
+        "example": "Guía oficial de estudio y rúbrica de evaluación para aspirantes a profesores de Cibernética y Computación.",
+        "venue": "Secretaría Académica de la Dirección General del CCH."
+      },
+      {
+        "id": "gl-071",
+        "name": "Guía de Lectura (Una Unidad — Nivel A)",
+        "rubros": [
+          "I"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Conjunto de secuencias didácticas elaboradas para que los estudiantes interpreten, comprendan, profundicen e interactúen con diferentes textos relativos al logro de los aprendizajes de una unidad de una asignatura.",
+        "example": "Guía de lectura analítica para la Unidad I de Taller de Lectura y Redacción I.",
+        "venue": "Academia Local / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-072",
+        "name": "Guía de Lectura (Todas las Unidades — Nivel B)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Conjunto de secuencias didácticas de comprensión e interpretación de textos que abarca todas las unidades del Programa de Estudio de la asignatura.",
+        "example": "Guía de lectura completa para todas las unidades de Historia de México I.",
+        "venue": "Academia Local / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-073",
+        "name": "Guía para el Profesor",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Documento realizado por grupo de trabajo que cubre todas las unidades del curso (introducción, conceptos clave, estrategias, actividades, materiales, puntos problemáticos y fuentes APA), con evaluación satisfactoria de Comité de Pares.",
+        "example": "Guía completa para el profesor de Matemáticas IV aprobada por Comité de Pares para su publicación institucional.",
+        "venue": "Secretaría Académica DGCCH / Comité de Pares."
+      },
+      {
+        "id": "gl-074",
+        "name": "Guía para Examen Extraordinario",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Documento impreso o en línea elaborado colegiadamente (introducción, instrucciones, conceptos clave por unidad, actividades, autoevaluación y fuentes APA), aprobado por Dirección y aplicado.",
+        "example": "Guía oficial en línea para examen extraordinario de Estadística y Probabilidad I aprobada por el Comité Local.",
+        "venue": "Comité Local de Evaluación de Guías / Dirección del Plantel."
+      },
+      {
+        "id": "gl-075",
+        "name": "Infografía o Infograma",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Elaboración de al menos 10 infografías o infogramas acordes a los aprendizajes o temas de un Programa de Estudio, combinando imágenes sintéticas, gráficos y textos explicativos.",
+        "example": "Colección digital de 12 infografías didácticas sobre distribución normal, muestreo y correlación para Estadística II.",
+        "venue": "Secretaría Académica del Plantel / Portal Académico."
+      },
+      {
+        "id": "gl-076",
+        "name": "Impartición de Cursos en Línea para Alumnos",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Cursos a distancia semestrales en plataforma LMS donde el profesor revisa y retroalimenta tareas/exámenes, ingresa al menos 2 veces al día y obtiene evaluación favorable de alumnos en PIA/PAL.",
+        "example": "Asesoría semestral en línea en el Programa de Asesoría en Línea (PAL) para alumnos de Matemáticas III.",
+        "venue": "Programa de Asesoría en Línea (PAL) / PIA / Sistema PSI."
+      },
+      {
+        "id": "gl-077",
+        "name": "Impartición de un Diplomado",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Participación de máximo 6 profesores en impartición y evaluación de un diplomado docente (mínimo 120 horas), presencial, semipresencial o en línea, avalado por IES o CFC-CCH.",
+        "example": "Impartición y evaluación de módulos en el Diplomado Institucional de Actualización Docente (120 horas).",
+        "venue": "Centro de Formación Continua del CCH / Facultades UNAM."
+      },
+      {
+        "id": "gl-078",
+        "name": "Jurado Calificador (Incisos a – k, incluye Comité de Revisión de Software Educativo)",
+        "rubros": [
+          "VI"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Evaluador en: a) Programa Editorial; b) Estímulos; c) Arbitraje; d) Comités evaluación; e) Comités DGAPA/DGTIC/CAB (incluye revisión de software educativo); f) Comité de Pares; g) Premios UNAM/Jóvenes Académicos/Bernardo Quintana; h) Concursos oposición definitividad; i) Ingreso carrera; j) Comité Académico CFC-CCH; k) Evaluación examen conocimientos disciplinarios.",
+        "example": "Integrante de Comité de Pares, Jurado de Concurso de Oposición o Comité de Revisión de Software Educativo DGTIC/CCH.",
+        "venue": "Consejo Académico del Bachillerato / DGCCH / DGAPA / DGTIC."
+      },
+      {
+        "id": "gl-079",
+        "name": "Jurado en Actividades Académicas",
+        "rubros": [
+          "V"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Profesor que dictamina la calidad de un artículo académico/divulgación o valora méritos de participantes en cualquier actividad o certamen académico.",
+        "example": "Jurado evaluador de carteles y ponencias estudiantiles en la Feria de las Ciencias o Encuentro de Jóvenes Investigadores.",
+        "venue": "Coordinación Local de Eventos / Feria de las Ciencias."
+      },
+      {
+        "id": "gl-080",
+        "name": "Lectura con Fines Didácticos",
+        "rubros": [
+          "I",
+          "V"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Lectura en voz alta de obra fundamental realizada ante auditorio o evento cultural/académico para difundir obras indispensables en formación humanística y científica, con constancia.",
+        "example": "Lectura comentada de textos clásicos de divulgación científica y filosófica en jornada cultural del plantel.",
+        "venue": "Departamento de Difusión Cultural / Biblioteca del Plantel."
+      },
+      {
+        "id": "gl-081",
+        "name": "Libro",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Obra original coherente e integrada con rigor conceptual y metodológico vinculada al Modelo Educativo y Plan de Estudios, revisada por Comité Editorial y publicada impresa o digital. Nivel C (150 pts) hasta 6 autores; más de 6 autores = Nivel B (50 pts), salvo dictamen de alta calidad.",
+        "example": "Libro publicado por el CCH sobre historia, epistemología y enseñanza de las matemáticas en el nivel medio superior.",
+        "venue": "Comité Editorial del CCH / Dirección General."
+      },
+      {
+        "id": "gl-082",
+        "name": "Libro de Texto",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Obra original dirigida a alumnos para facilitar enseñanza-aprendizaje de una asignatura del Plan de Estudios del Colegio, con actividades, problemas, equilibrio teórico-práctico y aval de Comité Editorial.",
+        "example": "Libro de texto oficial para los cursos curriculares de Matemáticas I a IV o Estadística y Probabilidad.",
+        "venue": "Comité Editorial del CCH / Programa Editorial UNAM."
+      },
+      {
+        "id": "gl-083",
+        "name": "Libro para la Actualización de Profesores",
+        "rubros": [
+          "III"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Obra que contribuye a la formación de profesores, relacionada con el Modelo Educativo y Plan de Estudios dentro de un programa institucional, elaborada a partir de ensayos, artículos o investigaciones educativas.",
+        "example": "Libro de actualización disciplinaria y didáctica dirigido a profesores del Área de Matemáticas del CCH.",
+        "venue": "Comité Editorial del CCH / Centro de Formación Continua."
+      },
+      {
+        "id": "gl-084",
+        "name": "Manual de Prácticas de Laboratorio",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Conjunto estructurado de técnicas y procedimientos (máximo 6 integrantes) para actividades experimentales o de campo sobre todas las unidades del Programa de Estudio, con análisis de datos y fuentes APA.",
+        "example": "Manual integral de prácticas experimentales y computacionales para todas las unidades de Física II.",
+        "venue": "Jefatura de Área de Ciencias Experimentales / SILADIN / Comité Editorial."
+      },
+      {
+        "id": "gl-085",
+        "name": "Material Audiovisual",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Material original (serie de diapositivas, filmaciones, videos, podcast) organizado conforme a un guion para presentar temas del Programa de Estudio, con información de utilidad y sugerencias de aplicación.",
+        "example": "Serie de podcasts educativos y presentaciones multimedia guionizadas para apoyar la asignatura de Cibernética.",
+        "venue": "Mediateca / Departamento Audiovisual / Secretaría Académica."
+      },
+      {
+        "id": "gl-086",
+        "name": "Material Didáctico con Uso de Software (Una Unidad — Nivel B)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Material didáctico interactivo elaborado con software o aplicaciones de uso libre para dispositivos móviles/computadoras con elementos audiovisuales, texto y secuencia didáctica para un tema o unidad.",
+        "example": "Colección de applets interactivos en GeoGebra con secuencia didáctica para la Unidad II de Matemáticas III.",
+        "venue": "Secretaría Académica del Plantel / Salas de Cómputo."
+      },
+      {
+        "id": "gl-087",
+        "name": "Material Didáctico con Uso de Software (Curso Completo — Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Material didáctico interactivo con software o aplicaciones de uso libre que cubre el curso completo de una asignatura y cuenta con evaluación satisfactoria de un Comité de Pares.",
+        "example": "Suite interactiva en software libre con secuencias didácticas para todo el curso de Cálculo I avalada por Comité de Pares.",
+        "venue": "Secretaría Académica / Comité de Pares / Portal Académico."
+      },
+      {
+        "id": "gl-088",
+        "name": "Material Educativo de Audio",
+        "rubros": [
+          "I"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": true,
+        "definition": "Producción de uno o más materiales digitalizados de audio con base en una estrategia didáctica para apoyar el aprendizaje de una asignatura, incluyendo guion detallado.",
+        "example": "Cápsulas de audio digitalizado con guion didáctico para comprensión auditiva en Inglés o Francés I-IV.",
+        "venue": "Mediateca / Departamento de Idiomas o Área Académica."
+      },
+      {
+        "id": "gl-089",
+        "name": "Monografía (Nivel B / Comité de Pares Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Escrito pormenorizado y sistemático sobre contenidos del Programa de Estudio (introducción, desarrollo, metodología, análisis, conclusiones y fuentes APA). Nivel B = 50 pts; Nivel C = 150 pts con evaluación satisfactoria de Comité de Pares.",
+        "example": "Monografía exhaustiva sobre métodos de muestreo estadístico o modelación matemática.",
+        "venue": "Secretaría Académica / Comité de Pares."
+      },
+      {
+        "id": "gl-090",
+        "name": "Organización de Actividades Académicas (Local A / General B / Nacional-Internacional C)",
+        "rubros": [
+          "I",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Planeación, difusión y realización de coloquios, congresos, ferias, encuentros, muestras o torneos (máximo 4 organizadores). Nivel A (25 pts) = locales; Nivel B (50 pts) = generales en el Colegio; Nivel C (150 pts) = nacionales o internacionales.",
+        "example": "Comité organizador de Jornada Académica General del Colegio (50 pts) o Congreso Nacional/Internacional (150 pts).",
+        "venue": "Dirección del Plantel / Dirección General del CCH."
+      },
+      {
+        "id": "gl-091",
+        "name": "Paquete Didáctico (Parcial Nivel B / Curso Completo Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Conjunto estructurado de materiales para enseñanza-aprendizaje de una asignatura (hasta 6 profesores) que facilite trabajo de taller/experimental. Nivel B = 50 pts; Nivel C = 150 pts si cubre todas las unidades de un curso y cuenta con evaluación satisfactoria de Comité de Pares o Editorial.",
+        "example": "Paquete didáctico completo con talleres, lecturas y evaluaciones para las 4 unidades de Estadística y Probabilidad I.",
+        "venue": "Comité de Pares / Comité Editorial / Secretaría Académica."
+      },
+      {
+        "id": "gl-092",
+        "name": "Paquete para la Evaluación de un Curso",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Conjunto estructurado de lineamientos, criterios e instrumentos para evaluación diagnóstica, formativa y sumativa de cada unidad de un curso, con evaluación satisfactoria de Comité de Pares o Editorial.",
+        "example": "Paquete integral de instrumentos y rúbricas de evaluación ordinaria por unidad para Matemáticas II aprobado por Comité de Pares.",
+        "venue": "Comité de Pares / Secretaría Académica."
+      },
+      {
+        "id": "gl-093",
+        "name": "Paquete para la Evaluación Extraordinaria de un Curso",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Conjunto estructurado que incluye: a) guía para examen extraordinario; b) banco de reactivos; c) tres modelos de examen derivados del banco. Evaluado satisfactoriamente por Comité de Pares, guía publicada y exámenes aplicados.",
+        "example": "Paquete completo (guía publicada + banco de reactivos + 3 exámenes aplicados) para Matemáticas IV.",
+        "venue": "Comité de Pares / Dirección del Plantel / Administración Escolar."
+      },
+      {
+        "id": "gl-094",
+        "name": "Participación en Grupos de Trabajo",
+        "rubros": [
+          "IV"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Cumplimiento de requisitos de un grupo de trabajo reconocido oficialmente (lecturas, borradores, material didáctico, exposiciones y asistencia mínima del 85% de sesiones) con informe y producto.",
+        "example": "Integrante activo con >85% de asistencia en Seminario Institucional de Área reconocido por el Consejo Académico.",
+        "venue": "Consejo Académico de Área / Dirección del Plantel."
+      },
+      {
+        "id": "gl-095",
+        "name": "Participación en Jornadas Académicas",
+        "rubros": [
+          "I",
+          "III"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Cumplimiento de tareas y actividades periódicas y sistemáticas en seminarios de área o semanas académicas con duración mínima de 20 horas y asistencia mínima al 90% de las sesiones.",
+        "example": "Asistencia y participación acreditada (>90%) en Semana Académica o Seminario Local de Área (20 horas).",
+        "venue": "Jefatura de Área / Secretaría Académica del Plantel."
+      },
+      {
+        "id": "gl-096",
+        "name": "Participación en la Elaboración y Publicación de una Revista (Nivel B / Con 2 Artículos Propios Nivel C)",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Actividades durante un año en Comité Editorial de revista impresa o digital del Colegio (mínimo 2 números publicados). Nivel B = 50 pts; Nivel C = 150 pts si además colabora con al menos 2 artículos o ensayos de su autoría.",
+        "example": "Integrante del Comité Editorial de revista académica digital del CCH con 2 números publicados en el año.",
+        "venue": "Comité Editorial de Revista Institucional / Plantel."
+      },
+      {
+        "id": "gl-097",
+        "name": "Ponencia",
+        "rubros": [
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Aportación presentada por escrito en un mínimo de 5 cuartillas en foros, congresos, simposia, coloquios o encuentros académicos, basada en estudio o experiencia docente.",
+        "example": "Ponencia escrita de 7 cuartillas presentada en el Coloquio Nacional de Enseñanza de las Ciencias en el Bachillerato.",
+        "venue": "Congresos, Simposia y Encuentros Académicos Nacionales/Internacionales."
+      },
+      {
+        "id": "gl-098",
+        "name": "Prácticas de Campo",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Conjunto de actividades teórico-prácticas para realizar prácticas de campo no obligatorias sobre temas del Programa de Estudio, apegadas al Reglamento de Prácticas de Campo del CCH, con presentación de resultados.",
+        "example": "Práctica de campo interdisciplinaria en reserva ecológica o centro industrial con reporte de resultados estudiantiles.",
+        "venue": "Secretaría Académica / Comisión Local de Prácticas de Campo."
+      },
+      {
+        "id": "gl-099",
+        "name": "Presentación de un Libro o Revista",
+        "rubros": [
+          "V"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Presentación del autor y exposición oral ante un público sobre un libro o revista publicado recientemente o reeditado, entregando un texto de 3 cuartillas como mínimo.",
+        "example": "Presentación comentada de novedad editorial del CCH en feria del libro o auditorio de plantel (texto de 4 cuartillas).",
+        "venue": "Departamento de Difusión Cultural / Programa Editorial CCH."
+      },
+      {
+        "id": "gl-100",
+        "name": "Programas de Cómputo para la Enseñanza (Unidad Nivel B / Curso Completo Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": true,
+        "definition": "Programas de cómputo originales e interactivos con fines didácticos (presentación, manual de instalación/operación, aprendizajes, orientación didáctica, autoevaluación y fuentes APA). Nivel B = 50 pts (unidad); Nivel C = 150 pts (curso completo + evaluación Comité de Pares).",
+        "example": "Software educativo interactivo original para todo el curso de Cibernética o Estadística aprobado por Comité de Pares.",
+        "venue": "Departamento de Medios Digitales / Comité de Pares / DGTIC."
+      },
+      {
+        "id": "gl-101",
+        "name": "Programa de Fortalecimiento a la Calidad del Egreso (PROFOCE)",
+        "rubros": [
+          "IV"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Grupo de trabajo institucional convocado por Dirección General para planear, organizar, coordinar, asesorar y supervisar actividades del PROFOCE, apoyando a alumnos del último ciclo hacia la licenciatura.",
+        "example": "Coordinación institucional del programa PROFOCE en el plantel para fortalecer el egreso hacia carreras de área físico-matemática.",
+        "venue": "Dirección General del CCH / Secretaría de Programas Institucionales."
+      },
+      {
+        "id": "gl-102",
+        "name": "Programa Operativo (Individual Nivel B / Colegiado Anual Nivel C)",
+        "rubros": [
+          "I"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": false,
+        "definition": "Propuesta didáctica individual o colegiada (máximo 6 integrantes) que articula aprendizajes, contenidos, estrategias, materiales, evaluación y fuentes. Nivel B = 50 pts; Nivel C = 150 pts si es colegiado, incluye los 2 semestres de un ciclo y evidencias de aplicación.",
+        "example": "Programa operativo colegiado anual (Semestres Non y Par) de Matemáticas I-II con evidencias de aplicación en aula (Nivel C: 150 pts).",
+        "venue": "Secretaría Académica del Plantel / Academia Local."
+      },
+      {
+        "id": "gl-103",
+        "name": "Programa Permanente de Atención al Rezago Escolar",
+        "rubros": [
+          "I"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Diseño y desarrollo de programa institucional convocado por Dirección General o planteles para prevenir y abatir reprobación y deserción en una asignatura, con diagnóstico, acciones, resultados y reflexión.",
+        "example": "Programa institucional de atención al rezago y abatimiento de reprobación en Matemáticas I y II.",
+        "venue": "Dirección General del CCH / Dirección del Plantel / SSAA."
+      },
+      {
+        "id": "gl-104",
+        "name": "Propuesta Educativa",
+        "rubros": [
+          "I",
+          "II"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Propuesta teórico-metodológica fundamentada e innovadora basada en estudio formal para mejorar enseñanza-aprendizaje de una asignatura o área, con marco teórico, contribución disciplinaria/pedagógica, propuestas y evaluación satisfactoria de Comité de Pares.",
+        "example": "Propuesta teórico-metodológica innovadora para la integración de ciencia de datos en el tronco común de Matemáticas.",
+        "venue": "Comité de Pares / Secretaría Académica DGCCH."
+      },
+      {
+        "id": "gl-105",
+        "name": "Relator / Reseña Bibliográfica o Videográfica / Revisión Técnica de Libro / Secuencia Didáctica",
+        "rubros": [
+          "I",
+          "V"
+        ],
+        "level": "A",
+        "points": 25,
+        "isDigital": false,
+        "definition": "Agrupa productos de nivel A y B: Relator (V-A, 25 pts, sinopsis ≥1 cuartilla); Reseña bibliográfica o videográfica (V-A, 25 pts, ≥3 cuartillas); Secuencia didáctica (I-A, 25 pts, fases inicial, desarrollo y síntesis con anexos); Revisión técnica de libro (I-B, 50 pts).",
+        "example": "Secuencia didáctica completa de 3 fases (inicio, desarrollo, síntesis) para un aprendizaje de Estadística I (Nivel A: 25 pts).",
+        "venue": "Secretaría Académica del Plantel / Comités Editoriales."
+      },
+      {
+        "id": "gl-106",
+        "name": "Seguimiento, Análisis y Preparación Grupal de la Experiencia Docente / Seminarios Monitores",
+        "rubros": [
+          "I",
+          "V"
+        ],
+        "level": "C",
+        "points": 150,
+        "isDigital": false,
+        "definition": "Seguimiento grupal institucional de dos cursos de asignaturas impartidas durante el mismo ciclo escolar con planeación, ajustes, evaluación de aprendizajes y reflexión (Rubro I-C: 150 pts); y Seminarios/talleres extracurriculares para alumnos monitores (Rubro V-B: 50 pts / V-C: 150 pts con réplica).",
+        "example": "Informe grupal anual de seguimiento y análisis de la experiencia docente en dos cursos curriculares del ciclo escolar.",
+        "venue": "Secretaría Académica del Plantel / Grupos Institucionales."
+      },
+      {
+        "id": "gl-107",
+        "name": "Sinodal de Examen de Grado / Traducción de Artículo o Libro / Tutoría para Alumnos (PIT) / Video Educativo / Visitas Guiadas",
+        "rubros": [
+          "I",
+          "III",
+          "V"
+        ],
+        "level": "B",
+        "points": 50,
+        "isDigital": true,
+        "definition": "Sinodal examen de grado (V-A: 25 pts); Visitas guiadas (I-A: 25 pts); Traducción artículo/ensayo (V-B: 50 pts); Traducción de libro (I/III/V-C: 150 pts con Pares); Video educativo digital original con guion ≥5 min (I-B: 50 pts); Tutoría para alumnos PIT (I-B: 50 pts por 1 grupo anual; I-C: 150 pts por 2 grupos curriculares).",
+        "example": "Tutoría grupal anual dentro del PIT (50 pts 1 grupo / 150 pts 2 grupos) o Video Educativo digital guionizado (50 pts).",
+        "venue": "Programa Institucional de Tutorías (PIT) / Mediateca / Facultades UNAM."
+      }
+    ],
+    "categorias": {
+      "Asociado A": {
+        "puntos": 100,
+        "min_rubro_I_pct": 50
+      },
+      "Asociado B": {
+        "puntos": 200,
+        "min_rubro_I_pct": 50
+      },
+      "Asociado C": {
+        "puntos": 250,
+        "min_rubro_I_pct": 50,
+        "nivel_minimo": "B"
+      },
+      "Titular A": {
+        "puntos": 300,
+        "min_rubro_I_o_II_pct": 50,
+        "nivel_minimo_I_o_II": "C",
+        "min_rubro_III_pts": 75,
+        "nivel_minimo_III": "B"
+      },
+      "Titular B": {
+        "puntos": 350,
+        "min_rubro_I_II_III_pts": 150,
+        "nivel_minimo_I_II_III": "C",
+        "min_rubro_IV_pts": 50,
+        "min_rubro_III_pts": 50
+      },
+      "Titular C": {
+        "puntos": 400,
+        "min_rubro_I_II_III_pts": 200,
+        "nivel_minimo_I_II_III": "C",
+        "min_rubro_IV_pts": 50,
+        "min_rubro_III_pts": 50
+      }
+    }
+  },
+  "instructivo_asignacion_horarios_2023": {
+    "publicacion": "Gaceta CCH Suplemento, 10 de marzo de 2023",
+    "horas_permanentes_plantel": {
+      "Azcapotzalco": 8784,
+      "Naucalpan": 8452,
+      "Vallejo": 8856,
+      "Oriente": 8924,
+      "Sur": 9576,
+      "Total": 44592
+    },
+    "plazos_legales": {
+      "inicio_proceso": "10 semanas antes de finalizar año lectivo (Art. 26)",
+      "revision_representacion_legal": "10 días hábiles (Art. 27)",
+      "formalizacion_asignacion": "3 días hábiles (Art. 30)",
+      "inconformidad_mixta_local": "3 días (Art. 32)",
+      "resolucion_mixta_local": "5 días hábiles (Art. 32)",
+      "resolucion_mixta_central": "15 días hábiles (Art. 32)"
+    }
+  },
+  "directorio_institucional_completo": [
+    {
+      "sede": "unam",
+      "title": "Autoridades Centrales UNAM",
+      "subtitle": "Rectoría y Secretaría General",
+      "badge": "UNAM Central",
+      "contact": "unam.mx • Ciudad Universitaria",
+      "members": [
+        {
+          "role": "Rector",
+          "name": "Dr. Enrique Graue Wiechers"
+        },
+        {
+          "role": "Secretario General",
+          "name": "Dr. Leonardo Lomelí Vanegas"
+        },
+        {
+          "role": "Abogado General",
+          "name": "Mtro. Hugo Alejandro Concha Cantú"
+        },
+        {
+          "role": "Secretario Administrativo",
+          "name": "Dr. Luis Álvarez Icaza Longoria"
+        },
+        {
+          "role": "Secretaria de Desarrollo Institucional",
+          "name": "Dra. Patricia Dolores Dávila Aranda"
+        },
+        {
+          "role": "Secretario de Prevención y Seguridad Univ.",
+          "name": "Lic. Raúl Arcenio Aguilar Tamayo"
+        },
+        {
+          "role": "Director General de Comunicación Social",
+          "name": "Mtro. Néstor Martínez Cristo"
+        }
+      ]
+    },
+    {
+      "sede": "dgcch",
+      "title": "Dirección General del CCH (DGCCH)",
+      "subtitle": "Insurgentes Sur y Circuito Escolar, C.U.",
+      "badge": "Sede Central CCH",
+      "contact": "cch.unam.mx • consejotecnico@cch.unam.mx",
+      "members": [
+        {
+          "role": "Director General",
+          "name": "Dr. Benjamín Barajas Sánchez"
+        },
+        {
+          "role": "Secretaria General",
+          "name": "Lic. Mayra Monsalvo Carmona"
+        },
+        {
+          "role": "Secretaria Administrativa",
+          "name": "Lic. Rocío Carrillo Camargo"
+        },
+        {
+          "role": "Secretaria Académica",
+          "name": "Lic. María Elena Juárez Sánchez"
+        },
+        {
+          "role": "Sec. de Servicios de Apoyo al Aprendizaje",
+          "name": "Biól. David Castillo Muñoz"
+        },
+        {
+          "role": "Secretaria de Planeación",
+          "name": "Mtra. Dulce María E. Santillán Reyes"
+        },
+        {
+          "role": "Secretario Estudiantil",
+          "name": "Mtro. José Alfredo Núñez Toledo"
+        },
+        {
+          "role": "Secretaria de Programas Institucionales",
+          "name": "Lic. Gema Góngora Jaramillo"
+        },
+        {
+          "role": "Secretario de Comunicación Institucional",
+          "name": "Lic. Héctor Baca Espinoza"
+        },
+        {
+          "role": "Secretario de Informática",
+          "name": "Ing. Armando Rodríguez Arguijo"
+        }
+      ]
+    },
+    {
+      "sede": "azcapotzalco",
+      "title": "Plantel Azcapotzalco",
+      "subtitle": "8,784 horas permanentes (Art. 4)",
+      "badge": "Azcapotzalco",
+      "contact": "cch-azcapotzalco.unam.mx • secacad.azcapotzalco@cch.unam.mx",
+      "members": [
+        {
+          "role": "Directora",
+          "name": "Mtra. Martha Patricia López Abundio"
+        },
+        {
+          "role": "Secretario General",
+          "name": "Dr. Juan Concepción Barrera De Jesús"
+        },
+        {
+          "role": "Secretario Administrativo",
+          "name": "C.P. Celfo Sarabia Eusebio"
+        },
+        {
+          "role": "Secretaria Académica",
+          "name": "Lic. Veidy Salazar De Lucio"
+        },
+        {
+          "role": "Secretaria Docente",
+          "name": "Mtra. Fabiola Margarita Torres García"
+        },
+        {
+          "role": "Secretario de Servicios Estudiantiles",
+          "name": "Lic. Antonio Nájera Flores"
+        },
+        {
+          "role": "Sec. de Servicios de Apoyo al Aprendizaje",
+          "name": "Lic. Antonio Gil Ruíz Guerrero"
+        },
+        {
+          "role": "Jefa de la Unidad de Planeación",
+          "name": "C. Adriana Astrid Getsemaní Castillo Juárez"
+        },
+        {
+          "role": "Secretaria Técnica del SILADIN",
+          "name": "Lic. Martha Contreras Sánchez"
+        },
+        {
+          "role": "Secretaria Particular y de Gestión",
+          "name": "Lic. Verónica Andrade Villa"
+        }
+      ]
+    },
+    {
+      "sede": "naucalpan",
+      "title": "Plantel Naucalpan",
+      "subtitle": "8,452 horas permanentes (Art. 4)",
+      "badge": "Naucalpan",
+      "contact": "cch-naucalpan.unam.mx • secacad.naucalpan@cch.unam.mx",
+      "members": [
+        {
+          "role": "Director",
+          "name": "Mtro. Keshava Quintanar Cano"
+        },
+        {
+          "role": "Secretaria General",
+          "name": "Mtra. Verónica Berenice Ruiz Melgarejo"
+        },
+        {
+          "role": "Secretaria Administrativa",
+          "name": "Lic. Teresa De Jesús Sánchez Serrano"
+        },
+        {
+          "role": "Secretario Académico",
+          "name": "Ing. Damián Feltrín Rodríguez"
+        },
+        {
+          "role": "Secretaria Docente",
+          "name": "Mtra. Angélica Garcilazo Galnares"
+        },
+        {
+          "role": "Secretaria de Servicios Estudiantiles",
+          "name": "Biól. Guadalupe Hurtado García"
+        },
+        {
+          "role": "Sec. de Apoyo al Aprendizaje y Cómputo",
+          "name": "Mtro. Miguel Ángel Zamora Calderilla"
+        },
+        {
+          "role": "Secretaria de Administración Escolar",
+          "name": "Lic. Ana Rocío Alvarado Torres"
+        },
+        {
+          "role": "Secretaria Técnica del SILADIN",
+          "name": "Ing. María del Carmen Tenorio Chávez"
+        },
+        {
+          "role": "Coord. de Gestión y Planeación",
+          "name": "Lic. Reyna I. Valencia López"
+        }
+      ]
+    },
+    {
+      "sede": "vallejo",
+      "title": "Plantel Vallejo",
+      "subtitle": "8,856 horas permanentes (Art. 4)",
+      "badge": "Vallejo",
+      "contact": "cch-vallejo.unam.mx • secacad.vallejo@cch.unam.mx",
+      "members": [
+        {
+          "role": "Directora",
+          "name": "Lic. Maricela González Delgado"
+        },
+        {
+          "role": "Secretario General",
+          "name": "Ing. Manuel Odilón Gómez Castillo"
+        },
+        {
+          "role": "Secretaria Administrativa",
+          "name": "Lic. Blanca Adela Zamora Muñoz"
+        },
+        {
+          "role": "Secretaria Académica",
+          "name": "Mtra. María Xóchitl Megchún Trejo"
+        },
+        {
+          "role": "Secretaria Docente",
+          "name": "Lic. María del Rocío Sánchez Sánchez"
+        },
+        {
+          "role": "Secretario de Asuntos Estudiantiles",
+          "name": "Lic. Armando Segura Morales"
+        },
+        {
+          "role": "Sec. de Servicios de Apoyo al Aprendizaje",
+          "name": "Lic. Carlos Ortega Ambriz"
+        },
+        {
+          "role": "Secretaria Técnico del SILADIN",
+          "name": "IQ. Georgina Guadalupe Góngora Cruz"
+        }
+      ]
+    },
+    {
+      "sede": "oriente",
+      "title": "Plantel Oriente",
+      "subtitle": "8,924 horas permanentes (Art. 4)",
+      "badge": "Oriente",
+      "contact": "cch-oriente.unam.mx • secacad.oriente@cch.unam.mx",
+      "members": [
+        {
+          "role": "Directora",
+          "name": "Mtra. Patricia García Pavón"
+        },
+        {
+          "role": "Secretario General",
+          "name": "QFB. Reyes Flores Hernández"
+        },
+        {
+          "role": "Secretaria Administrativa",
+          "name": "Mtra. Alejandra Barrios Rivera"
+        },
+        {
+          "role": "Secretaria Académica",
+          "name": "Lic. Edith Catalina Jardón Flores"
+        },
+        {
+          "role": "Secretaria Docente",
+          "name": "Mtra. Cecilia Espinosa Muñoz"
+        },
+        {
+          "role": "Secretaria de Asuntos Estudiantiles",
+          "name": "Dra. Elsa Rodríguez Saldaña"
+        },
+        {
+          "role": "Secretaria de Administración Escolar",
+          "name": "Mtra. Claudia Verónica Morales Montaño"
+        },
+        {
+          "role": "Secretaria Técnica del SILADIN",
+          "name": "Ing. Angélica Nohelia Guillén Méndez"
+        }
+      ]
+    },
+    {
+      "sede": "sur",
+      "title": "Plantel Sur",
+      "subtitle": "9,576 horas permanentes (Art. 4)",
+      "badge": "Sur",
+      "contact": "cch-sur.unam.mx • secacad.sur@cch.unam.mx",
+      "members": [
+        {
+          "role": "Directora",
+          "name": "Mtra. Susana de los Ángeles Lira de Garay"
+        },
+        {
+          "role": "Secretario General",
+          "name": "Lic. Noé Israel Reyna Méndez"
+        },
+        {
+          "role": "Secretario Administrativo",
+          "name": "C.P. Erasto Rebolledo Avalos"
+        },
+        {
+          "role": "Secretario Académico",
+          "name": "Mtro. Ernesto Márquez Fragoso"
+        },
+        {
+          "role": "Secretario Docente",
+          "name": "Mtro. Armando Moncada Sánchez"
+        },
+        {
+          "role": "Secretaria de Asuntos Estudiantiles",
+          "name": "Dra. Georgina Balderas Gallardo"
+        },
+        {
+          "role": "Secretario de Apoyo al Aprendizaje",
+          "name": "Mtro. Reynaldo Cruz Contreras"
+        },
+        {
+          "role": "Secretaria Técnico del SILADIN",
+          "name": "Mtra. Nohemí Claudia Saavedra Rojas"
+        },
+        {
+          "role": "Jefa de la Unidad de Planeación",
+          "name": "Mtra. Clara León Ríos"
+        }
+      ]
+    }
+  ],
+  "plantillas_oficiales_tramite": [
+    {
+      "numero": 1,
+      "instancia": "Dirección del Plantel / Secretaría Académica / Consejo Académico de Área",
+      "fundamento": "Arts. 56, 60 y 61 EPA • Consideraciones 6 y 7 Protocolo 2020",
+      "texto": "UNIVERSIDAD NACIONAL AUTÓNOMA DE MÉXICO\nESCUELA NACIONAL COLEGIO DE CIENCIAS Y HUMANIDADES\nPLANTEL [AZCAPOTZALCO / NAUCALPAN / VALLEJO / ORIENTE / SUR]\n\n[PROYECTO ANUAL / INFORME ANUAL] DE ACTIVIDADES ACADÉMICAS\nCICLO ESCOLAR [202X - 202X]\n\n1. DATOS DE IDENTIFICACIÓN DEL PROFESOR/A:\n- Nombre completo: [APELLIDO PATERNO, APELLIDO MATERNO, NOMBRE(S)]\n- Número de trabajador: [NÚMERO] | RFC: [RFC]\n- Categoría y nivel: Profesor/a Ordinario/a de Carrera [Asociado / Titular] \"[A / B / C]\" [Definitivo / Interino]\n- Área Académica y Asignatura(s) que imparte: [ÁREA / ASIGNATURAS]\n- Correo institucional: [usuario@cch.unam.mx]\n\n2. CUMPLIMIENTO DE LABORES DOCENTES FRENTE A GRUPO (ART. 56 EPA):\n- Grupos atendidos (Semestre Non / Par): [CLAVES DE GRUPO Y HORARIOS]\n- Entrega oportuna de Programas de Estudio el primer día de clases y cumplimiento del 100% de unidades.\n- Asistencia puntual a clases (>85%) y participación en exámenes ordinarios y extraordinarios.\n\n3. ACTIVIDADES DE PRODUCCIÓN ACADÉMICA Y APOYO A LA DOCENCIA (PROTOCOLO 2020):\n- Actividad 1: [NOMBRE EXACTO SEGÚN GLOSARIO 2020] | Rubro [I-VI] | Nivel [A/B/C] ([25/50/150] pts).\n  * Propósitos y aprendizajes del Programa de Estudio que atiende: [DESCRIPCIÓN]\n  * Productos concretos y evidencias anexas: [DETALLE DE DOCUMENTOS PROBATORIOS]\n- Actividad 2: [NOMBRE EXACTO SEGÚN GLOSARIO 2020] | Rubro [I-VI] | Nivel [A/B/C] ([25/50/150] pts).\n\n4. PARTICIPACIÓN EN CUERPOS COLEGIADOS, COMISIONES Y FORMACIÓN DOCENTE:\n- Seminarios / Grupos de trabajo / Cursos recibidos o impartidos: [DETALLE]\n\n\"POR MI RAZA HABLARÁ EL ESPÍRITU\"\nCiudad Universitaria / Plantel [PLANTEL], a [DÍA] de [MES] de [AÑO].\n\n_________________________________________\n[NOMBRE Y FIRMA DEL PROFESOR/A]\n\nVo. Bo. Jefe/a de Área / Sección Académica: ___________________________"
+    },
+    {
+      "numero": 2,
+      "instancia": "Consejo Académico de Área / H. Consejo Técnico CCH / Secretaría Académica",
+      "fundamento": "Reglas Grupos de Trabajo Institucionales • Rubro IV (50/150 pts) y Art. 29-III (4 pts/año)",
+      "texto": "H. CONSEJO ACADÉMICO DEL ÁREA DE [MATEMÁTICAS / CIENCIAS EXPERIMENTALES / HISTÓRICO-SOCIAL / TALLERES]\nESCUELA NACIONAL COLEGIO DE CIENCIAS Y HUMANIDADES, UNAM\nPresente.\n\nSOLICITUD DE REGISTRO Y PROTOCOLO DE GRUPO DE TRABAJO INSTITUCIONAL\n(Modalidad: [Ordinario / Extraordinario / Seminario Local o Institucional])\n\n1. NOMBRE DEL PROYECTO / GRUPO DE TRABAJO:\n\"[TÍTULO COMPLETO DEL PROYECTO COLEGIADO]\"\n\n2. INTEGRANTES Y COORDINACIÓN:\n- Coordinador/a responsable: [NOMBRE COMPLETO, CATEGORÍA, PLANTEL Y CORREO @cch.unam.mx]\n- Integrantes (nombre completo, categoría, plantel de adscripción y firma):\n  1) [PROFESOR/A 1 - PLANTEL]\n  2) [PROFESOR/A 2 - PLANTEL]\n  3) [PROFESOR/A 3 - PLANTEL]\n\n3. JUSTIFICACIÓN Y VINCULACIÓN CON EL PLAN Y PROGRAMAS DE ESTUDIO:\n[Fundamentar pertinencia institucional (criterios 3.1-3.5 del Protocolo 2020), diagnóstico de necesidades educativas y relación con el Modelo Educativo del CCH].\n\n4. PROPÓSITOS GENERALES Y APRENDIZAJES QUE ATIENDE:\n- Asignatura(s) y semestre(s): [ASIGNATURA(S)]\n- Propósitos específicos: [ENUMERAR PROPÓSITOS]\n\n5. METAS Y PRODUCTOS ACADÉMICOS COMPROMETIDOS (SEGÚN GLOSARIO 2020):\n- Producto 1: [Ej. Paquete didáctico / Cuaderno de trabajo / Guía para el profesor / Material interactivo] (Rubro [I/III], Nivel [B/C]).\n- Producto 2: [Ej. Ponencia / Informe anual de seguimiento docente].\n\n6. CRONOGRAMA DE SESIONES Y EVALUACIÓN:\n- Periodicidad y sede de reuniones (mínimo 85% de asistencia obligatoria para constancia): [DÍAS, HORARIO Y SEDE/PLATAFORMA].\n\nAtentamente,\n[NOMBRE Y FIRMA DEL COORDINADOR/A DEL GRUPO]"
+    },
+    {
+      "numero": 3,
+      "instancia": "Comité de Pares / Depto. de Medios Digitales (Portal Académico) / Comité Editorial",
+      "fundamento": "Criterio de Aplicación 9 • Criterios Calidad 4.1-4.7 • Nivel C (150 pts)",
+      "texto": "C. PRESIDENTE/A DEL COMITÉ DE PARES / JEFE/A DEL DEPTO. DE MEDIOS DIGITALES\nESCUELA NACIONAL COLEGIO DE CIENCIAS Y HUMANIDADES, UNAM\nPresente.\n\nSOLICITUD DE EVALUACIÓN ACADÉMICA Y DICTAMEN DE NIVEL C (150 PUNTOS)\n\nPor medio de la presente, someto(emos) a evaluación académica el producto titulado:\n\"[TÍTULO COMPLETO DEL MATERIAL O PRODUCTO]\"\n\n1. CLASIFICACIÓN NORMATIVA (PROTOCOLO DE EQUIVALENCIAS 2020):\n- Término exacto del Glosario: [Materiales Didácticos Interactivos para el Portal Académico / Curso en Línea / Programa de Cómputo / Cuaderno de Trabajo / Paquete Didáctico / Propuesta Educativa]\n- Rubro: [I / II / III / V] | Nivel solicitado: C (150 puntos)\n- Autor(es) (respetando límite máximo del Glosario): [NOMBRE(S) Y PLANTEL(ES)]\n- Asignatura y unidades que cubre: [ASIGNATURA Y UNIDADES COMPLETAS]\n\n2. CHECKLIST DE REQUISITOS FORMALES Y TÉCNICOS ADJUNTOS:\n[X] Presentación, propósitos, aprendizajes y contenidos congruentes con el Programa de Estudio vigente.\n[X] Estrategias didácticas secuenciadas e instrumentos de evaluación diagnóstica, formativa y sumativa con retroalimentación.\n[X] Para recursos digitales/TIC: Guion instruccional, manual de operación, URL funcional / software libre y criterios de usabilidad DGTIC.\n[X] Fuentes de información actualizadas y citadas rigurosamente en formato APA.\n[X] Evidencias de aplicación o pilotaje con grupos escolares.\n\nAtentamente,\n[NOMBRE COMPLETO Y FIRMA DEL AUTOR/A RESPONSABLE]\nCorreo electrónico: [usuario@cch.unam.mx]"
+    },
+    {
+      "numero": 4,
+      "instancia": "Coordinación Local PIA / PIT / Secretaría de Servicios de Apoyo al Aprendizaje (PSI)",
+      "fundamento": "Glosario 2020 Rubro I (Nivel B: 50 pts / Nivel C: 150 pts) • Instructivo 2023 Art. 29-III (2 pts)",
+      "texto": "C. COORDINADOR/A LOCAL DEL PROGRAMA INSTITUCIONAL DE [ASESORÍAS (PIA) / TUTORÍAS (PIT)]\nPLANTEL [AZCAPOTZALCO / NAUCALPAN / VALLEJO / ORIENTE / SUR], CCH - UNAM\nPresente.\n\nINFORME [SEMESTRAL / ANUAL] DE ACCIÓN [ASESORA (PIA) / TUTORIAL (PIT)]\nREGISTRADO EN EL PROGRAMA DE SEGUIMIENTO INTEGRAL (PSI)\n\n1. DATOS GENERALES:\n- Profesor/a responsable: [NOMBRE COMPLETO]\n- Periodo reportado: [Semestre 202X-1 / Ciclo Escolar 202X-202X completo]\n- Modalidad: [Asesoría Curricular / Extracurricular / Tutoría Grupal PIT]\n- Horas semanales cubiertas: [MÍNIMO 4 HORAS SEMANALES EN PIA / HORAS ÁREA COMPLEMENTARIA EN PIT]\n- Grupo(s) o población atendida: [CLAVE DE GRUPO(S) O TOTAL DE ALUMNOS (≥15 POR SEMESTRE PARA NIVEL C)]\n\n2. ESTRUCTURA DEL INFORME (CONFORME AL GLOSARIO DE TÉRMINOS 2020):\na) Instrumento(s) de diagnóstico académico aplicado(s) al inicio del periodo.\nb) Plan de asesoría personalizado por alumno / Planeación grupal de acción tutorial.\nc) Estrategias, secuencias didácticas y materiales didácticos impresos o en línea utilizados.\nd) Bitácora de sesiones, asistencia de alumnos, reuniones con profesores/padres y folio de registro en el PSI.\ne) Análisis cuantitativo y cualitativo de logros (comparativo de calificaciones, acreditación ordinaria/extraordinaria y prevención de deserción).\nf) Reflexión crítica sobre dificultades detectadas y propuestas de mejora.\n\nAtentamente,\n[NOMBRE COMPLETO Y FIRMA DEL PROFESOR/A]"
+    },
+    {
+      "numero": 5,
+      "instancia": "Secretaría Técnica del SILADIN del Plantel / Coordinación Jóvenes hacia la Investigación",
+      "fundamento": "Glosario 2020 Rubros I-C, II-B/C, IV-B/C (50 / 150 pts) • Instructivo 2023 Art. 29-III (2-3 pts)",
+      "texto": "C. SECRETARIO/A TÉCNICO/A DEL SILADIN / COORDINACIÓN JÓVENES HACIA LA INVESTIGACIÓN\nPLANTEL [AZCAPOTZALCO / NAUCALPAN / VALLEJO / ORIENTE / SUR], CCH - UNAM\nPresente.\n\nPROTOCOLO E INFORME DE ACTIVIDADES EXPERIMENTALES / INVESTIGACIÓN CON ALUMNOS\n\n1. MODALIDAD DE PARTICIPACIÓN (PROTOCOLO 2020):\n[ ] Actividades Experimentales para Reforzar Aprendizajes Curriculares en SILADIN (Rubro I-C, 150 pts: mín. 6 actividades/año ante ≥12 grupos).\n[ ] Dirección de Grupos de Trabajo con Alumnos (Rubro II/IV-B: 50 pts; Nivel C: 150 pts con Comité de Pares).\n[ ] Diseño y Seguimiento de Actividades Experimentales o Virtuales con TIC/Sensores (Rubro I-B: 4 act./año; Nivel C: 6 act./año + Pares).\n\n2. DATOS DEL PROYECTO:\n- Título: \"[TÍTULO DEL PROYECTO O CONJUNTO DE ACTIVIDADES EXPERIMENTALES]\"\n- Responsable(s) (máximo 4 integrantes en SILADIN): [NOMBRE(S) Y ASIGNATURA]\n- Alumnos o grupos curriculares atendidos: [NÚMERO DE ALUMNOS / GRUPOS]\n\n3. ELEMENTOS TÉCNICO-METODOLÓGICOS ADJUNTOS:\n- Planteamiento del problema, propósitos y aprendizajes del Programa de Estudio vigente.\n- Marco teórico-conceptual, hipótesis y metodología experimental o de simulación computacional.\n- Recursos, equipo, sustancias/software empleados y calendario de presentaciones.\n- Análisis de resultados, evidencias del trabajo estudiantil, evaluación conjunta y fuentes APA.\n\nAtentamente,\n[NOMBRE COMPLETO Y FIRMA DEL RESPONSABLE]"
+    },
+    {
+      "numero": 6,
+      "instancia": "Secretaría Académica del Plantel / H. Comisión Mixta Local de Horarios",
+      "fundamento": "Instructivo de Asignación de Horarios 2023 • Arts. 10, 16, 26, 28, 29 y 32 (Plazo: 3 días)",
+      "texto": "C. SECRETARIO/A ACADÉMICO/A DEL PLANTEL / H. COMISIÓN MIXTA LOCAL DE HORARIOS\nPLANTEL [AZCAPOTZALCO / NAUCALPAN / VALLEJO / ORIENTE / SUR], CCH - UNAM\nPresente.\n\nASUNTO: [ACTUALIZACIÓN DE LISTA JERARQUIZADA (ART. 29) / INCONFORMIDAD BOLETÍN (ART. 32)]\n\nCon fundamento en los Artículos 10, 16, 26, 28, 29 y 32 del Instructivo de Asignación de Horarios del Colegio de Ciencias y Humanidades (Gaceta CCH, 10 de marzo de 2023), presento la siguiente solicitud:\n\n1. DATOS DEL DOCENTE:\n- Nombre completo: [NOMBRE COMPLETO]\n- Categoría actual: Profesor/a de Asignatura [\"B\" Definitivo / \"A\" Definitivo / \"A\" Interino] | Antigüedad UNAM: [AÑOS] años.\n- Asignatura(s) en la(s) que concursa: [NOMBRE DE LA ASIGNATURA]\n\n2. DESGLOSE DE DOCUMENTACIÓN PROBATORIA ANEXA PARA LISTA JERARQUIZADA (ART. 29):\n- Criterio II (Trayectoria Profesional y Habilidades Digitales):\n  * Grado máximo: [Licenciatura (24) / Maestría (30/36) / Doctorado (40/46)]\n  * Diplomados (≥120 hrs, incluye habilidades digitales): [NÚMERO x 8 pts]\n  * Programas CISE / PAAS (6 pts) / PROFORED (5 pts) / Cursos 20h (1 pt c/u): [DETALLE]\n- Criterio III (Productos de Apoyo, Formación, Grupos y Participación Honoraria):\n  * [Guías / Libros / Paquetes (6 pts) / Asesorías PIA / Tutorías PIT / SILADIN (2 pts) / Jurado / Comité Software (4 pts)]\n- Carta de Desempeño Académico favorable emitida por la Dirección del Plantel (Art. 28: ≥85% asistencia, entrega de actas y CAD).\n\n3. [EN CASO DE INCONFORMIDAD ART. 32 - DENTRO DE LOS 3 DÍAS SIGUIENTES A LA PUBLICACIÓN]:\nSolicito la revisión de la asignación del grupo [CLAVE] del boletín [NÚMERO], dado que acredito mayor puntaje y prelación conforme al Artículo 29, requiriendo resolución en el plazo de cinco días hábiles.\n\nAtentamente,\n[NOMBRE COMPLETO Y FIRMA]\nNúm. Trabajador: [NÚMERO] | Teléfono: [TELÉFONO] | Correo: [usuario@cch.unam.mx]"
+    },
+    {
+      "numero": 7,
+      "instancia": "Comité Académico del Centro de Formación Continua del CCH (CFC-CCH) / PROFOCA",
+      "fundamento": "Glosario 2020 Rubro III-B (Curso 20h: 50 pts) y Rubro III-C (Diplomado 120h: 150 pts)",
+      "texto": "H. COMITÉ ACADÉMICO DEL CENTRO DE FORMACIÓN CONTINUA DEL CCH (CFC-CCH)\nDIRECCIÓN GENERAL DEL COLEGIO DE CIENCIAS Y HUMANIDADES, UNAM\nPresente.\n\nPROPUESTA DE [CURSO DE FORMACIÓN DOCENTE (20-40 HRS) / DIPLOMADO (120 HRS)]\n\n1. IDENTIFICACIÓN DE LA ACTIVIDAD ACADÉMICA:\n- Título: \"[TÍTULO DEL CURSO O DIPLOMADO]\"\n- Rubro y Nivel en Protocolo 2020: Rubro III - [Nivel B: Diseño/Impartición Curso 50 pts | Nivel C: Diseño/Impartición Diplomado 150 pts]\n- Modalidad: [Presencial / Semipresencial / A distancia en línea]\n- Duración total: [20 / 40 / 120] horas | Periodo propuesto: [FECHAS]\n- Diseñador(es) / Coordinador(es) (máx. 2 para curso; máx. 4 para diseño de diplomado): [NOMBRE(S) Y PLANTEL(ES)]\n\n2. ESTRUCTURA CURRICULAR ADJUNTA (REQUISITOS GLOSARIO 2020):\na) Presentación y justificación vinculada con el Modelo Educativo, Plan de Estudios y Orientación y Sentido de las Áreas.\nb) Marco conceptual/referencial y detección de necesidades de formación disciplinaria, pedagógica o de habilidades digitales.\nc) Propósitos generales y específicos por módulo o sesión.\nd) Contenidos temáticos y programación detallada (actividades de aprendizaje, tiempos, sugerencias metodológicas y recursos TIC).\ne) Sistema de evaluación y criterios de acreditación de los profesores participantes.\nf) Fuentes de información actualizadas citadas en formato APA.\n\nAtentamente,\n[NOMBRE COMPLETO Y FIRMA DEL RESPONSABLE ACADÉMICO]"
+    }
+  ],
+  "version_catalogo": "v2 (2026-11-18)",
+  "fuente_archivo": "cch_normatividad_unificada_2020_2023.json",
+  "catalogo_v1": "protocolo-puntaje-cch.json (158 actividades, JSON del usuario, sin modificar)",
+  "categorias_medio_tiempo": {
+    "Asociado A": {
+      "puntos": 75,
+      "min_rubro_I_pts": 25
+    },
+    "Asociado B": {
+      "puntos": 100,
+      "min_rubro_I_pts": 50
+    },
+    "Asociado C": {
+      "puntos": 125,
+      "min_rubro_I_pts": 75,
+      "nivel_minimo": "B"
+    },
+    "Titular A": {
+      "puntos": 200,
+      "min_pts": 150,
+      "condicion": "una actividad de nivel C + 50 de nivel B en Rubro III o IV"
+    },
+    "Titular B": {
+      "puntos": 200,
+      "min_pts": 150,
+      "condicion": "una actividad de nivel C + 50 de nivel B en Rubro III o IV"
+    },
+    "Titular C": {
+      "puntos": 200,
+      "min_pts": 150,
+      "condicion": "una actividad de nivel C + 50 de nivel B en Rubro III o IV"
+    }
+  },
+  "analisis_v2": {
+    "fuente": "cch_normatividad_unificada_2020_2023.json (fecha_generacion 2026-11-18T23:57:12.420Z)",
+    "total_terminos_glosario": 107,
+    "por_nivel": {
+      "B": 59,
+      "C": 36,
+      "A": 12
+    },
+    "por_rubro_expandido": {
+      "I": 63,
+      "II": 9,
+      "III": 34,
+      "IV": 7,
+      "V": 19,
+      "VI": 4
+    },
+    "por_rubro_solo": {
+      "I": 44,
+      "II": 5,
+      "III": 22,
+      "IV": 5,
+      "V": 6,
+      "VI": 4
+    },
+    "por_rubro_nivel": {
+      "I": {
+        "B": 34,
+        "C": 22,
+        "A": 7
+      },
+      "II": {
+        "B": 5,
+        "C": 4
+      },
+      "III": {
+        "B": 21,
+        "A": 3,
+        "C": 10
+      },
+      "IV": {
+        "B": 4,
+        "C": 3
+      },
+      "V": {
+        "B": 11,
+        "C": 3,
+        "A": 5
+      },
+      "VI": {
+        "B": 2,
+        "C": 1,
+        "A": 1
+      }
+    },
+    "multi_rubro": 21,
+    "isDigital_true": 33,
+    "isDigital_false": 74,
+    "puntos_por_nivel": {
+      "A": 25,
+      "B": 50,
+      "C": 150
+    },
+    "inconsistencias_puntos": [],
+    "terminos_multi_nivel_en_definicion": [
+      {
+        "id": "gl-038",
+        "name": "Cursos Especiales o Extracurriculares para Alumnos (<40h Nivel A / ≥40h Nivel B)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": "gl-042",
+        "name": "Charlas de Divulgación (Individual Nivel A / Ciclo 5 Charlas Nivel B)",
+        "level_campo": "A",
+        "niveles_en_definicion": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": "gl-046",
+        "name": "Dirección de Obra de Teatro de Carácter Didáctico (Nivel B / Evento Nivel C)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-051",
+        "name": "Diseño y Seguimiento de Actividades Experimentales o Virtuales Aplicables en los Laboratorios",
+        "level_campo": "C",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-081",
+        "name": "Libro",
+        "level_campo": "C",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-089",
+        "name": "Monografía (Nivel B / Comité de Pares Nivel C)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-090",
+        "name": "Organización de Actividades Académicas (Local A / General B / Nacional-Internacional C)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-091",
+        "name": "Paquete Didáctico (Parcial Nivel B / Curso Completo Nivel C)",
+        "level_campo": "C",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-096",
+        "name": "Participación en la Elaboración y Publicación de una Revista (Nivel B / Con 2 Artículos Propios Nivel C)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-100",
+        "name": "Programas de Cómputo para la Enseñanza (Unidad Nivel B / Curso Completo Nivel C)",
+        "level_campo": "C",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-102",
+        "name": "Programa Operativo (Individual Nivel B / Colegiado Anual Nivel C)",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-105",
+        "name": "Relator / Reseña Bibliográfica o Videográfica / Revisión Técnica de Libro / Secuencia Didáctica",
+        "level_campo": "A",
+        "niveles_en_definicion": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": "gl-106",
+        "name": "Seguimiento, Análisis y Preparación Grupal de la Experiencia Docente / Seminarios Monitores",
+        "level_campo": "C",
+        "niveles_en_definicion": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "id": "gl-107",
+        "name": "Sinodal de Examen de Grado / Traducción de Artículo o Libro / Tutoría para Alumnos (PIT) / Video Educativo / Visitas Guiadas",
+        "level_campo": "B",
+        "niveles_en_definicion": [
+          "A",
+          "B",
+          "C"
+        ]
+      }
+    ],
+    "actividades_v1_sin_equivalente_literal_en_glosario": [
+      "Reporte de investigación",
+      "Reporte de investigación (incluyendo avances)",
+      "Reporte de validación"
+    ],
+    "notas": [
+      "El glosario tiene 107 términos; el Cuadro oficial tiene 165 actividades. El glosario agrupa variantes (alcance, horas, unidades) en un solo término, por eso 107 != 165.",
+      "Varios términos fusionan varios niveles en la definición (p. ej. gl-090 Organización A/B/C, gl-105 cuatro actividades A, gl-107 cinco actividades) pero el campo level trae un solo nivel. No se corrigió el campo level: se documenta en terminos_multi_nivel_en_definicion y el nivel correcto se elige por alcance/horas según la definición.",
+      "Reporte de investigación (II-B y II-C) y Reporte de validación (II-C) del Cuadro no tienen término propio en el glosario; la actividad más cercana es gl-024 Colaboración en el Desarrollo de Estudios e Investigaciones (II-B) y gl-057 Evaluación de un Programa de Estudio (II-C).",
+      "Participación en jornadas académicas queda en Rubro I o III, nivel A (gl-095): resuelve la contradicción Glosario vs Cuadro del análisis v1.",
+      "Directorio institucional: el archivo trae como Rector al Dr. Enrique Graue Wiechers, pero el rector para el periodo 2023-2027 es el Dr. Leonardo Lomelí Vanegas (designado 9 nov 2023). Directorio desactualizado en UNAM central; el resto de cargos no se verificó uno por uno.",
+      "El instructivo en el archivo unificado trae solo publicacion, horas_permanentes_plantel y plazos_legales; NO trae los criterios I-VII de la lista jerarquizada (siguen en el JSON v1, documento_2).",
+      "Categorías de Medio Tiempo (Adenda 2020) no vienen en el archivo unificado; se conservan en categorias_medio_tiempo desde CORRECCIONES.md."
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "CCH Proyectos",
+  "short_name": "CCH",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#002663",
+  "icons": []
+}

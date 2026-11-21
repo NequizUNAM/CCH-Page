@@ -1,0 +1,45 @@
+{
+  "plantilla_version": 1,
+  "hashtag": "#CchPage",
+  "slug": "cch-page",
+  "nombre": "CCH-Page",
+  "instrucciones": "Copia esta plantilla, llena los campos vacios y pasala a Muse con el hashtag al inicio. Si un campo no aplica, dejalo en null. No borres campos: si hay un campo nuevo, la plantilla sube de version y los registros viejos conservan su version.",
+  "sesion": {
+    "id": "cch-page-AAAA-MM-DD-001",
+    "fecha": "AAAA-MM-DD HH:MM (por defecto, la actual al capturar)",
+    "titulo": "",
+    "tipo": "Reunion | Sesion | Avance | Nota",
+    "texto": "",
+    "asistentes": [
+      ""
+    ],
+    "acuerdos": [
+      {
+        "texto": "",
+        "responsable": "",
+        "fecha_compromiso": "AAAA-MM-DD",
+        "estado": "Pendiente"
+      }
+    ],
+    "pendientes": [],
+    "hitos": [
+      {
+        "titulo": "",
+        "fecha": "AAAA-MM-DD",
+        "estado": "Pendiente"
+      }
+    ],
+    "evidencias": [
+      {
+        "archivo": "",
+        "descripcion": ""
+      }
+    ],
+    "campos_propios": {
+      "grupo": "401",
+      "parcial": "Parcial 2",
+      "version": "v7.1"
+    },
+    "plantilla_version": 1
+  }
+}

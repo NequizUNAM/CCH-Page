@@ -1,0 +1,8 @@
+{
+  "name": "CCH Proyectos",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "custom",
+  "npmClient": "npm"
+}
