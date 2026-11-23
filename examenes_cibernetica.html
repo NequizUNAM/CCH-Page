@@ -1739,6 +1739,30 @@ function fcLoop(p) {               // Inicio → Leer → inicialización → ¿
 }
 const jtrunc = (a, b) => Math.trunc(a / b);
 const jdec = x => Number.isInteger(x) ? x.toFixed(1) : String(+x.toFixed(6));
+/* Vector visual del Parcial 2: muestra datos, recorrido y desplazamiento en una sola representación. */
+function p2VectorSVG(vals, start, step, threshold = null) {
+  const cards = vals.map((v, i) => `<g transform="translate(${20 + i * 118},38)"><rect width="96" height="58" rx="7" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/><text x="48" y="24" text-anchor="middle" font-size="18" font-weight="800" fill="#9a3412">${v}</text><text x="48" y="46" text-anchor="middle" font-size="11" fill="#475569">índice ${i}</text></g>`).join('');
+  const final = start + step * vals.length;
+  return `<div class="scratch-wrap"><svg class="scratch-svg" viewBox="0 0 650 260" width="650" role="img" aria-label="Vector de ${vals.length} datos, pseudocódigo de recorrido y diagrama de flujo">
+    <defs><marker id="pv-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L10 5 L0 9z" fill="#334155"/></marker></defs>
+    <text x="20" y="20" font-size="13" font-weight="800" fill="#0f172a">Vector V</text>${cards}
+    <rect x="20" y="112" width="290" height="130" rx="9" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="35" y="136" font-size="12" font-weight="800" fill="#1e3a8a">Pseudocódigo</text>
+    <text x="35" y="160" font-size="12" font-family="Consolas,monospace" fill="#1e293b">total ← 0</text>
+    <text x="35" y="182" font-size="12" font-family="Consolas,monospace" fill="#1e293b">Para i ← 0 hasta ${vals.length - 1}</text>
+    <text x="35" y="204" font-size="12" font-family="Consolas,monospace" fill="#1e293b">${threshold === null ? '   total ← total + V[i]' : `   Si V[i] > ${threshold} Entonces`}</text>
+    ${threshold === null ? '' : `<text x="35" y="216" font-size="12" font-family="Consolas,monospace" fill="#1e293b">      total ← total + V[i]</text><text x="35" y="228" font-size="12" font-family="Consolas,monospace" fill="#1e293b">   FinSi</text>`}
+    <text x="35" y="${threshold === null ? 226 : 240}" font-size="12" font-family="Consolas,monospace" fill="#1e293b">FinPara</text>
+    <rect x="330" y="112" width="300" height="130" rx="9" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="480" y="136" text-anchor="middle" font-size="12" font-weight="800" fill="#334155">Diagrama de flujo</text>
+    <rect x="430" y="148" width="100" height="28" rx="14" fill="#ede9fe" stroke="#7c3aed"/><text x="480" y="167" text-anchor="middle" font-size="11" fill="#4c1d95">Inicio</text>
+    <path d="M480 176V188" stroke="#334155" stroke-width="2" marker-end="url(#pv-arrow)"/>
+    <polygon points="480,188 535,207 480,226 425,207" fill="#fff7ed" stroke="#ea580c"/><text x="480" y="211" text-anchor="middle" font-size="10" font-weight="700" fill="#9a3412">¿i válido?</text>
+    <path d="M535 207H580V232" stroke="#334155" stroke-width="2" marker-end="url(#pv-arrow)"/><text x="550" y="199" font-size="10" fill="#166534">Sí</text>
+    <text x="530" y="248" font-size="11" font-weight="700" fill="#1e293b">V[i] → total</text>
+    <text x="20" y="254" font-size="11" fill="#475569">posX inicial = ${start}; desplazamiento por dato = ${step}; posX final = ${final}</text>
+  </svg></div>`;
+}
 function buildP2Unit3(tipo, seed) {
   const rnd = mulberry32((seed ^ ({ A: 0x1B873593, B: 0xCC9E2D51, C: 0x27D4EB2F }[tipo])) >>> 0);
   const qs = [];
@@ -1776,8 +1800,11 @@ function buildP2Unit3(tipo, seed) {
   push(mcQ('cic', '¿Por qué un bloque por siempre puede bloquear cálculos sin condición de parada?', 'Crea un ciclo infinito que impide continuar hacia las siguientes instrucciones.', ['Detiene automáticamente el programa al primer cálculo.', 'Solo puede sumar números enteros.', 'Cambia todas las variables a cero.'], rnd, 'Comprender'));
   push(mcQ('cic', 'En <span class="mono">Para i ← 10 Hasta 1 Con Paso -1</span>, ¿cuál es el límite?', 'i debe llegar a 1 (condición i >= 1).', ['i comienza en 1.', 'El paso modifica i sumando 10.', 'No existe condición de parada.'], rnd, 'Comprender'));
   push(mcQ('cic', '¿Cuál es la diferencia central entre Mientras y Hacer-Mientras?', 'Hacer-Mientras ejecuta el cuerpo al menos una vez antes de evaluar la condición.', ['Mientras siempre ejecuta dos veces.', 'Hacer-Mientras no usa condición.', 'No existe diferencia.'], rnd, 'Comprender'));
-  push(mcQ('cic', `El vector Monedas contiene 10, 25 y 15 y el sprite inicia en x = -100.<div class="my-2">${scratchVectorSVG()}</div>¿Cuál será la X final?`, '50', ['0', '35', '150'], rnd, 'Aplicar')).hlp = 'loop';
-  push(mcQ('cic', `Observa el vector Monedas y responde cuánto suma “decir (total)”.<div class="my-2">${scratchVectorSVG()}</div>`, '50; i es el índice o contador de acceso.', ['35; i guarda el valor de cada moneda.', '15; i cuenta las repeticiones.', '60; i es una bandera lógica.'], rnd, 'Analizar'));
+  { const vals = [R(8, 18), R(12, 28), R(10, 20), R(15, 25)], start = R(-6, -2) * 10, step = R(2, 5) * 10, final = start + step * vals.length;
+    const bad = [...new Set([start, start + step, final - step, final + step].filter(v => v !== final).map(String))].slice(0, 3);
+    push(mcQ('cic', `Observa el vector y el recorrido combinado con pseudocódigo y diagrama de flujo.<div class="my-2 fc-wrap">${p2VectorSVG(vals, start, step)}</div>¿Cuál será la posición X final después de procesar los ${vals.length} elementos?`, String(final), bad, rnd, 'Aplicar')).hlp = 'vector'; }
+  { const vals = [R(8, 18), R(12, 28), R(10, 20), R(15, 25)], total = vals.reduce((s, v) => s + v, 0);
+    push(openQ('cic', `Según el recorrido visual del vector, ¿qué valor queda en <span class="mono">total</span> al terminar?<div class="my-2 fc-wrap">${p2VectorSVG(vals, -100, 50)}</div>`, String(total), intRule, 'num', 'Analizar')).hlp = 'vector'; }
   push(mcQ('cic', '¿Qué representa el pseudocódigo equivalente al recorrido del vector base 0?', 'Para i desde 0 hasta 2 se suman Monedas[i] y se incrementa posX.', ['Se recorren los elementos de 1 hasta 3 multiplicados por i.', 'Solo se procesa el primer elemento.', 'Se reinicia Monedas en cada vuelta.'], rnd, 'Crear'));
 
   /* Bloque V: equivalencias entre paradigmas */
@@ -1792,7 +1819,8 @@ function buildP2Unit3(tipo, seed) {
   push(mcQ('alg', 'Para c = 1 hasta 4, suma solo los pares. ¿Qué suma queda al final?', '6.', ['0', '4', '10'], rnd, 'Aplicar'));
   push(mcQ('alg', '¿Cuál es la corrección al pseudocódigo donde suma empieza en 10 y se sobrescribe con calificacion?', 'Inicializar suma = 0 y usar suma ← suma + calificacion.', ['Conservar suma = 10 y imprimir calificacion.', 'Eliminar el ciclo y leer una sola nota.', 'Asignar promedio ← calificacion.'], rnd, 'Analizar'));
   push(mcQ('alg', '¿Qué diferencia existe entre contador y acumulador?', 'El contador cambia por una cantidad fija; el acumulador suma valores variables.', ['Ambos siempre aumentan de uno en uno.', 'El contador guarda texto y el acumulador banderas.', 'No existe diferencia.'], rnd, 'Comprender'));
-  push(openQ('alg', 'V = [4, 6, 2, 8]. Recorre de 0 a 3 y acumula solo elementos mayores que 4. ¿Qué imprime acum?', '14', intRule, 'num', 'Analizar')).hlp = 'pseudo';
+  { const vals = [R(3, 9), R(4, 10), R(2, 8), R(6, 12)], threshold = R(4, 6), acum = vals.filter(v => v > threshold).reduce((s, v) => s + v, 0);
+    push(openQ('alg', `Recorre el vector visualizado y acumula únicamente los valores mayores que ${threshold}. ¿Qué imprime <span class="mono">acum</span>?<div class="my-2 fc-wrap">${p2VectorSVG(vals, -80, 20, threshold)}</div>`, String(acum), intRule, 'num', 'Analizar')).hlp = 'pseudo'; }
   push(mcQ('alg', `Con llaves = 2 y alarmaActiva = Verdadero, ¿qué bloque ejecuta la agrupación?<div class="my-2">${scratchNestedSVG()}</div>`, 'Acceso denegado.', ['Puerta abierta.', 'Ninguna acción.', 'Se abre y se activa la alarma.'], rnd, 'Analizar'));
   push(mcQ('alg', '¿Qué estructura completa el algoritmo que pide N y calcula su tabla del 1 al 10 solo si N > 0?', 'Si (N > 0) Entonces + Para i ← 1 hasta 10 + SiNo + mensaje.', ['Un Mientras infinito sin condición.', 'Solo un Para sin validar N.', 'Una decisión que imprime todos los resultados sin ciclo.'], rnd, 'Crear'));
   return qs;

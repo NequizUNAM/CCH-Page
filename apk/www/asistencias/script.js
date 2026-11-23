@@ -61,10 +61,16 @@ const Prefs = {
 const Session = {
   data: {},
   load() {
-    try { this.data = JSON.parse(sessionStorage.getItem(CONFIG.SESSION_KEY) || "{}"); } catch (e) { this.data = {}; }
+    try {
+      this.data = JSON.parse(localStorage.getItem(CONFIG.SESSION_KEY) || sessionStorage.getItem(CONFIG.SESSION_KEY) || "{}");
+    } catch (e) { this.data = {}; }
   },
   save() {
-    try { sessionStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(this.data)); } catch (e) { /* solo en memoria */ }
+    try {
+      const s = JSON.stringify(this.data);
+      sessionStorage.setItem(CONFIG.SESSION_KEY, s);
+      localStorage.setItem(CONFIG.SESSION_KEY, s);
+    } catch (e) { /* solo en memoria */ }
   },
   get(key) { return this.data[key] || null; },
   set(key, value) {
@@ -72,7 +78,16 @@ const Session = {
     this.save();
     if (key === "admin" || key === "student") ApiQueue.kick();
   },
-  clear(key) { if (key) delete this.data[key]; else this.data = {}; this.save(); }
+  clear(key) {
+    if (key) delete this.data[key]; else this.data = {};
+    this.save();
+    try {
+      if (!key) {
+        localStorage.removeItem(CONFIG.SESSION_KEY);
+        sessionStorage.removeItem(CONFIG.SESSION_KEY);
+      }
+    } catch (e) {}
+  }
 };
 
 /** Dirección del servidor (Apps Script): CONFIG.API_URL o la que se guardó en este navegador. */
@@ -2552,9 +2567,9 @@ const Admin = {
     const size = mobile ? "btn-lg" : "btn-sm";
 
     const OPTIONS = [
-      { v: "Asistencia", k: "✓", cls: "success" },
-      { v: "Falta", k: "✗", cls: "danger" },
-      { v: "Justificante", k: "J", cls: "info" }
+      { v: "Asistencia", k: "✓", icon: "check-lg", cls: "success" },
+      { v: "Falta", k: "✗", icon: "x-lg", cls: "danger" },
+      { v: "Justificante", k: "J", icon: "file-earmark-medical", cls: "info" }
     ];
 
     const counter = h("span", { class: "small text-body-secondary" });
@@ -2574,7 +2589,7 @@ const Admin = {
       tr.querySelectorAll(".roll-btns .btn").forEach(b => {
         const opt = OPTIONS.find(o => o.v === b.dataset.v);
         const on = marks[cuenta] === opt.v;
-        b.className = `btn ${size} ${on ? "btn-" + opt.cls : "btn-outline-" + opt.cls}`;
+        b.className = `btn ${mobile ? "roll-icon-btn" : size} ${on ? "btn-" + opt.cls : "btn-outline-" + opt.cls}`;
         b.setAttribute("aria-pressed", String(on));
       });
     };
@@ -2582,16 +2597,16 @@ const Admin = {
     const mobileItem = s => {
       const faltas = s.counts ? s.counts.falta : 0;
       const item = h("div", { class: "roll-card" },
-        h("div", { class: "d-flex justify-content-between align-items-start gap-2 mb-2" },
-          h("div", { class: "min-w-0" },
-            h("div", { class: "fw-semibold roll-name", text: s.nombre || s.cuenta }),
-            h("div", { class: "small mono text-body-secondary", text: s.cuenta })),
-          faltas ? h("span", { class: `badge ${faltas > CONFIG.FALTAS_UMBRAL ? "text-bg-danger" : "text-bg-light border"}`, text: `${faltas} falta${faltas > 1 ? "s" : ""}` }) : null),
-        h("div", { class: "roll-btns roll-choices", role: "group", style: `--roll-n:${OPTIONS.length}`, "aria-label": `Asistencia de ${s.nombre || s.cuenta}` },
-          OPTIONS.map(o => h("button", {
-            type: "button", class: "btn", dataset: { v: o.v }, title: o.v,
-            onclick: () => { marks[s.cuenta] = marks[s.cuenta] === o.v ? "" : o.v; paintRow(item, s.cuenta); refresh(); }
-          }, h("span", { class: "roll-sym", text: o.k }), h("span", { class: "roll-lbl", text: o.v === "Justificante" ? "Justif." : o.v })))));
+        h("div", { class: "d-flex justify-content-between align-items-center gap-2" },
+          h("div", { class: "fw-semibold roll-name flex-grow-1 text-truncate", title: s.nombre || s.cuenta, text: s.nombre || s.cuenta }),
+          h("div", { class: "btn-group roll-btns roll-icons flex-shrink-0", role: "group", "aria-label": `Asistencia de ${s.nombre || s.cuenta}` },
+            OPTIONS.map(o => h("button", {
+              type: "button", class: "btn roll-icon-btn", dataset: { v: o.v }, title: o.v, "aria-label": o.v,
+              onclick: () => { marks[s.cuenta] = marks[s.cuenta] === o.v ? "" : o.v; paintRow(item, s.cuenta); refresh(); }
+            }, o.icon ? icon(o.icon) : o.k)))),
+        h("div", { class: "d-flex align-items-center gap-2 mt-1" },
+          h("span", { class: "small mono text-body-secondary", text: s.cuenta }),
+          faltas ? h("span", { class: `badge ${faltas > CONFIG.FALTAS_UMBRAL ? "text-bg-danger" : "text-bg-light border"}`, text: `${faltas} falta${faltas > 1 ? "s" : ""}` }) : null));
       paintRow(item, s.cuenta);
       return item;
     };

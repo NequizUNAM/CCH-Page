@@ -67,6 +67,7 @@ body {
   box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
   border-bottom: 3px solid transparent;
   border-image: linear-gradient(90deg, var(--cy), var(--acc)) 1;
+  padding-top: calc(38px + env(safe-area-inset-top, 0px)) !important;
 }
 .app-nav .navbar-brand i { color: var(--cy); }
 .app-nav #btn-admin { background: var(--grad); border: 0; color: #fff; font-weight: 600; }
@@ -323,10 +324,26 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 
 /* ---------- 11. Celular ---------- */
 /* Pase de lista: tarjetas a todo el ancho + barra fija */
-.roll-list { display: flex; flex-direction: column; gap: .6rem; padding-bottom: 5.5rem; }
-.roll-card { background: var(--bs-body-bg); border-radius: 16px; padding: .8rem; box-shadow: var(--shadow); border-left: 5px solid transparent; animation: rise .25s ease; }
+.roll-list { display: flex; flex-direction: column; gap: .5rem; padding-bottom: 5.5rem; }
+.roll-card { background: var(--bs-body-bg); border-radius: 14px; padding: .65rem .85rem; box-shadow: var(--shadow); border-left: 5px solid transparent; animation: rise .25s ease; }
 .roll-card.unmarked { border-left-color: var(--warn); }
-.roll-name { line-height: 1.2; overflow-wrap: anywhere; }
+.roll-name { line-height: 1.25; font-size: .95rem; overflow-wrap: anywhere; }
+.roll-icons { display: inline-flex; gap: 6px; }
+.roll-icon-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  border-radius: 10px !important;
+  border-width: 1.5px;
+  line-height: 1;
+}
+.roll-icon-btn:active { transform: scale(0.92); }
 .roll-choices { display: grid; grid-template-columns: repeat(var(--roll-n, 3), 1fr); gap: .5rem; }
 .roll-choices .btn { min-height: 3.4rem; padding: .3rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 14px; font-weight: 700; border-width: 2px; }
 .roll-sym { font-size: 1.35rem; line-height: 1; }

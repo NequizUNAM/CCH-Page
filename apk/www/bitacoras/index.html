@@ -42,7 +42,7 @@ h3{font-size:15px;color:var(--azul)}
 .btn-recarga.cargando{cursor:wait}
 
 /* Encabezado */
-header{background:var(--azul);color:#fff;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+header{background:var(--azul);color:#fff;padding:calc(42px + env(safe-area-inset-top, 0px)) 18px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 header .logo{font-weight:800;font-size:20px;letter-spacing:.3px}
 header .logo span{color:var(--dorado)}
 header input[type=search]{max-width:320px;flex:1;min-width:180px}
@@ -153,9 +153,15 @@ tr.vencido td{color:var(--rojo);font-weight:600}
 .vista-toggle button{background:#fff;border:none;padding:7px 11px;font-weight:600;font-size:13px;color:var(--gris);display:flex;gap:6px;align-items:center}
 .vista-toggle button[aria-pressed="true"]{background:var(--azul);color:#fff}
 .vista-toggle button svg{flex-shrink:0}
-.tabla-scroll{overflow-x:auto;margin-bottom:14px}
-.tabla-scroll table{min-width:760px}
+.tabla-scroll{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;border:1px solid var(--borde);border-radius:10px;background:#fff;box-shadow:inset -8px 0 10px -6px rgba(0,0,0,.14)}
+.tabla-scroll table{min-width:680px;width:100%;border-collapse:collapse}
+.tabla-scroll th,.tabla-scroll td{padding:8px 10px;font-size:13px;white-space:nowrap}
+.tabla-scroll td strong{white-space:normal;display:inline-block;max-width:240px}
 .tabla-scroll .fila>*{flex:0 0 auto;min-width:0}
+.edicion-masiva{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--borde);border-radius:10px;background:#fff;margin-bottom:14px;box-shadow:inset -8px 0 10px -6px rgba(0,0,0,.14)}
+.edicion-masiva table{min-width:680px;width:100%}
+.edicion-masiva th,.edicion-masiva td{padding:7px 9px;white-space:nowrap}
+.edicion-masiva input,.edicion-masiva select{min-width:120px;font-size:13px;padding:5px 8px}
 .pend-tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:10px}
 .pend-tarjeta{border:1px solid var(--borde);border-radius:10px;padding:12px;background:#fff}
 .pend-tarjeta.vencido{border-color:var(--rojo)}
@@ -165,9 +171,9 @@ details.menu summary::-webkit-details-marker{display:none}
 @media (max-width:1000px){.dos-col{grid-template-columns:1fr}#atencion{position:static;order:-1}}
 @media (max-width:760px){
   .resumen{grid-template-columns:1fr 1fr}
-  main{flex-direction:column}
+  main{flex-direction:column;max-width:100vw;overflow-x:hidden}
   .grid2{grid-template-columns:1fr}
-  header{flex-wrap:nowrap;padding:10px 12px}
+  header{flex-wrap:wrap;padding:calc(42px + env(safe-area-inset-top, 0px)) 14px 12px}
   header .logo{font-size:17px}
   header input[type=search]{display:none}
   header .btn{padding:8px 10px;font-size:13px}
@@ -175,10 +181,6 @@ details.menu summary::-webkit-details-marker{display:none}
   .tabs button{border-radius:8px;flex:1}
   body{padding-bottom:64px}
   #btnNuevaFlotante{display:block!important;position:fixed;right:16px;bottom:72px;z-index:41;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-  #listaPendientes table,#listaPendientes thead,#listaPendientes tbody,#listaPendientes tr,#listaPendientes td{display:block;width:100%}
-  #listaPendientes thead{display:none}
-  #listaPendientes tr{border:1px solid var(--borde);border-radius:10px;margin-bottom:10px;padding:6px}
-  #listaPendientes td{border:none;padding:4px 8px}
   .agenda{display:block!important}
   .toast-sync{left:12px;right:12px;bottom:72px;align-items:flex-start;flex-direction:column}
   .toast-sync .fila{width:100%}
@@ -190,7 +192,7 @@ details.menu summary::-webkit-details-marker{display:none}
   .encabezado-bitacoras h2{flex-basis:100%}
   .encabezado-bitacoras .vista-toggle{margin-right:auto}
   .encabezado-bitacoras #btnExportarProyecto{flex:0 0 auto}
-  section.contenido{min-width:0}
+  section.contenido{min-width:0;max-width:100%}
   .tabs{overflow-x:auto;justify-content:flex-start}
   .tabs button{min-width:max-content}
   .resumen{gap:8px;padding-left:12px;padding-right:12px}
@@ -220,14 +222,11 @@ details.menu summary::-webkit-details-marker{display:none}
   .modal .btn{min-height:42px}
 }
 @media (max-width:760px){
-  /* Dentro de .tabla-scroll la tabla conserva su formato y se desplaza
-     en horizontal, en lugar de romperse en bloques (regla general de móvil). */
-  #listaPendientes .tabla-scroll table{display:table;width:100%}
+  #listaPendientes .tabla-scroll table{display:table;width:100%;min-width:620px}
   #listaPendientes .tabla-scroll thead{display:table-header-group}
   #listaPendientes .tabla-scroll tbody{display:table-row-group}
   #listaPendientes .tabla-scroll tr{display:table-row;border:none;border-radius:0;margin-bottom:0;padding:0}
   #listaPendientes .tabla-scroll td,#listaPendientes .tabla-scroll th{display:table-cell;border:1px solid var(--borde);padding:7px 9px}
-  #listaPendientes .tabla-scroll thead{display:table-header-group}
 }
 @media print{ header,.tabs,.no-imprimir{display:none!important} body{font-size:12px} }
 </style>
@@ -621,7 +620,38 @@ async function cargarMiniaturas(raiz){
 /* Paso 10 (M9): en modo local (sin URL de Apps Script) no hay sesión que
    pedir: sesionAutenticada() es siempre true y se puede crear, editar y
    probar todo en localStorage. Con Apps Script, exige el token. */
-function sesionAutenticada(){ return !TIENE_APPS_SCRIPT || !!sessionStorage.getItem('bitacoras_token'); }
+const CLAVE_TOKEN = 'bitacoras_token';
+const CLAVE_RECORDAR = 'bitacoras_recordar_sesion';
+
+function obtenerToken(){
+  try {
+    return sessionStorage.getItem(CLAVE_TOKEN) || localStorage.getItem(CLAVE_TOKEN) || '';
+  } catch(e){ return ''; }
+}
+
+function guardarToken(token, persistente = true){
+  try {
+    sessionStorage.setItem(CLAVE_TOKEN, token);
+    if(persistente){
+      localStorage.setItem(CLAVE_TOKEN, token);
+      localStorage.setItem(CLAVE_RECORDAR, '1');
+    } else {
+      localStorage.removeItem(CLAVE_TOKEN);
+      localStorage.removeItem(CLAVE_RECORDAR);
+    }
+  } catch(e){}
+}
+
+function borrarToken(){
+  try {
+    sessionStorage.removeItem(CLAVE_TOKEN);
+    localStorage.removeItem(CLAVE_TOKEN);
+    localStorage.removeItem(CLAVE_RECORDAR);
+    sessionStorage.removeItem(CLAVE_LECTURA_RECIENTE);
+  } catch(e){}
+}
+
+function sesionAutenticada(){ return !TIENE_APPS_SCRIPT || !!obtenerToken(); }
 const CLAVE_LECTURA_RECIENTE = 'bitacoras_lectura_reciente';
 const ESPERA_LECTURA_MS = 2500;
 let timerAvisoRecarga = null;
@@ -656,7 +686,7 @@ async function validarSesion(){
   if(!TIENE_APPS_SCRIPT || !sesionAutenticada()) return false;
   try {
     const r = await enviarAppsScript('validarSesion', {});
-    if(!r || !r.ok){ sessionStorage.removeItem('bitacoras_token'); sessionStorage.removeItem(CLAVE_LECTURA_RECIENTE); refrescarSesionUI(); return false; }
+    if(!r || !r.ok){ borrarToken(); refrescarSesionUI(); return false; }
     return true;
   } catch(e){ avisar('No se pudo validar la sesión: ' + e.message, 'rojo'); return false; }
 }
@@ -1364,7 +1394,7 @@ async function cargarDatos(){
 async function llamar(accion, datos){
   const r = await enviarAppsScript(accion, datos);
   if(r && r.ok === false){
-    if(/Token/i.test(r.error || '')){ sessionStorage.removeItem('bitacoras_token'); refrescarSesionUI(); }
+    if(/Token/i.test(r.error || '')){ borrarToken(); refrescarSesionUI(); }
     throw new Error(r.error || 'Error desconocido');
   }
   return r;
@@ -1376,7 +1406,7 @@ async function enviarAppsScript(accion, datos){
   // C2: el token viaja en el body en TODAS las acciones salvo login y ping.
   const body = Object.assign({ accion }, datos || {});
   if(accion !== 'login' && accion !== 'ping'){
-    body.token = sessionStorage.getItem('bitacoras_token') || '';
+    body.token = obtenerToken();
   }
   const opciones = { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) };
   let temporizador = null;
@@ -1518,9 +1548,18 @@ async function iniciarAplicacion(){
   } finally { ocultarCargaPantalla(); }
 }
 function abrirLogin(){
-  if(sesionAutenticada()){ if(TIENE_APPS_SCRIPT) enviarAppsScript('cerrarSesion', {}).catch(() => {}); sessionStorage.removeItem('bitacoras_token'); sessionStorage.removeItem(CLAVE_LECTURA_RECIENTE); estado.sesiones = []; estado.pendientes = []; estado.hitos = []; estado.puntaje = []; refrescarSesionUI(); renderTodo(); avisar('Sesión cerrada.', 'verde'); return; }
-  abrirModal('<h2>Iniciar sesión</h2><p class="muted">La contraseña se valida en Apps Script. Nunca se guarda en este archivo ni en localStorage.</p>' +
+  if(sesionAutenticada()){
+    if(TIENE_APPS_SCRIPT) enviarAppsScript('cerrarSesion', {}).catch(() => {});
+    borrarToken();
+    estado.sesiones = []; estado.pendientes = []; estado.hitos = []; estado.puntaje = [];
+    refrescarSesionUI(); renderTodo(); avisar('Sesión cerrada.', 'verde'); return;
+  }
+  abrirModal('<h2>Iniciar sesión</h2><p class="muted">La contraseña se valida en Apps Script. Puedes guardar la sesión en este dispositivo para no tener que escribirla de nuevo.</p>' +
     '<label>Contraseña</label><input type="password" id="loginPass" autocomplete="current-password">' +
+    '<div style="margin:12px 0 6px;display:flex;align-items:center;gap:8px">' +
+      '<input type="checkbox" id="loginRecordar" checked style="width:18px;height:18px;cursor:pointer">' +
+      '<label for="loginRecordar" style="font-size:13px;font-weight:normal;cursor:pointer;margin:0;color:var(--texto)">Guardar sesión en este celular (no pedir de nuevo)</label>' +
+    '</div>' +
     '<p id="loginError" class="muted" style="color:var(--rojo)"></p>' +
     '<div class="fila" style="margin-top:12px"><button class="btn" id="loginEnviar">Entrar</button><button class="btn blanco" id="loginCancelar">Cancelar</button></div>');
   $('#loginEnviar').onclick = async () => {
@@ -1535,7 +1574,9 @@ function abrirLogin(){
       try { r = await enviarAppsScript('login', { password: pass, cliente: idCliente() }); }
       catch(e){ $('#loginError').textContent = 'Error al validar: ' + e.message; return; }
       if(r && r.ok && r.token){
-        sessionStorage.setItem('bitacoras_token', r.token); intentosLogin = 0;
+        const recordar = $('#loginRecordar') ? $('#loginRecordar').checked : true;
+        guardarToken(r.token, recordar);
+        intentosLogin = 0;
         cerrarModal(); refrescarSesionUI();
         // C3b: tras el login, cargar los datos de Drive (leer exige token).
         marcarLecturaReciente();
@@ -3241,7 +3282,7 @@ function abrirMantenimiento(){
     const finalizarCarga = iniciarCargaBoton($('#mCambiar'), 'Cambiando contraseña…');
     if(!finalizarCarga) return;
     // C4: cambiarPassword usa los nombres del backend: {passwordActual, passwordNueva}.
-    try { await llamar('cambiarPassword', { passwordActual: actual, passwordNueva: nueva }); alert('Contraseña cambiada. Inicia sesión de nuevo.'); sessionStorage.removeItem('bitacoras_token'); sessionStorage.removeItem(CLAVE_LECTURA_RECIENTE); refrescarSesionUI(); cerrarModal(); }
+    try { await llamar('cambiarPassword', { passwordActual: actual, passwordNueva: nueva }); alert('Contraseña cambiada. Inicia sesión de nuevo.'); borrarToken(); refrescarSesionUI(); cerrarModal(); }
     catch(e){ alert('No se pudo cambiar la contraseña: ' + e.message); }
     finally { finalizarCarga(); }
   };
