@@ -256,6 +256,18 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .task-content { overflow-wrap: anywhere; }
 .task-content > :last-child { margin-bottom: 0; }
 .task-content ul, .task-content ol { padding-left: 1.5rem; }
+.task-accordion .accordion-item { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.task-accordion .accordion-item + .accordion-item { margin-top: .5rem; }
+.task-accordion .accordion-button,
+.task-accordion .accordion-button:not(.collapsed) { color: var(--acc); background: var(--acc-soft); }
+.task-accordion .accordion-button:focus { box-shadow: var(--ring); }
+.task-accordion .accordion-button.collapsed { border-radius: 12px; }
+.task-accordion .accordion-button:not(.collapsed) { box-shadow: none; border-radius: 11px 11px 0 0; }
+.task-last-activity { border: 1px solid transparent; font-size: .72rem; white-space: nowrap; }
+.task-last-activity.task-activity-open { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+.task-last-activity.task-activity-closed { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+[data-bs-theme="dark"] .task-last-activity.task-activity-open { background: #082f49; color: #bae6fd; border-color: #164e63; }
+[data-bs-theme="dark"] .task-last-activity.task-activity-closed { background: #431407; color: #fdba74; border-color: #7c2d12; }
 
 /* ---------- 9. Panel ---------- */
 /* Captura */

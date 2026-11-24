@@ -3583,6 +3583,40 @@ const Admin = {
     return `${date < today ? "Venció" : "Vence"}: ${Admin.taskDateLabel(date)}`;
   },
 
+  taskActivity(task) {
+    const hasClosingDate = !!task.fechaCierre;
+    const referenceDate = hasClosingDate ? task.fechaCierre : task.fechaInicio;
+    const match = String(referenceDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return { label: "Sin fecha", className: "task-activity-open", title: "No hay una fecha válida para la última tarea." };
+    }
+
+    const year = Number(match[1]), month = Number(match[2]) - 1, day = Number(match[3]);
+    const reference = Date.UTC(year, month, day);
+    const parsed = new Date(reference);
+    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month || parsed.getUTCDate() !== day) {
+      return { label: "Sin fecha", className: "task-activity-open", title: "No hay una fecha válida para la última tarea." };
+    }
+    const now = new Date();
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const daysUntil = (reference - today) / 86400000;
+    const daysLabel = count => `${count} ${count === 1 ? "día" : "días"}`;
+
+    if (!hasClosingDate) {
+      const label = daysUntil > 0
+        ? `Asignada en ${daysLabel(daysUntil)}`
+        : daysUntil === 0 ? "Asignada hoy" : `Asignada hace ${daysLabel(-daysUntil)}`;
+      return { label, className: "task-activity-open", title: "Sin fecha de cierre; se muestra el tiempo desde la asignación." };
+    }
+    if (daysUntil > 0) {
+      return { label: `Cierra en ${daysLabel(daysUntil)}`, className: "task-activity-open", title: `Fecha de cierre: ${Admin.taskDateLabel(referenceDate)}.` };
+    }
+    if (daysUntil === 0) {
+      return { label: "Cierra hoy", className: "task-activity-open", title: `Fecha de cierre: ${Admin.taskDateLabel(referenceDate)}.` };
+    }
+    return { label: `Venció hace ${daysLabel(-daysUntil)}`, className: "task-activity-closed", title: `Fecha de cierre: ${Admin.taskDateLabel(referenceDate)}.` };
+  },
+
   viewTask(task) {
     const content = h("div", { class: "task-content" });
     const safeHtml = Admin.sanitizeTaskHtml(task.contenido);
@@ -3613,13 +3647,15 @@ const Admin = {
 
   editTask(task, template) {
     const groups = (Admin.boot && Admin.boot.groups) || [];
+    const selectableGroups = task ? groups : groups.filter(g => g.active);
     const source = task || template || null;
     const localToday = () => {
       const date = new Date();
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     };
-    const selectedGroup = task ? task.idCurso : (Admin.group && Admin.group.group.id) || (groups[0] && groups[0].id) || "";
-    const groupOptions = groups.map(g => h("option", { value: g.id, selected: g.id === selectedGroup, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` }));
+    const currentGroup = Admin.group && selectableGroups.find(g => g.id === Admin.group.group.id);
+    const selectedGroup = task ? task.idCurso : (currentGroup && currentGroup.id) || (selectableGroups[0] && selectableGroups[0].id) || "";
+    const groupOptions = selectableGroups.map(g => h("option", { value: g.id, selected: g.id === selectedGroup, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` }));
     if (task && task.archivada && !groups.some(g => g.id === task.idCurso)) {
       groupOptions.unshift(h("option", { value: task.idCurso, selected: true, text: `Historial · ${task.grupoLabel || task.idCurso}` }));
     }
@@ -3754,12 +3790,13 @@ const Admin = {
 
   async tabTasks(content) {
     const groups = (Admin.boot && Admin.boot.groups) || [];
+    const activeGroups = groups.filter(g => g.active);
     const request = Admin.taskLoadToken = (Admin.taskLoadToken || 0) + 1;
     let tasks = [];
     const newTask = h("button", {
       class: "btn btn-sm btn-primary",
       type: "button",
-      disabled: !groups.length,
+      disabled: !activeGroups.length,
       onclick: () => Admin.editTask(null)
     }, icon("plus-lg", "me-1"), "Nueva tarea");
     const library = h("button", {
@@ -3783,7 +3820,9 @@ const Admin = {
           : "Crea un grupo antes de registrar tareas."));
         return;
       }
-      const groupsWithTasks = groups.filter(g => tasks.some(task => task.idCurso === g.id));
+      const groupsWithTasks = groups
+        .filter(g => tasks.some(task => task.idCurso === g.id))
+        .sort((a, b) => b.label.localeCompare(a.label, "es", { sensitivity: "base" }));
       if (!groupsWithTasks.length) {
         content.replaceChildren(UI.empty("journal-x", tasks.length
           ? "No hay tareas en los grupos actuales. El historial sigue disponible en Biblioteca."
@@ -3792,7 +3831,12 @@ const Admin = {
       }
       const accordion = h("div", { class: "accordion task-accordion", id: "task-groups" });
       groupsWithTasks.forEach((g, index) => {
-        const groupTasks = tasks.filter(task => task.idCurso === g.id);
+        const groupTasks = tasks
+          .filter(task => task.idCurso === g.id)
+          .sort((a, b) => String(b.titulo || "").localeCompare(String(a.titulo || ""), "es", { sensitivity: "base" }));
+        const latestTask = groupTasks.reduce((latest, task) =>
+          (task.fechaInicio || "") > (latest.fechaInicio || "") ? task : latest, groupTasks[0]);
+        const latestActivity = Admin.taskActivity(latestTask);
         const collapseId = `task-collapse-${request}-${index}`;
         const open = index === 0;
         const titles = h("div", { class: "list-group list-group-flush" }, groupTasks.map(task => h("button", {
@@ -3813,8 +3857,14 @@ const Admin = {
               "aria-expanded": String(open),
               "aria-controls": collapseId
             },
-              h("span", { class: "fw-semibold", text: g.label }),
-              h("span", { class: "badge rounded-pill text-bg-secondary ms-auto me-2", text: `${groupTasks.length} ${groupTasks.length === 1 ? "tarea" : "tareas"}` }))),
+              h("span", { class: "fw-semibold text-break", text: g.label }),
+              h("span", {
+                class: `badge rounded-pill task-last-activity ${latestActivity.className} ms-auto me-2`,
+                title: latestActivity.title,
+                "aria-label": `Última tarea asignada: ${latestActivity.label}. ${latestActivity.title}`,
+                text: latestActivity.label
+              }),
+              h("span", { class: "badge rounded-pill text-bg-secondary flex-shrink-0", text: `${groupTasks.length} ${groupTasks.length === 1 ? "tarea" : "tareas"}` }))),
           h("div", {
             id: collapseId,
             class: `accordion-collapse collapse ${open ? "show" : ""}`,
