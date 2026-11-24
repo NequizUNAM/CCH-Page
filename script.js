@@ -3398,33 +3398,42 @@ const Admin = {
     else content.append(h("p", { class: "text-body-secondary fst-italic mb-0", text: "Sin contenido adicional." }));
 
     const close = h("button", { class: "btn btn-secondary", type: "button", "data-bs-dismiss": "modal", text: "Cerrar" });
+    const reuse = h("button", { class: "btn btn-outline-primary", type: "button" }, icon("copy", "me-1"), "Reutilizar");
     const edit = h("button", { class: "btn btn-primary", type: "button" }, icon("pencil", "me-1"), "Editar");
     const modal = UI.modal({
       title: [icon("journal-text", "me-2"), "Detalle de tarea"],
       body: h("div", {},
         h("h3", { class: "h5 mb-2", text: task.titulo }),
         h("div", { class: "d-flex flex-wrap gap-2 small text-body-secondary mb-3" },
-          h("span", {}, icon("people", "me-1"), task.grupo),
+          h("span", {}, icon("book", "me-1"), task.materia || "Materia no identificada"),
+          h("span", {}, icon("people", "me-1"), task.grupo || task.grupoLabel || `Grupo eliminado (${task.idCurso})`),
+          task.archivada ? h("span", { class: "badge text-bg-secondary", text: "Grupo eliminado" }) : null,
           h("span", {}, icon("calendar-event", "me-1"), "Asignada: ", Admin.taskDateLabel(task.fechaInicio)),
           task.fechaCierre ? h("span", {}, icon("calendar-x", "me-1"), "Cierre: ", Admin.taskDateLabel(task.fechaCierre)) : null),
         content),
-      footer: [close, edit],
+      footer: [close, reuse, edit],
       size: "modal-lg"
     });
     edit.addEventListener("click", () => Admin.editTask(task));
+    reuse.addEventListener("click", () => Admin.editTask(null, task));
     return modal;
   },
 
-  editTask(task) {
+  editTask(task, template) {
     const groups = (Admin.boot && Admin.boot.groups) || [];
+    const source = task || template || null;
     const localToday = () => {
       const date = new Date();
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     };
     const selectedGroup = task ? task.idCurso : (Admin.group && Admin.group.group.id) || (groups[0] && groups[0].id) || "";
+    const groupOptions = groups.map(g => h("option", { value: g.id, selected: g.id === selectedGroup, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` }));
+    if (task && task.archivada && !groups.some(g => g.id === task.idCurso)) {
+      groupOptions.unshift(h("option", { value: task.idCurso, selected: true, text: `Historial · ${task.grupoLabel || task.idCurso}` }));
+    }
     const group = h("select", { class: "form-select", "aria-label": "Grupo" },
-      groups.map(g => h("option", { value: g.id, selected: g.id === selectedGroup, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` })));
-    const title = h("input", { class: "form-control", type: "text", maxlength: "200", required: true, value: task ? task.titulo : "", placeholder: "Título de la tarea", "aria-label": "Título de la tarea" });
+      groupOptions);
+    const title = h("input", { class: "form-control", type: "text", maxlength: "200", required: true, value: source ? source.titulo : "", placeholder: "Título de la tarea", "aria-label": "Título de la tarea" });
     const start = h("input", { class: "form-control", type: "date", required: true, value: task && task.fechaInicio ? task.fechaInicio : localToday(), "aria-label": "Fecha de asignación" });
     const end = h("input", { class: "form-control", type: "date", value: task ? task.fechaCierre || "" : "", "aria-label": "Fecha de cierre" });
     const editor = h("div", {
@@ -3436,7 +3445,7 @@ const Admin = {
       spellcheck: "true"
     });
     editor.id = "task-editor";
-    editor.innerHTML = Admin.sanitizeTaskHtml(task ? task.contenido : "");
+    editor.innerHTML = Admin.sanitizeTaskHtml(source ? source.contenido : "");
 
     const commandButton = (iconName, label, command) => h("button", {
       class: "btn btn-sm btn-outline-secondary",
@@ -3462,7 +3471,7 @@ const Admin = {
     const save = h("button", { class: "btn btn-primary", type: "button" }, icon("save", "me-1"), "Guardar tarea");
     const cancel = h("button", { class: "btn btn-secondary", type: "button", text: task ? "Volver al detalle" : "Cancelar" });
     const modal = UI.modal({
-      title: [icon(task ? "pencil" : "plus-lg", "me-2"), task ? "Editar tarea" : "Nueva tarea"],
+      title: [icon(task ? "pencil" : template ? "copy" : "plus-lg", "me-2"), task ? "Editar tarea" : template ? "Reutilizar tarea" : "Nueva tarea"],
       body: h("div", {},
         field("Grupo", group, group.id),
         field("Título", title, title.id),
@@ -3473,7 +3482,7 @@ const Admin = {
           h("label", { class: "form-label", for: "task-editor", text: "Contenido (opcional)" }),
           toolbar,
           editor,
-          h("div", { class: "form-text", text: "Usa la barra para aplicar formato. Las tareas son recordatorios y no generan calificación ni ponderación." }))),
+          h("div", { class: "form-text", text: "La materia se toma del grupo y queda guardada en el historial. Usa la barra para aplicar formato; las tareas no generan calificación ni ponderación." }))),
       footer: [cancel, save],
       size: "modal-lg"
     });
@@ -3483,6 +3492,7 @@ const Admin = {
       else modal.close();
     });
     save.addEventListener("click", async () => {
+      if (!group.value) return UI.toast("warning", "Selecciona un grupo para la tarea.");
       if (!title.value.trim()) { title.focus(); return UI.toast("warning", "Escribe el título de la tarea."); }
       if (!start.value) { start.focus(); return UI.toast("warning", "Selecciona la fecha en que se deja la tarea."); }
       if (end.value && end.value < start.value) { end.focus(); return UI.toast("warning", "La fecha de cierre no puede ser anterior a la fecha de asignación."); }
@@ -3506,38 +3516,97 @@ const Admin = {
     });
   },
 
+  taskLibrary(tasks) {
+    const subjects = [...new Set(tasks.map(task => task.materia).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "es"));
+    const filter = h("select", { class: "form-select form-select-sm w-auto", "aria-label": "Filtrar por materia" },
+      h("option", { value: "", text: "Todas las materias" }),
+      subjects.map(materia => h("option", { value: materia, text: materia })),
+      tasks.some(task => !task.materia) ? h("option", { value: "__unknown__", text: "Materia no identificada" }) : null);
+    const list = h("div", { class: "list-group task-library-list" });
+    const draw = () => {
+      const selected = filter.value;
+      const visible = tasks.filter(task => !selected
+        || (selected === "__unknown__" ? !task.materia : task.materia === selected));
+      if (!visible.length) {
+        list.replaceChildren(UI.empty("journal-x", "No hay tareas guardadas para esta materia."));
+        return;
+      }
+      list.replaceChildren(...visible.map(task => h("button", {
+        class: "list-group-item list-group-item-action text-start",
+        type: "button",
+        onclick: () => Admin.viewTask(task)
+      },
+        h("div", { class: "d-flex align-items-center gap-2" },
+          h("span", { class: "fw-semibold text-truncate", text: task.titulo }),
+          task.archivada ? h("span", { class: "badge text-bg-secondary flex-shrink-0", text: "Histórica" }) : null),
+        h("div", { class: "small text-body-secondary mt-1" },
+          task.materia || "Materia no identificada",
+          " · ",
+          task.grupo || task.grupoLabel || `Grupo eliminado (${task.idCurso})`,
+          " · Asignada: ",
+          Admin.taskDateLabel(task.fechaInicio)))));
+    };
+    filter.addEventListener("change", draw);
+    draw();
+    return UI.modal({
+      title: [icon("archive", "me-2"), "Biblioteca de tareas"],
+      body: h("div", {},
+        h("p", { class: "small text-body-secondary", text: "Incluye el historial de todos los grupos. Las tareas aparecen en el orden en que se registraron; reutilizar crea una copia independiente." }),
+        h("div", { class: "d-flex justify-content-end mb-2" }, filter),
+        list),
+      size: "modal-lg"
+    });
+  },
+
   async tabTasks(content) {
     const groups = (Admin.boot && Admin.boot.groups) || [];
     const request = Admin.taskLoadToken = (Admin.taskLoadToken || 0) + 1;
+    let tasks = [];
     const newTask = h("button", {
       class: "btn btn-sm btn-primary",
       type: "button",
       disabled: !groups.length,
       onclick: () => Admin.editTask(null)
     }, icon("plus-lg", "me-1"), "Nueva tarea");
-    $("adm-toolbar").replaceChildren(newTask);
-    if (!groups.length) {
-      content.replaceChildren(UI.empty("people", "Crea un grupo antes de registrar tareas."));
-      return;
-    }
+    const library = h("button", {
+      class: "btn btn-sm btn-outline-primary",
+      type: "button",
+      disabled: true,
+      onclick: () => Admin.taskLibrary(tasks)
+    }, icon("archive", "me-1"), "Biblioteca");
+    $("adm-toolbar").replaceChildren(newTask, library);
 
     UI.loading(content, "Cargando tareas…");
     try {
       const result = await Api.call("listTasks", {}, "admin");
       if (request !== Admin.taskLoadToken || Prefs.get("admTab") !== "tareas") return;
-      const tasks = result.tasks || [];
+      tasks = result.tasks || [];
+      library.disabled = !tasks.length;
+      library.replaceChildren(icon("archive", "me-1"), `Biblioteca${tasks.length ? ` (${tasks.length})` : ""}`);
+      if (!groups.length) {
+        content.replaceChildren(UI.empty("archive", tasks.length
+          ? "No hay grupos actuales. El historial sigue disponible en Biblioteca."
+          : "Crea un grupo antes de registrar tareas."));
+        return;
+      }
+      const groupsWithTasks = groups.filter(g => tasks.some(task => task.idCurso === g.id));
+      if (!groupsWithTasks.length) {
+        content.replaceChildren(UI.empty("journal-x", tasks.length
+          ? "No hay tareas en los grupos actuales. El historial sigue disponible en Biblioteca."
+          : "Aún no hay tareas registradas. Crea una nueva para que aparezca su grupo."));
+        return;
+      }
       const accordion = h("div", { class: "accordion task-accordion", id: "task-groups" });
-      groups.forEach((g, index) => {
+      groupsWithTasks.forEach((g, index) => {
         const groupTasks = tasks.filter(task => task.idCurso === g.id);
         const collapseId = `task-collapse-${request}-${index}`;
         const open = index === 0;
-        const titles = groupTasks.length
-          ? h("div", { class: "list-group list-group-flush" }, groupTasks.map(task => h("button", {
+        const titles = h("div", { class: "list-group list-group-flush" }, groupTasks.map(task => h("button", {
             class: "list-group-item list-group-item-action text-start",
             type: "button",
             onclick: () => Admin.viewTask(task)
-          }, task.titulo)))
-          : h("div", { class: "small text-body-secondary p-3", text: "Aún no hay tareas en este grupo." });
+          }, task.titulo)));
         accordion.append(h("div", { class: "accordion-item" },
           h("h2", { class: "accordion-header" },
             h("button", {
@@ -3557,7 +3626,7 @@ const Admin = {
           }, h("div", { class: "accordion-body p-0" }, titles))));
       });
       content.replaceChildren(
-        h("p", { class: "small text-body-secondary mb-2", text: "Cada tarea pertenece a un grupo. Selecciona un título para ver y editar sus detalles." }),
+        h("p", { class: "small text-body-secondary mb-2", text: "Solo se muestran grupos con tareas. En Biblioteca puedes consultar el historial de grupos eliminados y reutilizar tareas como copias independientes." }),
         accordion);
     } catch (error) {
       if (error.code !== "AUTH" && request === Admin.taskLoadToken) content.replaceChildren(UI.empty("wifi-off", error.message));
@@ -4218,18 +4287,19 @@ const Admin = {
         : h("p", { class: "small text-body-secondary mb-0", text: "Aún no hay respaldos." })));
 
     // ---- Vaciar tablas ----
-    const clear = async (table, rows) => {
+    const clear = async (table, rows, label) => {
       const all = table === "*";
       const word = all ? info.clearAllWord : table;
+      const displayName = label || table;
       const ok = await UI.confirmTyped({
-        title: all ? "Vaciar TODAS las tablas" : `Vaciar ${table}`,
+        title: all ? "Vaciar TODAS las tablas" : `Vaciar ${displayName}`,
         word,
         okText: "Respaldar y vaciar",
         body: h("div", {},
           h("div", { class: "alert alert-danger py-2" },
             h("b", { text: "¡Cuidado! " }),
             all ? "Se borrarán TODOS los registros de todas las tablas (alumnos, cursos, asistencias, calificaciones y todo lo de la web). La hoja quedará completamente limpia, solo con encabezados."
-              : `Se borrarán los ${rows} registro(s) de «${table}». Los encabezados se conservan.`),
+              : `Se borrarán los ${rows} registro(s) de «${displayName}». Los encabezados se conservan.`),
           h("p", { class: "small mb-0", text: "Antes se guarda un ZIP con el Excel de lo que se borra, en la carpeta de la hoja. Las hojas Reporte_ no se tocan; para borrarlas usa el respaldo por ciclo. AppSheet verá las tablas vacías." }))
       });
       if (!ok) return;
@@ -4239,6 +4309,19 @@ const Admin = {
         await reloadAll();
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     };
+
+    const taskLog = (info.tables || []).find(t => t.name === "W_Tareas");
+    const taskLogRows = taskLog && taskLog.exists ? taskLog.rows : 0;
+    const clearTaskLogBtn = h("button", {
+      class: "btn btn-sm btn-outline-danger",
+      type: "button",
+      disabled: !taskLogRows,
+      onclick: () => clear("W_Tareas", taskLogRows, "log de tareas")
+    }, icon("trash", "me-1"), "Vaciar log de tareas");
+    const taskLogCard = h("div", { class: "card card-soft border-warning" }, h("div", { class: "card-body" },
+      h("h2", { class: "h6" }, icon("journal-x", "me-1"), "Registro de tareas"),
+      h("p", { class: "small text-body-secondary" }, `Registros guardados: ${taskLogRows}. Vaciar elimina el log completo, incluido el historial de la Biblioteca, pero no borra grupos. Antes se guarda un ZIP de respaldo.`),
+      clearTaskLogBtn));
 
     const tableRows = info.tables.map(t => h("tr", {},
       h("td", { class: "text-start mono small", text: t.name }),
@@ -4358,7 +4441,7 @@ const Admin = {
       factoryBtn));
 
     content.replaceChildren(h("div", { class: "row g-3" },
-      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard, serverCard),
+      h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, taskLogCard, structureCard, serverCard),
       h("div", { class: "col-12 col-xl-7 vstack gap-3" }, examCard, backupCard, dangerCard, factoryCard)));
   }
 };

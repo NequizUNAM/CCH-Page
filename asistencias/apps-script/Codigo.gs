@@ -45,7 +45,7 @@ const WEB = {
   TEAM_EVALS:  { name: "W_EvalEquipos",    headers: ["ID_Equipo", "ID_Proyecto", "Estrellas", "Calificacion", "Observaciones", "Actualizado"] },
   EVIDENCE:    { name: "W_Evidencias",     headers: ["ID", "Cuenta", "ID_Curso", "Tipo", "Titulo", "Descripcion", "Archivo_URL", "Archivo_Nombre", "Enviado", "Estado", "Puntos", "ID_Componente", "Aplicado", "Nota"] },
   COMMENTS:    { name: "W_Comentarios",    headers: ["ID", "Cuenta", "ID_Curso", "Texto", "Fecha"] },
-  TASKS:       { name: "W_Tareas",         headers: ["ID", "ID_Curso", "Titulo", "Contenido", "Fecha_Inicio", "Fecha_Cierre"], text: ["ID", "ID_Curso", "Fecha_Inicio", "Fecha_Cierre"] },
+  TASKS:       { name: "W_Tareas",         headers: ["ID", "ID_Curso", "Titulo", "Contenido", "Fecha_Inicio", "Fecha_Cierre", "Materia", "Grupo", "Orden"], text: ["ID", "ID_Curso", "Fecha_Inicio", "Fecha_Cierre", "Materia", "Grupo"] },
   // Enlace de columnas del Reporte_ con un componente, proyecto o promedio
   COLUMNS:     { name: "W_Columnas",       headers: ["ID_Curso", "Columna", "Tipo", "Ref"] },
   LINKS:       { name: "W_Enlaces",        headers: ["ID", "Titulo", "URL", "ID_Curso", "Orden", "Activo"] },
@@ -461,6 +461,7 @@ function setupWeb_(options) {
 
   // Hojas Reporte_ que ningún curso tiene ligadas → se ligan al curso detectado (si no tiene hoja)
   const courses = courseMap_();
+  ensureTaskMetadata_();
   const usedSheets = new Set(Object.values(courses).map(c => c.sheet).filter(Boolean));
   const studentCourses = studentCourseMap_();
   getReportSheets_().forEach(report => {
@@ -3515,22 +3516,46 @@ function deleteComment_(params) {
 
 // ---------- Tareas ----------
 
+function ensureTaskMetadata_() {
+  const rows = Db.read(WEB.TASKS).rows;
+  if (!rows.length) return;
+
+  const groups = groupsMap_();
+  const resetOrder = rows.some(r => !toNumberOrNull_(r.Orden) || toNumberOrNull_(r.Orden) < 1);
+  let changed = false;
+  const updated = rows.map((r, index) => {
+    const group = groups[cleanText_(r.ID_Curso)];
+    const materia = cleanText_(r.Materia) || (group && group.courseName) || "";
+    const grupo = cleanText_(r.Grupo) || (group && group.group) || "";
+    const orden = resetOrder ? index + 1 : toNumberOrNull_(r.Orden);
+    if (materia !== cleanText_(r.Materia) || grupo !== cleanText_(r.Grupo) || orden !== toNumberOrNull_(r.Orden)) changed = true;
+    return Object.assign({}, r, { Materia: materia, Grupo: grupo, Orden: orden });
+  });
+  if (changed) Db.writeAll(WEB.TASKS, updated);
+}
+
 function listTasks_() {
   const groups = groupsMap_();
   const tasks = Db.read(WEB.TASKS).rows.map(r => {
     const idCurso = cleanText_(r.ID_Curso);
     const group = groups[idCurso];
+    const materia = cleanText_(r.Materia) || (group && group.courseName) || "";
+    const grupo = cleanText_(r.Grupo) || (group && group.group) || "";
     return {
       id: cleanText_(r.ID),
       idCurso,
-      grupo: group ? group.label : idCurso,
+      materia,
+      grupo,
+      grupoLabel: group ? group.label : ([materia, grupo].filter(Boolean).join(" · ") || `Grupo eliminado (${idCurso})`),
       titulo: cleanText_(r.Titulo),
       contenido: cleanText_(r.Contenido),
       fechaInicio: cleanText_(r.Fecha_Inicio),
-      fechaCierre: cleanText_(r.Fecha_Cierre)
+      fechaCierre: cleanText_(r.Fecha_Cierre),
+      orden: toNumberOrNull_(r.Orden) || r._row - 1,
+      archivada: !group
     };
   });
-  tasks.sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio) || a.titulo.localeCompare(b.titulo, "es"));
+  tasks.sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id));
   return { tasks };
 }
 
@@ -3613,7 +3638,12 @@ function sanitizeTaskHtml_(value) {
 function saveTask_(params) {
   const id = cleanText_(params.id);
   const idCurso = cleanText_(params.idCurso);
-  if (!groupsMap_()[idCurso]) throw new Error("Selecciona un grupo válido.");
+  const rows = Db.read(WEB.TASKS).rows;
+  const current = id ? rows.find(r => cleanText_(r.ID) === id) : null;
+  if (id && !current) throw new Error("No se encontró la tarea que intentas editar. Recarga la vista e inténtalo de nuevo.");
+  const groups = groupsMap_();
+  const group = groups[idCurso];
+  if (!group && !(current && cleanText_(current.ID_Curso) === idCurso)) throw new Error("Selecciona un grupo válido.");
 
   const titulo = cleanText_(params.titulo);
   if (!titulo) throw new Error("Escribe el título de la tarea.");
@@ -3623,30 +3653,41 @@ function saveTask_(params) {
   const fechaCierre = taskDate_(params.fechaCierre, "Fecha de cierre", false);
   if (fechaCierre && fechaCierre < fechaInicio) throw new Error("La fecha de cierre no puede ser anterior a la fecha de asignación.");
   const contenido = sanitizeTaskHtml_(params.contenido);
-  const rows = Db.read(WEB.TASKS).rows;
-  const current = id ? rows.find(r => cleanText_(r.ID) === id) : null;
-  if (id && !current) throw new Error("No se encontró la tarea que intentas editar. Recarga la vista e inténtalo de nuevo.");
+  const materia = group ? cleanText_(group.courseName) || group.label : cleanText_(current.Materia);
+  const grupo = group ? cleanText_(group.group) : cleanText_(current.Grupo);
+  const orden = current
+    ? toNumberOrNull_(current.Orden) || current._row - 1
+    : rows.reduce((max, r) => Math.max(max, toNumberOrNull_(r.Orden) || r._row - 1), 0) + 1;
 
   const task = {
     ID: current ? cleanText_(current.ID) : shortId_(),
     ID_Curso: idCurso,
+    Materia: materia,
+    Grupo: grupo,
     Titulo: titulo,
     Contenido: contenido,
     Fecha_Inicio: fechaInicio,
-    Fecha_Cierre: fechaCierre
+    Fecha_Cierre: fechaCierre,
+    Orden: orden
   };
   if (current) Db.update(WEB.TASKS, Object.assign({}, current, task));
   else Db.append(WEB.TASKS, [task]);
 
+  const grupoLabel = group ? group.label
+    : ([materia, grupo].filter(Boolean).join(" · ") || `Grupo eliminado (${idCurso})`);
   return {
     task: {
       id: task.ID,
       idCurso: task.ID_Curso,
-      grupo: groupsMap_()[task.ID_Curso].label,
+      materia,
+      grupo,
+      grupoLabel,
       titulo: task.Titulo,
       contenido: task.Contenido,
       fechaInicio: task.Fecha_Inicio,
-      fechaCierre: task.Fecha_Cierre
+      fechaCierre: task.Fecha_Cierre,
+      orden,
+      archivada: !group
     },
     message: current ? "Tarea actualizada." : "Tarea guardada."
   };
