@@ -3657,7 +3657,7 @@ const Admin = {
           h("label", { class: "form-label", for: "task-editor", text: "Contenido (opcional)" }),
           toolbar,
           editor,
-          h("div", { class: "form-text", text: "Usa la barra para aplicar formato. Las tareas son recordatorios y no generan calificación ni ponderación." })),
+          h("div", { class: "form-text", text: "Usa la barra para aplicar formato. Las tareas son recordatorios y no generan calificación ni ponderación." }))),
       footer: [cancel, save],
       size: "modal-lg"
     });
