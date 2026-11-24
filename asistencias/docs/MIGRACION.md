@@ -100,7 +100,7 @@ En **AppSheet**: Data → Course → **Regenerate schema**. Pon `Hoja_Reporte` c
 |---|---|
 | Columnas de una hoja **nueva** | `BASE_SHEETS` → `optional` |
 | Columnas de los Reporte_ nuevos | `REPORT_COLUMNS = ["Cuenta", "Nombre"]` |
-| Estatus de alumno (Acta, Reprobado…) | `STUDENT_STATUSES` (value = lo que va en la hoja, label = lo que ves) |
+| Estatus de alumno (Acta, Reprobado, MR…) | `STUDENT_STATUSES` (value = lo que va en la hoja, label = lo que ves) |
 | Volver a usar Retardo | `USE_RETARDO = true` |
 
 ## Columnas del reporte: visibles y enlazadas
@@ -221,7 +221,7 @@ El panel guarda en este navegador lo último que viste de cada grupo. Al abrirlo
 - una fila en su hoja **Reporte_**, con sus columnas enlazadas ya llenas;
 - su registro en el reporte Excel del grupo y en la exportación a PSI.
 
-El estatus se cambia desde la ficha del alumno. La función «Buscar alumnos duplicados» ahora escribe en su propia columna `Duplicado` y ya no en `Status`.
+El estatus se cambia desde la ficha del alumno. **MR** identifica Medida Reduca y se muestra en naranja. Al iniciar sesión como administrador después de publicar `Codigo.gs`, los valores existentes `Alerta` de la columna `Status` se migran a `MR`; aparece un aviso con el número de registros actualizados. La función «Buscar alumnos duplicados» escribe en su propia columna `Duplicado`, no en `Status`.
 
 ## Hojas: cuáles quedan
 

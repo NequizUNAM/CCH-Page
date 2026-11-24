@@ -91,7 +91,7 @@ const STUDENT_STATUSES = [
   { value: "", label: "Regular" },
   { value: "Acta", label: "Acta complementaria" },
   { value: "Reprobado", label: "Reprobado" },
-  { value: "Alerta", label: "Alerta" },
+  { value: "MR", label: "MR" },
   { value: "Baja", label: "Baja" }
 ];
 
@@ -486,7 +486,8 @@ function setupWeb_(options) {
     created.push(...missing.filter(n => ss.getSheetByName(n)));
   }
 
-  return { sheets, linked, created, missingColumns: base.missingColumns, folders };
+  const migratedAlertStatuses = migrateLegacyStudentStatuses_();
+  return { sheets, linked, created, missingColumns: base.missingColumns, folders, migratedAlertStatuses };
 }
 
 /**
@@ -566,9 +567,12 @@ function adminLogin_(params) {
   const session = createAdminSession_();
 
   // Primer ingreso: asegura que existan las hojas W_*
-  withScriptLock_(() => setupWeb_());
+  const setup = withScriptLock_(() => setupWeb_());
 
-  return Object.assign(session, { factoryPassword: expected.factory });
+  return Object.assign(session, {
+    factoryPassword: expected.factory,
+    migratedAlertStatuses: setup.migratedAlertStatuses
+  });
 }
 
 function requireAdmin_(token) {
@@ -838,6 +842,42 @@ function studentRecords_() {
 
   Db._cache.__students = records;
   return records;
+}
+
+function migrateLegacyStudentStatuses_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.STUDENTS);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(cleanText_);
+  const statusColumn = findColumn_(headers, "Status");
+  if (statusColumn === -1) return 0;
+
+  const rowCount = sheet.getLastRow() - 1;
+  const column = sheet.getRange(2, statusColumn + 1, rowCount, 1);
+  const values = column.getValues();
+  const formulas = column.getFormulas();
+  const rows = [];
+  values.forEach((row, index) => {
+    if (!formulas[index][0] && cleanText_(row[0]) === "Alerta") rows.push(index + 2);
+  });
+  if (!rows.length) return 0;
+
+  let first = rows[0], last = first;
+  const replaceRange = () => {
+    const count = last - first + 1;
+    sheet.getRange(first, statusColumn + 1, count, 1).setValues(Array.from({ length: count }, () => ["MR"]));
+  };
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i] === last + 1) {
+      last = rows[i];
+      continue;
+    }
+    replaceRange();
+    first = last = rows[i];
+  }
+  replaceRange();
+  delete Db._cache.__students;
+  return rows.length;
 }
 
 /** Cuenta → [ID_Curso] (para findReportCourseId_). */

@@ -1500,6 +1500,7 @@ const App = {
     event.preventDefault();
     const errorBox = $("admin-error");
     errorBox.classList.add("d-none");
+    let migratedAlertStatuses = 0;
     try {
       await UI.busy($("admin-login-submit"), async () => {
         const password = $("admin-password").value;
@@ -1507,10 +1508,17 @@ const App = {
         const result = await Api.call("adminLogin", { password });
         Session.set("admin", result.token);
         Session.set("factory", !!result.factoryPassword);
+        migratedAlertStatuses = Number(result.migratedAlertStatuses) || 0;
       });
       $("admin-password").value = "";
       bootstrap.Modal.getOrCreateInstance($("modal-admin")).hide();
+      if (migratedAlertStatuses) {
+        Cache.clear("boot");
+        Cache.clear("g:");
+        Cache.clear("p:");
+      }
       App.route();
+      if (migratedAlertStatuses) UI.toast("success", `${migratedAlertStatuses} estatus “Alerta” migrados a “MR”.`);
     } catch (error) {
       errorBox.textContent = error.message;
       errorBox.classList.remove("d-none");
@@ -2293,7 +2301,8 @@ const Admin = {
     if (s.comments) wrap.append(h("span", { class: "badge text-bg-warning", title: `${s.comments} comentario(s)` }, icon("chat-left-text"), ` ${s.comments}`));
     if (s.status) {
       const label = ((Admin.group && Admin.group.statuses) || []).find(x => x.value === s.status);
-      wrap.append(h("span", { class: "badge status-badge", title: label ? label.label : s.status, text: s.status }));
+      const statusClass = Fmt.normalize(s.status) === "mr" ? " status-mr" : "";
+      wrap.append(h("span", { class: `badge status-badge${statusClass}`, title: label ? label.label : s.status, text: s.status }));
     }
 
     const td = h("td", { class: "text-start name-cell sticky-col sticky-name" }, wrap);
@@ -4593,7 +4602,8 @@ const Admin = {
           h("div", { text: r.created.length ? `Hojas creadas: ${r.created.join(", ")}` : "Hojas base: todas existen ✅" }),
           h("div", { text: r.folders.length ? `Carpetas creadas: ${r.folders.join(", ")}` : "Carpetas: todas existen ✅" }),
           r.missingColumns.length ? h("div", { class: "text-warning-emphasis", text: "Columnas faltantes (no se modificó la hoja): " + r.missingColumns.map(m => `${m.sheet}: ${m.columns.join(", ")}`).join(" · ") }) : null,
-          r.linked.length ? h("div", { text: `Grupos ligados: ${r.linked.map(x => x.Hoja_Reporte).join(", ")}` }) : null));
+          r.linked.length ? h("div", { text: `Grupos ligados: ${r.linked.map(x => x.Hoja_Reporte).join(", ")}` }) : null,
+          r.migratedAlertStatuses ? h("div", { class: "text-success", text: `${r.migratedAlertStatuses} estatus “Alerta” migrados a “MR”.` }) : null));
       } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
     });
     const structureCard = h("div", { class: "card card-soft" }, h("div", { class: "card-body" },
