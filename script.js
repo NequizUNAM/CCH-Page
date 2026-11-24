@@ -12,7 +12,7 @@
 const CONFIG = {
   // URL del Web App para la página web. En el APK se solicita al iniciar.
   API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
-  VERSION: "7.1",
+  VERSION: "7.2",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -38,6 +38,7 @@ const Prefs = {
     cuenta: "",
     stuTab: "avance",
     admTab: "asistencia",
+    attView: "all",
     admGroup: "",
     evFilter: "Pendiente",
     cache: true
@@ -63,9 +64,14 @@ const Session = {
   data: {},
   load() {
     try { this.data = JSON.parse(sessionStorage.getItem(CONFIG.SESSION_KEY) || "{}"); } catch (e) { this.data = {}; }
+    if (!this.data || typeof this.data !== "object" || Array.isArray(this.data)) this.data = {};
+    delete this.data.student;
+    this.save();
   },
   save() {
-    try { sessionStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(this.data)); } catch (e) { /* solo en memoria */ }
+    const stored = Object.assign({}, this.data);
+    delete stored.student;
+    try { sessionStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(stored)); } catch (e) { /* solo en memoria */ }
   },
   get(key) { return this.data[key] || null; },
   set(key, value) {
@@ -153,6 +159,10 @@ const Fmt = {
     return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   }
 };
+
+function isExtraCreditComponent(c) {
+  return !!c && ["punto adicional", "puntos adicionales"].includes(Fmt.normalize(c.nombre).replace(/\s+/g, " "));
+}
 
 function debounce(fn, wait) {
   let timer;
@@ -1547,7 +1557,7 @@ const Student = {
         h("div", { class: "fw-semibold", text: course.label }),
         h("div", { class: "small opacity-75", text: `Ciclo ${course.ciclo}` })),
       h("div", { class: "card-body" },
-        section("Asistencia", "calendar-check", Student.renderAttendance(course)),
+        section("Mis asistencias", "calendar-check", Student.renderAttendance(course)),
         section("Calificaciones", "bar-chart", Student.renderGrades(course)),
         section("Equipos", "people", Student.renderTeams(course))));
   },
@@ -1587,7 +1597,7 @@ const Student = {
         h("td", { class: "text-start" }, h("div", { class: "fw-semibold", text: comp.nombre }),
           typeHint[comp.tipo] ? h("div", { class: "small text-body-secondary", text: typeHint[comp.tipo] }) : null,
           rawText ? h("div", { class: "small text-body-secondary", text: rawText }) : null),
-        h("td", { class: "text-body-secondary", text: `${Fmt.num(comp.ponderacion)}%` }),
+        h("td", { class: "text-body-secondary", text: isExtraCreditComponent(comp) ? `+${Fmt.num(comp.ponderacion)}% extra` : `${Fmt.num(comp.ponderacion)}%` }),
         h("td", {}, Parts.gradeWithBonus(item, comp)));
     });
     const hasBonus = comps.some(c => course.items[c.id] && course.items[c.id].bonus > 0);
@@ -1771,10 +1781,12 @@ const Admin = {
   dirty: new Map(),    // captura sin guardar: "cuenta|compId" → valor
   compDraft: null,     // borrador de ponderaciones
   evidence: null,
+  captureMode: false,
   wired: false,
 
   reset() {
     Admin.boot = null; Admin.group = null; Admin.dirty = new Map(); Admin.compDraft = null; Admin.evidence = null;
+    Admin.captureMode = false;
     // Cierra el panel del examen (tiene el token en memoria)
     Admin.examView = ""; Admin.exams = null;
     const frame = $("exam-frame");
@@ -2015,7 +2027,13 @@ const Admin = {
   },
 
   renderTab() {
-    const tab = Prefs.get("admTab");
+    let tab = Prefs.get("admTab");
+    if (tab === "captura") {
+      Admin.captureMode = true;
+      Prefs.set("admTab", "asistencia");
+      tab = "asistencia";
+    }
+    if (tab !== "asistencia") Admin.captureMode = false;
     $("adm-tabs").querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     UI.disposePopovers(document.body);
     $("adm-toolbar").replaceChildren();
@@ -2034,7 +2052,7 @@ const Admin = {
       restoreScrolls();
       return;
     }
-    const views = { asistencia: Admin.tabAttendance, lista: Admin.tabRollCall, captura: Admin.tabCapture, evaluacion: Admin.tabWeights, proyectos: Admin.tabProjects };
+    const views = { asistencia: Admin.tabAttendance, lista: Admin.tabRollCall, evaluacion: Admin.tabWeights, proyectos: Admin.tabProjects };
     (views[tab] || Admin.tabAttendance)(content);
     restoreScrolls();
   },
@@ -2073,7 +2091,17 @@ const Admin = {
         section("Otros ciclos", other, "#64748b"));
       wrap.append(badges);
     }
-    if (s.comments) wrap.append(h("span", { class: "badge text-bg-warning", title: `${s.comments} comentario(s)` }, icon("chat-left-text"), ` ${s.comments}`));
+    if (s.comments) {
+      const comments = Array.isArray(s.notas) ? s.notas : [];
+      const badge = h("span", { class: "badge text-bg-warning", title: `${s.comments} comentario(s)` }, icon("chat-left-text"), ` ${s.comments}`);
+      if (!ES_APK && !Mobile.is()) {
+        const content = comments.length
+          ? comments.map((text, i) => `<div class="comment-item${i ? " mt-2" : ""}" style="white-space:pre-line">${Fmt.escape(text)}</div>`).join("")
+          : '<div class="small text-body-secondary">No hay comentarios para este grupo. Abre la ficha para ver los demás.</div>';
+        UI.popover(badge, `${s.comments} comentario(s)`, content);
+      }
+      wrap.append(badge);
+    }
     if (s.status) {
       const label = ((Admin.group && Admin.group.statuses) || []).find(x => x.value === s.status);
       wrap.append(h("span", { class: "badge status-badge", title: label ? label.label : s.status, text: s.status }));
@@ -2116,6 +2144,18 @@ const Admin = {
     const showHidden = Prefs.get("showHidden");
     const dateCols = att.dates.map((d, i) => ({ d, i })).filter(x => showHidden || x.d.visible);
     const otherCols = att.others.map((o, i) => ({ o, i })).filter(x => showHidden || x.o.visible);
+    const view = Prefs.get("attView") === "grades" ? "grades" : "all";
+    const componentByColumn = new Map();
+    (g.columns || []).filter(l => l.tipo === "componente").forEach(link => {
+      const comp = g.components.find(c => c.id === link.ref);
+      if (comp) componentByColumn.set(Fmt.normalize(link.columna), comp);
+    });
+    const linkedComponents = new Set();
+    att.others.forEach(o => {
+      const comp = componentByColumn.get(Fmt.normalize(o.label));
+      if (comp) linkedComponents.add(comp.id);
+    });
+    const standaloneComponents = g.components.filter(c => !linkedComponents.has(c.id));
 
     // Parciales para el filtro «Sin calificar parcial» (si no hay, cualquier manual).
     const parciales = g.components.filter(c => (c.tipo === "manual" || c.tipo === "examen") && /parcial/i.test(c.nombre));
@@ -2130,25 +2170,93 @@ const Admin = {
     };
 
     const tbody = h("tbody");
+    const tableHead = h("thead");
+    const table = h("table", { class: "table table-bordered table-hover table-cch att-table" }, tableHead, tbody);
+    const saveBtn = Admin.captureMode
+      ? h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.saveCapture(saveBtn) })
+      : null;
+    const discardBtn = Admin.captureMode
+      ? h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", onclick: () => { Admin.dirty = new Map(); Admin.renderTab(); } }, "Descartar")
+      : null;
+    const refreshCapture = () => {
+      if (!saveBtn) return;
+      saveBtn.replaceChildren(icon("save", "me-1"), `Guardar (${Admin.dirty.size})`);
+      saveBtn.disabled = discardBtn.disabled = !Admin.dirty.size;
+    };
+    const moveFocus = (input, delta) => {
+      const all = Array.from(tbody.querySelectorAll(`input[data-comp="${input.dataset.comp}"]`));
+      const next = all[all.indexOf(input) + delta];
+      if (next) { next.focus(); next.select(); }
+    };
+    const gradeCell = (s, comp) => {
+      const item = s.items[comp.id] || {};
+      if (Admin.captureMode && comp.tipo === "manual") {
+        const key = `${s.cuenta}|${comp.id}`;
+        const original = item.base === null || item.base === undefined ? "" : String(item.base);
+        const value = Admin.dirty.has(key) ? Admin.dirty.get(key) : original;
+        const input = h("input", {
+          class: `form-control grade-input ${Admin.dirty.has(key) ? "dirty" : ""}`,
+          inputmode: "decimal",
+          value,
+          "aria-label": `${comp.nombre} de ${s.nombre || s.cuenta}`,
+          dataset: { comp: comp.id }
+        });
+        input.addEventListener("input", () => {
+          const raw = input.value.trim().replace(",", ".");
+          const n = Number(raw);
+          const invalid = raw !== "" && (!isFinite(n) || n < 0 || n > comp.maximo);
+          input.classList.toggle("is-invalid", invalid);
+          input.title = invalid ? `Debe estar entre 0 y ${comp.maximo}` : "";
+          if (raw === original) Admin.dirty.delete(key); else Admin.dirty.set(key, raw);
+          input.classList.toggle("dirty", Admin.dirty.has(key));
+          refreshCapture();
+        });
+        input.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); moveFocus(input, 1); }
+          if (e.key === "ArrowUp") { e.preventDefault(); moveFocus(input, -1); }
+        });
+        input.addEventListener("focus", () => input.select());
+        return h("td", {}, h("div", { class: "d-flex align-items-center justify-content-center gap-1" }, input, Parts.bonusTag(item, comp)));
+      }
+      if (comp.tipo === "manual") {
+        return h("td", {}, h("div", { class: "d-flex align-items-center justify-content-center gap-1" },
+          h("span", { text: item.base === null || item.base === undefined ? "" : Fmt.num(item.base) }),
+          Parts.bonusTag(item, comp)));
+      }
+      return h("td", { class: "computed" }, Parts.gradeWithBonus(item, comp));
+    };
     const draw = (q = Admin._attQuery || "") => {
       Admin._attQuery = q;
       const rows = g.students
         .filter(s => (!q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q)) && matchFilter(s))
         .map(s => {
           const cuenta = h("td", { class: "sticky-col cuenta-cell", text: s.cuenta });
+          if (view === "grades") {
+            return h("tr", {}, cuenta, Admin.nameCell(s),
+              g.components.map(comp => gradeCell(s, comp)),
+              h("td", { class: `final-cell sticky-right cap-final ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
+              h("td", { class: "text-body-secondary sticky-right cap-strict", text: Fmt.grade(s.finalStrict) }),
+              h("td", { class: "fw-semibold sticky-right cap-entera", text: s.entero ?? "" }));
+          }
           Parts.applyFaltas(cuenta, s.counts && s.counts.falta);
           const r = Parts.risk(s);
           const dot = r.level ? h("span", { class: `risk-dot risk-${r.level}`, role: "img", title: `Riesgo ${r.level}: ${r.reasons.join(" · ")}`, "aria-label": `Riesgo ${r.level}: ${r.reasons.join(", ")}` }) : "";
+          const reportCells = otherCols.map(x => {
+            const comp = componentByColumn.get(Fmt.normalize(x.o.label));
+            return comp && Admin.captureMode ? gradeCell(s, comp) : h("td", { text: s.others[x.i] || "" });
+          });
           return h("tr", {}, cuenta, Admin.nameCell(s),
             h("td", { class: "risk-cell" }, dot),
             h("td", { class: s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL ? "fw-bold text-danger" : "", text: s.counts ? s.counts.falta : "" }),
             h("td", { text: s.counts ? s.counts.justificante : "" }),
             h("td", { class: "text-body-secondary", text: r.pct === null ? "" : `${r.pct}%` }),
             dateCols.map(x => Parts.statusCell(s.statuses[x.i], x.d.label)),
-            otherCols.map(x => h("td", { text: s.others[x.i] || "" })));
+            reportCells,
+            standaloneComponents.map(comp => gradeCell(s, comp)));
         });
-      tbody.replaceChildren(...(rows.length ? rows : [h("tr", {}, h("td", { colspan: 6 + dateCols.length + otherCols.length, class: "text-body-secondary py-4", text: "Sin coincidencias." }))]));    };
-    draw();
+      const colspan = view === "grades" ? 5 + g.components.length : 6 + dateCols.length + otherCols.length + standaloneComponents.length;
+      tbody.replaceChildren(...(rows.length ? rows : [h("tr", {}, h("td", { colspan, class: "text-body-secondary py-4", text: "Sin coincidencias." }))]));
+    };
 
     const th = (text, visible, cls = "", title = null) => h("th", { class: `${cls} ${visible === false ? "col-hidden" : ""}`, title: title || (visible === false ? "Oculto para alumnos" : null), text });
     // Encabezado de columna (no fecha) → clic abre la ponderación en un modal, resaltando su componente
@@ -2159,6 +2267,9 @@ const Admin = {
       return h("th", { class: `col-linked ${visible === false ? "col-hidden" : ""}`, title: `${link ? `Enlazada a ${link.label} · ` : ""}clic para editar la ponderación` },
         h("button", { type: "button", class: "th-link", onclick: () => Admin.weightsModal(focus) }, link ? icon("link-45deg", "me-1") : null, text));
     };
+    const componentTh = comp => h("th", { class: "col-linked text-center", title: `${Fmt.num(comp.ponderacion)}%${isExtraCreditComponent(comp) ? " extra" : ""} · Escala 0–${comp.maximo}` },
+      h("button", { type: "button", class: "th-link", onclick: () => Admin.weightsModal(comp.id) }, icon("sliders", "me-1"), comp.nombre),
+      h("div", { class: "small fw-normal text-body-secondary" }, `${Fmt.num(comp.ponderacion)}%${isExtraCreditComponent(comp) ? " extra" : ""}`));
 
     // Chips de triaje «Necesitan atención» (filtran en el cliente, sin pedir nada).
     const counts = {
@@ -2183,53 +2294,142 @@ const Admin = {
         draw();
       }
     }, d.label, " ", h("span", { class: "badge text-bg-light border", text: counts[d.key] })));
-    // Leyenda colapsable: antes ocupaba dos filas fijas junto a la barra.
-    const legendsBox = h("div", { class: "d-none", id: "att-legends" }, Parts.legend(), Admin.linksLegend());
-    const legendBtn = h("button", {
-      type: "button", class: "btn btn-sm btn-outline-secondary ms-auto", "aria-expanded": "false",
-      title: "Mostrar la leyenda de estados y enlaces",
-      onclick: e => { const open = legendsBox.classList.toggle("d-none") === false; e.currentTarget.setAttribute("aria-expanded", String(open)); }
-    }, icon("info-circle", "me-1"), "Leyenda");
+    const viewButton = (id, iconName, label, title) => h("button", {
+      class: `btn btn-sm ${view === id ? "btn-dark" : "btn-outline-secondary"}`,
+      type: "button",
+      title,
+      "aria-label": title,
+      "aria-pressed": String(view === id),
+      onclick: () => { Prefs.set("attView", id); Admin.renderTab(); }
+    }, icon(iconName, "me-1"), label);
+    const captureButton = h("button", {
+      class: `btn btn-sm ${Admin.captureMode ? "btn-warning" : "btn-outline-primary"}`,
+      type: "button",
+      "aria-pressed": String(Admin.captureMode),
+      onclick: async () => {
+        if (Admin.captureMode && !(await Admin.leaveCapture())) return;
+        Admin.captureMode = !Admin.captureMode;
+        Admin.renderTab();
+      }
+    }, icon(Admin.captureMode ? "check2" : "pencil-square", "me-1"), Admin.captureMode ? "Terminar captura" : "Capturar calificaciones");
+    const exportButton = h("button", {
+      class: "btn btn-sm btn-outline-secondary",
+      type: "button",
+      title: "Exportar o importar datos del grupo",
+      onclick: () => Admin.exportModal()
+    }, icon("download", "me-1"), "Exportar");
+    refreshCapture();
 
     $("adm-toolbar").replaceChildren(h("div", { class: "vstack gap-2" },
       h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
         Admin.searchBox("Buscar cuenta o nombre…", draw, Admin._attQuery || ""),
-        h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Descargar reporte (Excel/CSV)", onclick: () => Admin.exportGroup() }, icon("download", "me-1"), "Exportar"),
-        h("button", { class: "btn btn-sm btn-success", type: "button", title: "Llenar el formulario de PSI", onclick: () => Admin.psiModal() }, icon("send-check", "me-1"), "Exportar a PSI"),
+        h("div", { class: "btn-group", role: "group", "aria-label": "Vista de la tabla" },
+          viewButton("all", "1-circle", "Todo", "Mostrar asistencia y calificaciones"),
+          viewButton("grades", "2-circle", "Ponderaciones", "Mostrar solo los campos de calificación")),
+        captureButton,
+        Admin.captureMode ? discardBtn : null,
+        saveBtn,
+        exportButton,
         h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
-        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas"),
-        legendBtn),
+        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas")),
       h("div", { class: "d-flex flex-wrap align-items-center gap-2 small" },
-        h("span", { class: "fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips),
-      legendsBox));
+        h("span", { class: "fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips)));
 
-    content.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch att-table" },
-      h("thead", {}, h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"), th("⚠", true, "risk-col", "Riesgo: promedio menor a 6, más de 4 faltas o 3 faltas seguidas"), th("F", true), th("J", true), th("%", true, "", "Porcentaje de asistencia"),
-        dateCols.map(x => th(x.d.label, x.d.visible)), otherCols.map(x => linkTh(x.o.label, x.o.visible)))),
-      tbody)));
+    tableHead.replaceChildren(view === "grades"
+      ? h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"),
+        g.components.map(componentTh),
+        th("Final", true, "sticky-right cap-final"),
+        th("Estricta", true, "sticky-right cap-strict", "Lo no evaluado cuenta 0"),
+        th("Entera", true, "sticky-right cap-entera", "Suma de porcentajes sin redondear"))
+      : h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"),
+        th("⚠", true, "risk-col", "Riesgo: promedio menor a 6, más de 4 faltas o 3 faltas seguidas"),
+        th("F", true), th("J", true), th("%", true, "", "Porcentaje de asistencia"),
+        dateCols.map(x => th(x.d.label, x.d.visible)),
+        otherCols.map(x => linkTh(x.o.label, x.o.visible)),
+        standaloneComponents.map(componentTh)));
+    draw();
+    content.replaceChildren(h("div", { class: "table-wrap" }, table));
   },
 
-  /** Reporte del grupo (asistencia + calificaciones) como CSV que abre Excel. */
+  exportModal() {
+    let modal;
+    const run = action => {
+      $("modal-generic").addEventListener("hidden.bs.modal", action, { once: true });
+      modal.close();
+    };
+    const option = (iconName, title, description, action, cls = "btn-outline-secondary", disabled = false) => h("button", {
+      class: `btn ${cls} w-100 text-start p-3`,
+      type: "button",
+      disabled: disabled || undefined,
+      onclick: () => run(action)
+    }, h("span", { class: "d-flex align-items-start gap-3" },
+      icon(iconName, "fs-5"),
+      h("span", {}, h("span", { class: "d-block fw-semibold", text: title }), h("span", { class: "d-block small opacity-75", text: description }))));
+    const fileInput = h("input", {
+      type: "file",
+      accept: ".xlsx",
+      class: "visually-hidden",
+      onchange: e => {
+        const file = e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        $("modal-generic").addEventListener("hidden.bs.modal", () => Admin.importGrades(file), { once: true });
+        modal.close();
+      }
+    });
+    const importOption = h("label", { class: "btn btn-outline-secondary w-100 text-start p-3" },
+      h("span", { class: "d-flex align-items-start gap-3" }, icon("file-earmark-arrow-up", "fs-5"),
+        h("span", {}, h("span", { class: "d-block fw-semibold", text: "Importar plantilla Excel" }),
+          h("span", { class: "d-block small", text: "Cargar las calificaciones desde la plantilla descargada." }))),
+      fileInput);
+    modal = UI.modal({
+      title: [icon("download", "me-2"), `Exportar · ${Admin.group.group.label}`],
+      body: h("div", { class: "vstack gap-2" },
+        option("send-check", "Exportar a PSI", "Preparar las sugerencias del grupo para PSI.", () => Admin.psiModal(), "btn-outline-success"),
+        option("file-earmark-spreadsheet", "Plantilla Excel", "Descargar o capturar calificaciones por alumno.", () => Admin.gradesTemplate()),
+        importOption,
+        option("table", "Reporte del grupo · Excel", "Exportar la estructura completa de Reporte_, con grupo, materia y fecha.", () => Admin.exportGroup(),
+          "btn-outline-primary", !Admin.group.attendance)
+      ),
+      footer: [h("button", { class: "btn btn-secondary", type: "button", "data-bs-dismiss": "modal", text: "Cerrar" })],
+      size: "modal-lg"
+    });
+  },
+
+  /** Descarga el contenido de Reporte_ en el orden original, sin indicadores ni comentarios de la interfaz. */
   exportGroup() {
     const g = Admin.group;
-    const dates = g.attendance ? g.attendance.dates : [];
-    const comps = g.components;
-    const header = ["Cuenta", "Nombre"].concat(dates.map(d => d.key), ["Asistencias", "Faltas", "Justificantes", "% asistencia"],
-      comps.map(c => `${c.nombre} (${c.ponderacion}%)`), ["Final (evaluado)", "Final (estricta)", "Calificación (entera)"]);
-    const rows = g.students.map(s => {
-      const c = s.counts || { asistencia: 0, falta: 0, justificante: 0 };
-      const pct = Parts.pct(c);
-      return [s.cuenta, s.nombre].concat(dates.map((d, i) => s.statuses[i] || ""), [c.asistencia, c.falta, c.justificante, pct === null ? "" : pct],
-        comps.map(cp => { const it = s.items[cp.id]; return it && it.score10 !== null ? it.score10 : ""; }), [s.final ?? "", s.finalStrict ?? "", s.entero ?? ""]);
-    });
-    const esc = v => { const t = String(v ?? ""); return /[",;\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-    const csv = "\ufeff" + [header].concat(rows).map(r => r.map(esc).join(",")).join("\r\n");
-    const name = `${Fmt.normalize(g.group.label).replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${new Date().toISOString().slice(0, 10)}.csv`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = h("a", { href: url });
-    a.download = name;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    const att = g.attendance;
+    if (!att) return UI.toast("warning", "Este grupo no tiene una hoja Reporte_ para exportar.");
+    const fallbackColumns = [
+      { kind: "account", order: 0, label: "Cuenta" },
+      { kind: "name", order: 1, label: "Nombre" },
+      ...att.dates.map((d, i) => ({ kind: "date", dataIndex: i, order: i + 2, key: d.key })),
+      ...att.others.map((o, i) => ({ kind: "other", dataIndex: i, order: att.dates.length + i + 2, label: o.label }))
+    ];
+    const columns = (Array.isArray(att.columns) ? att.columns : fallbackColumns).slice().sort((a, b) => a.order - b.order);
+    const now = new Date();
+    const rows = [
+      [{ v: "Reporte del grupo", s: "head" }],
+      ["Grupo", g.group.group || g.group.label],
+      ["Materia", g.group.courseName || g.group.label],
+      ["Ciclo", g.group.ciclo || ""],
+      ["Fecha de exportación", now.toLocaleString("es-MX")],
+      [],
+      columns.map(c => ({ v: c.kind === "date" ? c.key : c.label, s: "head" }))
+    ];
+    const studentsByAccount = new Map(g.students.map(s => [s.cuenta, s]));
+    const reportStudents = Array.isArray(att.order)
+      ? att.order.map(cuenta => studentsByAccount.get(cuenta)).filter(Boolean)
+      : g.students;
+    reportStudents.forEach(s => rows.push(columns.map(c => {
+      if (c.kind === "account") return s.cuenta;
+      if (c.kind === "name") return s.attendanceName || "";
+      if (c.kind === "date") return s.statuses[c.dataIndex] || "";
+      return s.others[c.dataIndex] || "";
+    })));
+    const widths = [16, 38, ...columns.map(() => 16)];
+    Xlsx.download(Xlsx.write([{ name: "Reporte_grupo", rows, widths }]), "Reporte_grupo.xlsx");
   },
 
   psiModal() {
@@ -2294,7 +2494,7 @@ const Admin = {
       const fuenteNombre = (fuentes.find(c => c.id === opts.fuente) || {}).nombre || "";
       const sinNota = rows.filter(x => x.sinNota).length;
       body.replaceChildren(
-        sinNota ? h("div", { class: "alert alert-warning py-2 small mb-2" }, icon("exclamation-triangle", "me-1"), `${sinNota} alumno(s) sin calificación en ${fuenteNombre}: en PSI su avance quedará vacío. Captúralo en Captura antes de exportar.`) : null,
+        sinNota ? h("div", { class: "alert alert-warning py-2 small mb-2" }, icon("exclamation-triangle", "me-1"), `${sinNota} alumno(s) sin calificación en ${fuenteNombre}: en PSI su avance quedará vacío. Captúrala en Asistencia antes de exportar.`) : null,
         h("div", { class: "d-flex flex-wrap gap-2 mb-2" }, ["3", "2", "1", "0"].map(k => h("span", { class: `badge ${Psi.RIESGO[k][1]}`, text: `Riesgo ${Psi.RIESGO[k][0]}: ${count(k)}` }))),
         h("div", { class: "table-wrap auto-h", style: { maxHeight: "48vh" } }, h("table", { class: "table table-sm table-cch mb-0" },
           h("thead", {}, h("tr", {}, ["Cuenta", "Nombre", "Avance", "% Asist.", "Tareas", "Dificultades", "Asistencias", "Riesgo", "Derivación"].map((t, i) => h("th", { class: i === 0 ? "sticky-col" : i === 1 ? "text-start sticky-col sticky-name" : i === 8 ? "text-start" : "", text: t })))),
@@ -2673,99 +2873,6 @@ const Admin = {
     ));
   },
 
-  /* ---------------- Pestaña: Captura ---------------- */
-  tabCapture(content) {
-    const g = Admin.group;
-    const comps = g.components;
-    if (!comps.length) {
-      content.replaceChildren(UI.empty("sliders2", "Primero define los componentes en «Ponderaciones»."));
-      return;
-    }
-
-    const saveBtn = h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.saveCapture(saveBtn) });
-    const discardBtn = h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", onclick: () => { Admin.dirty = new Map(); Admin.renderTab(); } }, "Descartar");
-    const refreshSave = () => {
-      saveBtn.replaceChildren(icon("save", "me-1"), `Guardar (${Admin.dirty.size})`);
-      saveBtn.disabled = discardBtn.disabled = !Admin.dirty.size;
-    };
-    refreshSave();
-
-    const manual = comps.filter(c => c.tipo === "manual" || c.tipo === "examen");
-    const tbody = h("tbody");
-
-    const moveFocus = (input, delta) => {
-      const all = Array.from(tbody.querySelectorAll(`input[data-comp="${input.dataset.comp}"]`));
-      const next = all[all.indexOf(input) + delta];
-      if (next) { next.focus(); next.select(); }
-    };
-
-    const draw = (q = Admin._capQuery || "") => {
-      Admin._capQuery = q;
-      tbody.replaceChildren(...g.students
-        .filter(s => !q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q))
-        .map(s => {
-          const cuenta = h("td", { class: "sticky-col cuenta-cell", text: s.cuenta });
-          Parts.applyFaltas(cuenta, s.counts && s.counts.falta);
-
-          const cells = comps.map(comp => {
-            const item = s.items[comp.id] || {};
-            if (comp.tipo !== "manual") {
-              return h("td", { class: "computed" }, Parts.gradeWithBonus(item, comp));
-            }
-            const key = `${s.cuenta}|${comp.id}`;
-            const original = item.base === null || item.base === undefined ? "" : String(item.base);
-            const value = Admin.dirty.has(key) ? Admin.dirty.get(key) : original;
-            const input = h("input", {
-              class: `form-control grade-input ${Admin.dirty.has(key) ? "dirty" : ""}`, inputmode: "decimal", value,
-              "aria-label": `${comp.nombre} de ${s.nombre || s.cuenta}`, dataset: { comp: comp.id }
-            });
-            input.addEventListener("input", () => {
-              const raw = input.value.trim().replace(",", ".");
-              const n = Number(raw);
-              const invalid = raw !== "" && (!isFinite(n) || n < 0 || n > comp.maximo);
-              input.classList.toggle("is-invalid", invalid);
-              input.title = invalid ? `Debe estar entre 0 y ${comp.maximo}` : "";
-              if (raw === original) Admin.dirty.delete(key); else Admin.dirty.set(key, raw);
-              input.classList.toggle("dirty", Admin.dirty.has(key));
-              refreshSave();
-            });
-            input.addEventListener("keydown", e => {
-              if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); moveFocus(input, 1); }
-              if (e.key === "ArrowUp") { e.preventDefault(); moveFocus(input, -1); }
-            });
-            input.addEventListener("focus", () => input.select());
-            return h("td", {}, h("div", { class: "d-flex align-items-center justify-content-center gap-1" }, input, Parts.bonusTag(item, comp)));
-          });
-
-          return h("tr", {}, cuenta, Admin.nameCell(s), cells,
-            h("td", { class: `final-cell sticky-right cap-final ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
-            h("td", { class: "text-body-secondary sticky-right cap-strict", text: Fmt.grade(s.finalStrict) }),
-            h("td", { class: "fw-semibold sticky-right cap-entera", text: s.entero ?? "" }));
-        }));
-      // Los popovers de bonos se crean dentro de gradeWithBonus
-    };
-    draw();
-
-    $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
-      Admin.searchBox("Buscar…", draw, Admin._capQuery || ""),
-      h("button", { class: "btn btn-sm btn-outline-success", type: "button", title: "Descargar Excel con las calificaciones actuales", onclick: () => Admin.gradesTemplate() }, icon("file-earmark-spreadsheet", "me-1"), "Plantilla Excel"),
-      h("label", { class: "btn btn-sm btn-success mb-0", title: "Subir el Excel llenado" }, icon("upload", "me-1"), "Importar Excel",
-        h("input", { type: "file", accept: ".xlsx", class: "d-none", onchange: e => { const f = e.target.files[0]; e.target.value = ""; if (f) Admin.importGrades(f); } })),
-      h("span", { class: "small text-body-secondary d-none d-xl-inline" }, icon("keyboard"), " Enter/↓ baja"),
-      h("div", { class: "ms-auto d-flex gap-2" }, discardBtn, saveBtn)));
-
-    content.replaceChildren(...kids(
-      h("div", { class: "table-wrap" }, h("table", { class: "table table-bordered table-hover table-cch" },
-        h("thead", {}, h("tr", {},
-          h("th", { class: "sticky-col", text: "Cuenta" }), h("th", { class: "text-start sticky-col sticky-name", text: "Nombre" }),
-          comps.map(c => h("th", { dataset: { comp: c.id }, title: c.tipo === "manual" ? `Escala 0–${c.maximo}` : "Se calcula solo" },
-            c.nombre, h("div", { class: "fw-normal small opacity-75", text: `${Fmt.num(c.ponderacion)}%${c.tipo !== "manual" ? " · auto" : Number(c.maximo) !== 10 ? ` · 0–${c.maximo}` : ""}` }))),
-          h("th", { dataset: { comp: "final" }, class: "sticky-right cap-final", text: "Final" }), h("th", { title: "Lo no evaluado cuenta 0", class: "sticky-right cap-strict", text: "Estricta" }), h("th", { title: "Suma de % sin redondear: solo se quitan los decimales (Calificación / SIAE)", class: "sticky-right cap-entera", text: "Entera" }))),
-        tbody)),
-      manual.length ? null : h("p", { class: "small text-body-secondary mt-2", text: "No hay componentes manuales: todo se calcula solo." })
-    ));
-  },
-
   /** Excel con Cuenta, Nombre y una columna por componente manual (vacíos en amarillo). */
   gradesTemplate() {
     const g = Admin.group;
@@ -2781,7 +2888,7 @@ const Admin = {
       ["1. Llena las celdas amarillas (faltantes). Puedes corregir las demás."],
       ["2. No cambies la columna Cuenta ni los títulos de los componentes."],
       ["3. Escala: " + comps.map(c => `${c.nombre} 0–${c.maximo}`).join(" · ")],
-      ["4. En la web: Captura → Importar Excel. Las celdas vacías no borran nada."]
+      ["4. En la web: Asistencia → Exportar → Importar plantilla Excel. Las celdas vacías no borran nada."]
     ];
     Xlsx.download(Xlsx.write([
       { name: g.group.label, rows: [header].concat(rows), widths: [13, 42].concat(comps.map(() => 13)), header: true },
@@ -2881,10 +2988,17 @@ const Admin = {
     const sumText = h("span", { class: "fw-semibold" });
 
     const updateSum = () => {
-      const sum = draft.reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
+      const extraComponents = draft.filter(isExtraCreditComponent);
+      const sum = draft.filter(c => !isExtraCreditComponent(c)).reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
+      const extraWeight = extraComponents.reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
       sumText.textContent = `${Fmt.num(sum)}%`;
       sumBar.style.width = `${Math.min(sum, 100)}%`;
       const exact = Math.abs(sum - 100) < 0.001;
+      const errors = [];
+      if (!exact) errors.push(`Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`);
+      if (extraComponents.length > 1) errors.push("Solo se permite un rubro «Puntos Adicionales».");
+      if (extraComponents.some(c => c.tipo !== "manual" || Number(c.maximo) !== 10)) errors.push("«Puntos Adicionales» debe ser manual y capturarse de 0 a 10.");
+      const notes = extraWeight > 0 ? [`+${Fmt.num(extraWeight)}% extra (no cuenta en el 100 % base).`] : [];
       const ids = new Set(draft.map(c => c.id).filter(Boolean));
       const gone = (g.columns || []).filter(l => l.tipo === "componente" && !ids.has(l.ref)).map(l => l.columna);
       const fresh = draft.filter(c => !c.id && c.nombre.trim()).map(c => c.nombre.trim());
@@ -2896,35 +3010,42 @@ const Admin = {
           .map(l => h("div", { class: "alert alert-warning py-1 px-2 mb-1 small" }, icon("exclamation-triangle", "me-1"),
             `«${l.columna}» muestra un proyecto en el reporte, pero no cuenta en la calificación. Agrega un componente llamado «${l.columna}» de tipo «Proyectos en equipo» con su %: tomará esa misma columna y ese proyecto.`))));
       sumBar.className = `progress-bar ${exact ? "bg-success" : sum > 100 ? "bg-danger" : "bg-warning"}`;
-      sumHint.textContent = exact ? "" : `Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`;
-      saveBtn.disabled = !exact;
+      sumHint.className = `small fw-semibold ms-2 ${errors.length ? "text-danger" : "text-body-secondary"}`;
+      sumHint.textContent = [...errors, ...notes].join(" · ");
+      saveBtn.disabled = errors.length > 0;
     };
-    const sumHint = h("span", { class: "small text-danger fw-semibold ms-2" });
+    const sumHint = h("span", { class: "small fw-semibold ms-2" });
     const pairNote = h("div", { class: "mt-2" });
-    const saveBtn = h("button", { class: "btn btn-primary", type: "button", title: "Las ponderaciones deben sumar 100 %" }, icon("save", "me-1"), "Guardar ponderaciones");
+    const saveBtn = h("button", { class: "btn btn-primary", type: "button", title: "Los componentes base deben sumar 100 %; Puntos Adicionales cuenta aparte." }, icon("save", "me-1"), "Guardar ponderaciones");
 
     const draw = () => {
       list.replaceChildren(...draft.map((c, i) => {
         // Solo porcentaje. Sellos es el único con máximo propio (ej. 40 sellos = su 100 %).
+        const isExtra = isExtraCreditComponent(c);
         const isSello = c.tipo === "manual" && /sello/.test(Fmt.normalize(c.nombre));
-        const scaleNote = isSello ? h("div", { class: "input-group input-group-sm mt-1", style: { maxWidth: "260px" } },
+        const scaleNote = isExtra ? h("div", { class: "small text-body-secondary mt-1" },
+          "Captura desde Asistencia → Capturar calificaciones, de 0 a 10. Cada 10 % extra puede sumar hasta 1 punto al promedio (tope 10). ",
+          c.tipo !== "manual" ? "Selecciona el tipo Manual." : Number(c.maximo) !== 10
+            ? h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Usar escala de 0 a 10")
+            : null)
+        : isSello ? h("div", { class: "input-group input-group-sm mt-1", style: { maxWidth: "260px" } },
           h("span", { class: "input-group-text", text: "Máximo de sellos" }),
           h("input", { class: "form-control", type: "number", min: "1", step: "1", value: c.maximo, "aria-label": "Máximo de sellos", oninput: e => { c.maximo = e.target.value; } }))
         : c.tipo === "examen" ? h("select", { class: "form-select form-select-sm mt-1", "aria-label": "Examen y parcial", onchange: e => { c.fuente = e.target.value; } },
           h("option", { value: "", text: exams.length ? "— Elige examen y parcial —" : "No hay hojas «Resultados …» (ejecuta crearTablasExamenes)" }),
           exams.map(x => h("option", { value: x.id, selected: c.fuente === x.id, text: x.label })))
         : c.tipo === "manual" && Number(c.maximo) !== 10 ? h("div", { class: "small text-body-secondary mt-1" },
-          `En Captura se escribe de 0 a ${c.maximo}. `,
+          `En Asistencia → Capturar calificaciones se escribe de 0 a ${c.maximo}. `,
           h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
         return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
-          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Teams, Sellos)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const was = /sello/.test(Fmt.normalize(c.nombre)); c.nombre = e.target.value; updateSum(); if (was !== /sello/.test(Fmt.normalize(c.nombre))) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } } }), scaleNote),
+          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Sellos, Puntos Adicionales)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const wasSello = /sello/.test(Fmt.normalize(c.nombre)); const wasExtra = isExtraCreditComponent(c); c.nombre = e.target.value; if (wasSello !== /sello/.test(Fmt.normalize(c.nombre)) || wasExtra !== isExtraCreditComponent(c)) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } else updateSum(); } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
             onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; if (c.tipo !== "examen") c.fuente = ""; draw(); }
           }, Object.entries(types).map(([v, t]) => h("option", { value: v, selected: c.tipo === v, text: t })))),
           h("div", { class: "col-6 col-md-2" }, h("div", { class: "input-group input-group-sm" },
             h("input", { class: "form-control", type: "number", min: "0", max: "100", step: "any", value: c.ponderacion, "aria-label": "Ponderación", oninput: e => { c.ponderacion = e.target.value; updateSum(); } }),
-            h("span", { class: "input-group-text", text: "%" }))),
+            h("span", { class: "input-group-text", text: isExtra ? "% extra" : "%" }))),
           h("div", { class: "col-6 col-md-2 text-end" },
             h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", title: "Subir", disabled: i === 0, onclick: () => { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); } }, icon("arrow-up")),
             h("button", { class: "btn btn-sm btn-outline-secondary ms-1", type: "button", title: "Bajar", disabled: i === draft.length - 1, onclick: () => { [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; draw(); } }, icon("arrow-down")),
@@ -2973,7 +3094,8 @@ const Admin = {
         h("div", { class: "progress weight-bar mb-2", role: "progressbar", "aria-label": "Suma de ponderaciones" }, sumBar),
         h("p", { class: "small text-body-secondary mb-0" },
           "Cada componente vale el % que le pongas y entre todos deben sumar 100 % (= 10). Ej.: Parcial 1 al 40 % con 8 aporta 3.2. ",
-          "«Manual» = lo capturas tú en Captura, de 0 a 10; solo Sellos lleva su máximo (ej. 40 sellos). ",
+          "El único rubro extra permitido es «Puntos Adicionales»: debe ser manual, de 0 a 10, y su % se suma aparte del 100 % base (10 % extra con 10 añade 1 punto; máximo final 10). ",
+          "«Manual» = lo capturas tú desde Asistencia → Capturar calificaciones, de 0 a 10; solo Sellos lleva su máximo (ej. 40 sellos). ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
           "«Examen en línea» = la calificación que el alumno sacó en el examen (Cibernética o Estadística) de ese parcial, por número de cuenta. ",
@@ -3449,7 +3571,7 @@ const Admin = {
         ? h("table", { class: "table table-sm table-cch mb-0" },
             h("thead", {}, h("tr", {}, h("th", { class: "text-start", text: "Componente" }), h("th", { text: "Peso" }), h("th", { text: "Calif." }))),
             h("tbody", {}, gr.components.map(cp => h("tr", {},
-              h("td", { class: "text-start", text: cp.nombre }), h("td", { class: "text-body-secondary", text: `${Fmt.num(cp.ponderacion)}%` }),
+              h("td", { class: "text-start", text: cp.nombre }), h("td", { class: "text-body-secondary", text: isExtraCreditComponent(cp) ? `+${Fmt.num(cp.ponderacion)}% extra` : `${Fmt.num(cp.ponderacion)}%` }),
               h("td", {}, Parts.gradeWithBonus(gr.items[cp.id], cp)))),
               h("tr", { class: "fw-bold" }, h("td", { class: "text-start", text: "Promedio actual" }), h("td", {}), h("td", { text: Fmt.grade(gr.final) }))))
         : h("p", { class: "small text-body-secondary mb-0", text: "Sin ponderaciones." });

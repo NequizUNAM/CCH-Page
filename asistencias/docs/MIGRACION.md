@@ -32,7 +32,7 @@ Cómo funciona: el Dashboard abre la página del examen en un marco oculto con `
 **Enlazar el examen con el grupo:** Ponderaciones → en el componente (ej. Parcial 1) elige el tipo **Examen en línea** y luego **Examen Estadística · Parcial 1**.
 
 - Se empata por **número de cuenta**: solo cuenta para alumnos inscritos en ese grupo y solo exámenes **Entregados**.
-- Si un alumno no lo presentó en línea, vale lo que captures a mano en Captura (ej. examen en papel).
+- Si un alumno no lo presentó en línea, vale lo que captures a mano en **Asistencia → Capturar calificaciones** (ej. examen en papel).
 - La calificación llega sola a su columna del Reporte_ (ej. Parcial_1) al abrir el grupo en el panel o con **Sync**.
 
 ## Instalación nueva (otra escuela u otra cuenta)
@@ -47,7 +47,7 @@ El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
 
 **URL para los alumnos:** el QR de la página de inicio comparte la URL configurada, así que el alumno no configura nada. En el APK, la URL se solicita y prueba cada vez que se abre Asistencias; la última se conserva solo como sugerencia en el dispositivo.
 
-**Login administrativo del APK:** después de configurar la URL `/exec`, usa la contraseña `CCH_ADMIN_PASSWORD` de Apps Script, igual que la página web. Apps Script conserva el token administrativo por 24 horas; cambiar la contraseña invalida las sesiones existentes. El login de alumnos con número de cuenta no cambia.
+**Login administrativo del APK:** después de configurar la URL `/exec`, usa la contraseña `CCH_ADMIN_PASSWORD` de Apps Script, igual que la página web. Apps Script conserva el token administrativo por 24 horas; cambiar la contraseña invalida las sesiones existentes. El token de alumno no se persiste en el dispositivo: al recargar o reabrir la app, el alumno vuelve a ingresar su número de cuenta.
 
 ## Restaurar a fábrica (DEMO)
 
@@ -121,21 +121,29 @@ En la web, pestaña **Asistencia → botón «Columnas»**:
 | Proyecto_Final (Estadística) | Componente Proyectos |
 | Ejercicio Clase (CYC) | Proyecto «Proyecto (AppSheet)», el que se migró |
 | Calificación, SIAE | **Calificación entera** |
-| Puntos Adicionales | Sin enlace: se queda como está |
+| Puntos Adicionales | Sin enlace por defecto; si agregas el componente «Puntos Adicionales», se enlaza a ese rubro |
 
-**Calificación entera:** los porcentajes suman 10 (100 % = 10). Se suma lo obtenido en cada componente y **se quitan los decimales, sin redondear**: 7.96 → 7. Si ya tenías Calificación o SIAE enlazadas a «Promedio actual», se cambian solas a entera al entrar como admin. En Captura verás la columna **Entera** junto a Final y Estricta.
+**Calificación entera:** los porcentajes suman 10 (100 % = 10). Se suma lo obtenido en cada componente y **se quitan los decimales, sin redondear**: 7.96 → 7. Si ya tenías Calificación o SIAE enlazadas a «Promedio actual», se cambian solas a entera al entrar como admin. En la vista **2 · Ponderaciones** de Asistencia verás la columna **Entera** junto a Final y Estricta.
 
 - En la tabla de asistencia, al hacer clic en el encabezado de una columna (Parcial_1, Sellos, Calificación…) se abre un **modal con la ponderación** del grupo, con el componente de esa columna resaltado. Ahí cambias porcentajes y guardas sin salir de Asistencia. 🔗 = la columna está enlazada.
 
 > En `Reporte_ESTADISTICA_512` la fórmula vieja de **Parcial_1** leía la columna de **Parcial_2** de Calificaciones. Al enlazar desde la web queda corregido.
 
-## Capturar calificaciones desde Excel
+## Plantilla Excel para calificaciones
 
-En **Captura**:
+En **Asistencia → Exportar**:
 
 - **Plantilla Excel** descarga el grupo con Cuenta, Nombre y una columna por componente manual. Las celdas vacías salen en amarillo.
-- **Importar Excel** lee el archivo, empata por **Cuenta** y por el **título** de cada columna, y muestra un resumen antes de guardar. Las celdas vacías no borran nada.
+- **Importar plantilla Excel** lee el archivo, empata por **Cuenta** y por el **título** de cada columna, y muestra un resumen antes de guardar. Las celdas vacías no borran nada.
 - Si el archivo tiene varias hojas, toma la que tenga el número del grupo en su nombre (ej. «Estadística 504»).
+
+## Asistencia y captura de calificaciones
+
+La tabla de **Asistencia** concentra la lista y la captura. El botón **Capturar calificaciones** habilita la edición de componentes manuales, con controles **Guardar** y **Descartar**. Los botones con icono **1** muestran la tabla completa; el icono **2** muestra solo ponderaciones y calificaciones. Si había quedado guardada la pestaña antigua **Captura**, se abre automáticamente la vista integrada de captura.
+
+En la web HTML de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor. No se muestra popover en móvil ni en el APK. El botón **Leyenda** se retiró de la vista.
+
+El botón **Exportar** abre un modal con exportación a PSI, descarga/importación de plantilla Excel y el reporte completo del grupo. El libro `Reporte_grupo` conserva el orden de columnas y alumnos de `Reporte_`, incluye grupo, materia, ciclo y fecha de exportación, y excluye comentarios e indicadores calculados de la interfaz.
 
 ## Respaldo por ciclo: qué se borra
 
@@ -178,7 +186,7 @@ En Asistencia solo aparecen los grupos **activos**; los demás se activan en la 
 
 ## Ponderaciones: solo porcentaje
 
-Cada componente lleva solo su **%** y entre todos deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. Ejemplo: Parcial 1 al 40 % con 8 aporta 3.2 puntos.
+Los componentes base deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. Se permite un único componente manual llamado **Puntos Adicionales** (o «Punto adicional»), con escala de 0 a 10; su ponderación se agrega aparte del 100 % y no se normaliza junto con los demás rubros. Cada 10 % adicional con calificación 10 aporta 1 punto al resultado; la calificación final no supera 10.
 
 Todo se captura de 0 a 10. Si un componente viejo se capturaba en otra escala (Sellos de 0 a 15), aparece una nota y el enlace «Capturar de 0 a 10» para cambiarlo.
 
@@ -202,7 +210,7 @@ El panel guarda en este navegador lo último que viste de cada grupo. Al abrirlo
 
 - una fila en **Students** con su Course y su Status;
 - una fila en su hoja **Reporte_**, con sus columnas enlazadas ya llenas;
-- su registro en **Exportar** (CSV) y en **Exportar a PSI**.
+- su registro en el reporte Excel del grupo y en la exportación a PSI.
 
 El estatus se cambia desde la ficha del alumno. La función «Buscar alumnos duplicados» ahora escribe en su propia columna `Duplicado` y ya no en `Status`.
 
@@ -211,7 +219,7 @@ El estatus se cambia desde la ficha del alumno. La función «Buscar alumnos dup
 | Hoja | ¿Se queda? | Por qué |
 |---|---|---|
 | Course, Students, Attendance Log, Roles | **Sí** | AppSheet pasa lista ahí con el QR. |
-| Reporte_* | **Sí (recomendado)** | Son la asistencia oficial del grupo y te las piden. El botón **Exportar** de la web genera además un reporte con calificaciones. |
+| Reporte_* | **Sí (recomendado)** | Son la asistencia oficial del grupo y te las piden. **Asistencia → Exportar → Reporte del grupo** descarga el contenido de la hoja en Excel. |
 | W_* | Sí | Todo lo de la web (ya no existe W_Grupos: está dentro de Course). |
 | Calificaciones | Ya se borró | Lo de Estadística se recupera con `ImportarEstadistica.gs` (arriba). |
 | Proyectos | Ya se borró | Está en la web. |
@@ -243,7 +251,7 @@ Si en algún momento quieres fijar el ciclo a mano: **Mantenimiento → Ciclo ac
 
 ## Exportar a PSI
 
-En **Asistencia**, el botón verde **Exportar a PSI** abre la vista previa de las sugerencias del grupo:
+En **Asistencia → Exportar → Exportar a PSI**, se abre la vista previa de las sugerencias del grupo:
 
 | Campo PSI | Regla |
 |---|---|
@@ -258,7 +266,7 @@ En **Asistencia**, el botón verde **Exportar a PSI** abre la vista previa de la
 
 Pasos: **Copiar JS** → abre en PSI la captura del grupo → F12 → Consola → pega → Enter. Se llena por número de cuenta y **no se guarda solo**: revisa y presiona Guardar. Las palabras que se detectan como psicoemocionales están en `Psi.KEYWORDS`, en `script.js`.
 
-**Parcial (v7.0):** arriba del todo elige en **«Calificación a exportar (Avance)»** el parcial (Parcial 1, 2, 3…) o «Promedio actual». Antes el Avance siempre era el promedio general aunque el registro fuera Parcial: si el alumno aún no tenía promedio, su calificación quedaba vacía y PSI no recibía nada. Ahora, con un parcial elegido, el Avance, el riesgo y la derivación salen de ese parcial, y la vista previa avisa cuántos alumnos **no tienen calificación en ese parcial** (su avance quedará vacío: captúralo en Captura antes de exportar). Al cambiar el «Tipo de registro» a Parcial se elige solo el primer parcial con calificaciones; en Final vuelve al promedio actual. El JS generado además detecta solo el prefijo de las listas de calificación de PSI (`c_`, `p_`, `parcial_`, `cal_`, `cp_`): si la captura parcial usa otro prefijo, lo avisa en la consola en lugar de no llenar nada en silencio.
+**Parcial (v7.0):** arriba del todo elige en **«Calificación a exportar (Avance)»** el parcial (Parcial 1, 2, 3…) o «Promedio actual». Antes el Avance siempre era el promedio general aunque el registro fuera Parcial: si el alumno aún no tenía promedio, su calificación quedaba vacía y PSI no recibía nada. Ahora, con un parcial elegido, el Avance, el riesgo y la derivación salen de ese parcial, y la vista previa avisa cuántos alumnos **no tienen calificación en ese parcial** (su avance quedará vacío: captúralo en Asistencia antes de exportar). Al cambiar el «Tipo de registro» a Parcial se elige solo el primer parcial con calificaciones; en Final vuelve al promedio actual. El JS generado además detecta solo el prefijo de las listas de calificación de PSI (`c_`, `p_`, `parcial_`, `cal_`, `cp_`): si la captura parcial usa otro prefijo, lo avisa en la consola en lugar de no llenar nada en silencio.
 
 ## Alumnos agregados a mano en Students
 
@@ -268,14 +276,22 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 
 | Pestaña | Qué haces |
 |---|---|
-| Asistencia | Ver ✓ ✗ J, **Exportar** el reporte, **Exportar a PSI**, **+ Alumno**, clic en un nombre para ver su **ficha** (una sola vista con una card por grupo) |
+| Asistencia | Ver ✓ ✗ J, capturar calificaciones, alternar entre tabla completa y ponderaciones, **Exportar** (PSI, plantilla, importación o reporte Excel), **+ Alumno**, clic en un nombre para ver su **ficha** |
 | Pase de lista | ✓ ✗ J por fecha (también escribe en Attendance Log) |
-| Captura / Ponderaciones | Calificaciones y evaluación |
+| Ponderaciones | Calificaciones y evaluación |
 | Evidencias | Lo que suben los alumnos en **Extracurriculares**; vista Tarjetas o Tabla (Revisar abre un modal) |
 | Proyectos | Vista **Tarjetas** (editas ahí mismo) o **Tabla** (Editar abre un modal) |
 | Alumnos | Buscar a cualquier alumno, de cualquier ciclo |
 | Grupos | Ligar hojas, **Nuevo grupo** (crea Course + Reporte_) y **Enlaces para alumnos** |
 | Mantenimiento | Ciclo, respaldos ZIP, alumnos agregados a mano, vaciar tablas |
+
+## Novedades v7.2 — asistencia integrada y exportación
+
+**Asistencia — captura integrada.** La pestaña Captura se retiró; el botón **Capturar calificaciones** habilita los rubros manuales en la tabla. Los iconos **1** y **2** alternan entre toda la asistencia y solo las ponderaciones. Las calificaciones sin guardar se pueden guardar o descartar desde esa vista.
+
+**Asistencia — Exportar.** Un solo modal ofrece PSI, plantilla Excel, importación y el libro `Reporte_grupo` con la estructura completa de `Reporte_`, grupo, materia, ciclo y fecha; no añade comentarios ni indicadores de la interfaz.
+
+**Comentarios.** En HTML de escritorio, el icono de comentario abre un popover con los comentarios del grupo al pasar el cursor. No aplica en móvil ni APK.
 
 ## Novedades v7.1 — triaje y riesgo a la vista
 
@@ -283,10 +299,8 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 
 **Asistencia — filtros «Necesitan atención».** Sobre la tabla hay cuatro chips con su conteo: Todos, En riesgo, +4 faltas y Sin calificar parcial. Un clic filtra las filas en el momento, sin pedir nada al servidor, y se combina con la búsqueda. «Sin calificar parcial» busca alumnos sin calificación en algún parcial (si el grupo no tiene parciales definidos en Ponderaciones, el chip queda deshabilitado).
 
-**Leyenda colapsable.** Las leyendas de estados y enlaces ya no ocupan dos filas fijas junto a la barra: están detrás del botón «Leyenda». La tabla sube y ganas espacio en pantalla.
-
 **Ficha — resumen de atención arriba.** Al abrir la ficha, arriba del detalle del grupo aparece una franja: «En riesgo», «Atención» o «Sin riesgo aparente», con el motivo, el promedio, el % de asistencia, las faltas y la derivación que sugeriría PSI (por ejemplo: «PSI: Dejó de asistir · riesgo alto»). Se actualiza al cambiar de grupo y al pasar asistencia.
 
 **Ficha — secciones plegables.** Comentarios sigue abierto (ahí está el formulario para agregar), pero Evidencias, Inscripciones y Ciclos anteriores arrancan cerrados: toca el título para desplegarlos.
 
-**Captura — Final, Estricta y Entera fijas a la derecha.** Al desplazar la tabla a la derecha para ver los componentes, las tres columnas de resultado ya no se pierden: quedan fijas en el borde derecho.
+**Vista 2 · Ponderaciones — Final, Estricta y Entera fijas a la derecha.** Al desplazar la tabla a la derecha para ver los componentes, las tres columnas de resultado ya no se pierden: quedan fijas en el borde derecho.

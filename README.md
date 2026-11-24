@@ -29,7 +29,7 @@ La carpeta `apk/` no se sincroniza automáticamente con estas fuentes web. Para 
 
 ### Acceso administrativo del APK
 
-En cada módulo, el APK solicita primero la URL `/exec` de su Web App de Apps Script y la prueba con `ping`. Después, el acceso administrativo usa la contraseña ya configurada en ese backend: `CCH_ADMIN_PASSWORD` para Asistencias y la contraseña web (`WEB_PASS_HASH` / `WEB_PASS_SALT`) para Bitácoras. Las contraseñas no se guardan en el APK. El token de sesión se conserva en el dispositivo y Apps Script lo mantiene válido por 24 horas; el acceso de alumnos por número de cuenta no cambia.
+En cada módulo, el APK solicita primero la URL `/exec` de su Web App de Apps Script y la prueba con `ping`. Después, el acceso administrativo usa la contraseña ya configurada en ese backend: `CCH_ADMIN_PASSWORD` para Asistencias y la contraseña web (`WEB_PASS_HASH` / `WEB_PASS_SALT`) para Bitácoras. Las contraseñas no se guardan en el APK. La sesión administrativa de Asistencias se conserva en el dispositivo y Apps Script la mantiene válida por 24 horas. La sesión del alumno no se guarda: su token vive solo en memoria y debe volver a ingresar su número de cuenta al reabrir o recargar la app.
 
 ### Bitácoras: datos, seguridad y operación
 
@@ -49,6 +49,12 @@ Asistencias y Bitácoras usan **Web Apps de Apps Script distintos**; cada uno ne
 - **Asistencias web:** lee la URL desde `CONFIG.API_URL` al inicio de `script.js`. **Bitácoras web:** lee `URL_APPS_SCRIPT_WEB` en `bitacoras/index.html`. Define ahí la URL `/exec` correspondiente a cada Web App; esos valores tienen prioridad sobre la configuración guardada localmente.
 - **APK:** Asistencias y Bitácoras solicitan y prueban su URL `/exec` cada vez que se abre el módulo. La última URL queda guardada solo como sugerencia prellenada; el APK no usa las variables de las páginas web. El APK requiere conexión a Apps Script y no ofrece modo local para omitir el servidor.
 - La web y el APK son entornos separados. El almacenamiento del navegador no se comparte con el APK.
+
+### Asistencias: tabla, captura y exportación
+
+En **Admin → Asistencia** la lista y la captura de calificaciones están unificadas. El botón **Capturar calificaciones** habilita la edición de rubros manuales; **Guardar** aplica los cambios y **Descartar** los cancela. Los botones de vista con iconos **1** y **2** alternan entre la tabla completa y solo los campos de ponderaciones. La pestaña independiente **Captura** y el botón **Leyenda** se retiraron. En la web de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor; no se usa ese popover en móvil ni en el APK.
+
+El botón **Exportar** abre un modal con cuatro acciones: exportar a PSI, descargar la plantilla Excel de calificaciones, importar esa plantilla y descargar el reporte completo del grupo. `Reporte_grupo` es un libro Excel que conserva el orden de las columnas y alumnos de `Reporte_`, añade grupo, materia, ciclo y fecha de exportación, y no incluye comentarios ni los indicadores calculados que solo aparecen en la interfaz. La captura integrada y el modal de exportación también están disponibles en la versión APK.
 
 ## Indicadores de carga y recargas
 

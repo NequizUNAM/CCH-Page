@@ -2276,7 +2276,9 @@ function syncRollCallLog_(idCurso, dateKey, marks, tz) {
 // Calificación final (sobre lo evaluado):
 //   Σ(calif10 × ponderación) / Σ(ponderación de los componentes con calificación)
 // Calificación final (estricta, lo no evaluado cuenta 0):
-//   Σ(calif10 × ponderación) / Σ(todas las ponderaciones)
+//   Σ(calif10 × ponderación base) / Σ(todas las ponderaciones base)
+// «Puntos Adicionales» queda fuera de ambas sumas y agrega
+//   calif10 × ponderación / 100 puntos al resultado.
 // ============================================================
 
 // ---------- Asistencia leída de la hoja Reporte_* ----------
@@ -2304,12 +2306,24 @@ function reportAttendance_(sheetName) {
 
   const dates = [];
   const others = [];
+  const columns = [
+    { kind: "account", order: accountIndex, label: headers[accountIndex] || "Cuenta" }
+  ];
+  if (nameIndex !== -1) columns.push({ kind: "name", order: nameIndex, label: headers[nameIndex] || "Nombre" });
   headers.forEach((header, index) => {
     if (index === accountIndex || index === nameIndex) return;
     const visible = normalizeVisibilityValue_(display[0][index]) === "Visible";
     const key = normalizeDateKey_(values[1][index], tz);
-    if (key) dates.push({ index, key, label: formatShortDate_(key), visible });
-    else if (header) others.push({ index, label: header, visible });
+    if (key) {
+      const dataIndex = dates.length;
+      const label = formatShortDate_(key);
+      dates.push({ index, key, label, visible });
+      columns.push({ kind: "date", dataIndex, order: index, key, label, visible });
+    } else if (header) {
+      const dataIndex = others.length;
+      others.push({ index, label: header, visible });
+      columns.push({ kind: "other", dataIndex, order: index, label: header, visible });
+    }
   });
 
   const order = [];
@@ -2327,7 +2341,7 @@ function reportAttendance_(sheetName) {
     };
   }
 
-  return (Db._cache[cacheKey] = { sheetName, dates, others, order, rows });
+  return (Db._cache[cacheKey] = { sheetName, dates, others, columns, order, rows });
 }
 
 /** Retardo (si existe en datos viejos) cuenta como asistencia. */
@@ -2374,6 +2388,10 @@ function componentsFor_(idCurso) {
     .sort((a, b) => a.orden - b.orden);
 }
 
+function isExtraCreditComponentName_(name) {
+  return ["punto adicional", "puntos adicionales"].includes(normalizeKey_(name).replace(/\s+/g, " "));
+}
+
 function saveComponents_(params) {
   const idCurso = cleanText_(params.idCurso);
   requireGroup_(idCurso);
@@ -2382,6 +2400,7 @@ function saveComponents_(params) {
   if (!list.length) throw new Error("Agrega al menos un componente.");
 
   const seen = new Set();
+  let extraCreditCount = 0;
   const newRows = list.map((c, i) => {
     const nombre = cleanText_(c.nombre).slice(0, 60);
     const tipo = cleanText_(c.tipo);
@@ -2394,6 +2413,11 @@ function saveComponents_(params) {
     if (!COMPONENT_TYPES.includes(tipo)) throw new Error(`Tipo inválido en "${nombre}".`);
     if (ponderacion === null || ponderacion < 0 || ponderacion > 100) throw new Error(`Ponderación inválida en "${nombre}" (0 a 100).`);
     if (!maximo || maximo <= 0 || maximo > 1000) throw new Error(`Máximo inválido en "${nombre}".`);
+    if (isExtraCreditComponentName_(nombre)) {
+      extraCreditCount++;
+      if (extraCreditCount > 1) throw new Error("Solo se permite un rubro «Puntos Adicionales».");
+      if (tipo !== "manual" || maximo !== 10) throw new Error("«Puntos Adicionales» debe ser manual y capturarse de 0 a 10.");
+    }
     const fuente = tipo === "examen" ? cleanText_(c.fuente) : "";
     if (tipo === "examen" && !examSources_().some(x => x.id === fuente)) throw new Error(`Elige el examen y parcial de "${nombre}".`);
 
@@ -2417,12 +2441,17 @@ function saveComponents_(params) {
   let notes = [];
   try { notes = pairComponentColumns_(idCurso, before); } catch (e) { notes = [`(No se pudo ajustar el reporte: ${e.message})`]; }
 
-  const total = newRows.reduce((sum, r) => sum + r.Ponderacion, 0);
+  const total = newRows
+    .filter(r => !isExtraCreditComponentName_(r.Nombre))
+    .reduce((sum, r) => sum + r.Ponderacion, 0);
+  const extra = newRows.find(r => isExtraCreditComponentName_(r.Nombre));
   return {
     components: componentsFor_(idCurso),
-    message: (total === 100
+    message: (Math.abs(total - 100) < 0.001
       ? "Ponderaciones guardadas ✅"
-      : `Guardado. Ojo: las ponderaciones suman ${total}% (se normalizan al calcular).`) + (notes.length ? " " + notes.join(" ") : "")
+      : `Guardado. Ojo: las ponderaciones base suman ${total}% (se normalizan al calcular).`) +
+      (extra && extra.Ponderacion > 0 ? ` «${extra.Nombre}» aporta ${extra.Ponderacion}% adicional.` : "") +
+      (notes.length ? " " + notes.join(" ") : "")
   };
 }
 
@@ -2549,12 +2578,15 @@ function computeCourse_(idCurso, onlyCuenta) {
   let roster = rosterFor_(idCurso, attendance);
   if (onlyCuenta) roster = roster.filter(s => s.cuenta === onlyCuenta);
 
-  const totalWeight = components.reduce((sum, c) => sum + c.ponderacion, 0);
+  const totalWeight = components
+    .filter(c => !isExtraCreditComponentName_(c.nombre))
+    .reduce((sum, c) => sum + c.ponderacion, 0);
 
   const students = roster.map(student => {
     const att = attendance && attendance.rows[student.cuenta];
     const items = {};
-    let weighted = 0, evaluatedWeight = 0;
+    // Puntos Adicionales aporta score10 × ponderación / 100, sin entrar al peso base.
+    let weighted = 0, evaluatedWeight = 0, extraCredit = 0;
 
     components.forEach(comp => {
       let base = null;
@@ -2590,8 +2622,11 @@ function computeCourse_(idCurso, onlyCuenta) {
       const score10 = raw === null ? null : raw / comp.maximo * 10;
 
       if (score10 !== null && comp.ponderacion > 0) {
-        weighted += score10 * comp.ponderacion;
-        evaluatedWeight += comp.ponderacion;
+        if (isExtraCreditComponentName_(comp.nombre)) extraCredit += score10 * comp.ponderacion / 100;
+        else {
+          weighted += score10 * comp.ponderacion;
+          evaluatedWeight += comp.ponderacion;
+        }
       }
 
       items[comp.id] = {
@@ -2603,14 +2638,16 @@ function computeCourse_(idCurso, onlyCuenta) {
       };
     });
 
+    const final = evaluatedWeight ? Math.min(weighted / evaluatedWeight + extraCredit, 10) : null;
+    const finalStrict = totalWeight ? Math.min(weighted / totalWeight + extraCredit, 10) : null;
     return {
       cuenta: student.cuenta,
       nombre: student.nombre,
       items,
-      final: evaluatedWeight ? round_(weighted / evaluatedWeight, 1) : null,
-      finalStrict: totalWeight ? round_(weighted / totalWeight, 1) : null,
+      final: final === null ? null : round_(final, 1),
+      finalStrict: finalStrict === null ? null : round_(finalStrict, 1),
       // Calificación entera: suma exacta de % SIN redondear antes (7.96 → 7, no 8)
-      entero: totalWeight ? truncGrade_(weighted / totalWeight) : null,
+      entero: finalStrict === null ? null : truncGrade_(finalStrict),
       evaluatedWeight,
       counts: att ? att.counts : null
     };
@@ -3257,13 +3294,16 @@ function groupData_(params) {
     attendance: att ? {
       sheetName: att.sheetName,
       dates: att.dates.map(d => ({ key: d.key, label: d.label, visible: d.visible })),
-      others: att.others.map(o => ({ label: o.label, visible: o.visible }))
+      others: att.others.map(o => ({ label: o.label, visible: o.visible })),
+      columns: att.columns,
+      order: att.order
     } : null,
     students: result.students.map(s => {
       const row = att && att.rows[s.cuenta];
       return Object.assign(s, {
         statuses: row ? row.statuses : [],
         others: row ? row.others : [],
+        attendanceName: row ? row.nombre : "",
         comments: commentCounts[s.cuenta] || 0,
         status: statusOf[s.cuenta] || "",
         // Textos de comentarios (de este grupo o generales) para las sugerencias PSI. Solo admin.
