@@ -45,6 +45,7 @@ const WEB = {
   TEAM_EVALS:  { name: "W_EvalEquipos",    headers: ["ID_Equipo", "ID_Proyecto", "Estrellas", "Calificacion", "Observaciones", "Actualizado"] },
   EVIDENCE:    { name: "W_Evidencias",     headers: ["ID", "Cuenta", "ID_Curso", "Tipo", "Titulo", "Descripcion", "Archivo_URL", "Archivo_Nombre", "Enviado", "Estado", "Puntos", "ID_Componente", "Aplicado", "Nota"] },
   COMMENTS:    { name: "W_Comentarios",    headers: ["ID", "Cuenta", "ID_Curso", "Texto", "Fecha"] },
+  TASKS:       { name: "W_Tareas",         headers: ["ID", "ID_Curso", "Titulo", "Contenido", "Fecha_Inicio", "Fecha_Cierre"], text: ["ID", "ID_Curso", "Fecha_Inicio", "Fecha_Cierre"] },
   // Enlace de columnas del Reporte_ con un componente, proyecto o promedio
   COLUMNS:     { name: "W_Columnas",       headers: ["ID_Curso", "Columna", "Tipo", "Ref"] },
   LINKS:       { name: "W_Enlaces",        headers: ["ID", "Titulo", "URL", "ID_Curso", "Orden", "Activo"] },
@@ -270,6 +271,8 @@ function routes_() {
   studentProfile:     { auth: "admin", fn: studentProfile_ },
   addComment:         { auth: "admin", fn: addComment_, lock: true },
   deleteComment:      { auth: "admin", fn: deleteComment_, lock: true },
+  listTasks:          { auth: "admin", fn: listTasks_ },
+  saveTask:           { auth: "admin", fn: saveTask_, lock: true },
   getReports:         { auth: "admin", fn: () => ({ reports: getReportSheets_() }) },
   createReportSheet:  { auth: "admin", fn: p => createReportSheet(p.reportName) },
   // syncAllData ya usa su propio candado
@@ -3510,6 +3513,145 @@ function deleteComment_(params) {
   return { comments: commentsFor_(limpiarCuenta_(target.Cuenta)), message: "Comentario eliminado." };
 }
 
+// ---------- Tareas ----------
+
+function listTasks_() {
+  const groups = groupsMap_();
+  const tasks = Db.read(WEB.TASKS).rows.map(r => {
+    const idCurso = cleanText_(r.ID_Curso);
+    const group = groups[idCurso];
+    return {
+      id: cleanText_(r.ID),
+      idCurso,
+      grupo: group ? group.label : idCurso,
+      titulo: cleanText_(r.Titulo),
+      contenido: cleanText_(r.Contenido),
+      fechaInicio: cleanText_(r.Fecha_Inicio),
+      fechaCierre: cleanText_(r.Fecha_Cierre)
+    };
+  });
+  tasks.sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio) || a.titulo.localeCompare(b.titulo, "es"));
+  return { tasks };
+}
+
+function taskDate_(value, label, defaultToday) {
+  const date = cleanText_(value);
+  if (!date && defaultToday) return Utilities.formatDate(new Date(), getSpreadsheetTz_(), "yyyy-MM-dd");
+  if (!date) return "";
+  const parsed = new Date(date + "T00:00:00Z");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new Error(`${label}: selecciona una fecha válida.`);
+  }
+  return date;
+}
+
+function taskHtmlAttribute_(value) {
+  return String(value || "")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function escapeTaskHtmlAttribute_(value) {
+  return String(value || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function sanitizeTaskHtml_(value) {
+  const source = String(value || "");
+  if (source.length > 16000) throw new Error("El contenido de la tarea no puede exceder 16,000 caracteres.");
+
+  const html = source.replace(/<\s*(script|style|iframe|object|svg|math|template)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+  const allowed = new Set(["p", "div", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "h2", "h3", "h4", "a"]);
+  const tokens = html.match(/<[^>]*>|[^<]+/g) || [];
+  const stack = [];
+  let result = "";
+
+  tokens.forEach(token => {
+    if (token.charAt(0) !== "<") {
+      result += token;
+      return;
+    }
+
+    const match = token.match(/^<\s*(\/?)\s*([a-z0-9]+)\b([^>]*)>$/i);
+    if (!match) return;
+    const closing = !!match[1];
+    const tag = match[2].toLowerCase();
+    if (!allowed.has(tag)) return;
+    if (tag === "br") {
+      if (!closing) result += "<br>";
+      return;
+    }
+    if (closing) {
+      const index = stack.lastIndexOf(tag);
+      if (index === -1) return;
+      for (let i = stack.length - 1; i >= index; i--) result += `</${stack.pop()}>`;
+      return;
+    }
+
+    if (tag === "a") {
+      const hrefMatch = match[3].match(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      const href = taskHtmlAttribute_(hrefMatch ? (hrefMatch[1] || hrefMatch[2]) : "").trim();
+      if (/^(https?:\/\/|mailto:)[^\s<>"]+$/i.test(href)) {
+        result += `<a href="${escapeTaskHtmlAttribute_(href)}">`;
+        stack.push(tag);
+        return;
+      }
+    }
+    result += `<${tag}>`;
+    stack.push(tag);
+  });
+
+  while (stack.length) result += `</${stack.pop()}>`;
+  if (result.length > 45000) throw new Error("El contenido formateado de la tarea es demasiado extenso.");
+  return result;
+}
+
+function saveTask_(params) {
+  const id = cleanText_(params.id);
+  const idCurso = cleanText_(params.idCurso);
+  if (!groupsMap_()[idCurso]) throw new Error("Selecciona un grupo válido.");
+
+  const titulo = cleanText_(params.titulo);
+  if (!titulo) throw new Error("Escribe el título de la tarea.");
+  if (titulo.length > 200) throw new Error("El título no puede exceder 200 caracteres.");
+
+  const fechaInicio = taskDate_(params.fechaInicio, "Fecha de asignación", true);
+  const fechaCierre = taskDate_(params.fechaCierre, "Fecha de cierre", false);
+  if (fechaCierre && fechaCierre < fechaInicio) throw new Error("La fecha de cierre no puede ser anterior a la fecha de asignación.");
+  const contenido = sanitizeTaskHtml_(params.contenido);
+  const rows = Db.read(WEB.TASKS).rows;
+  const current = id ? rows.find(r => cleanText_(r.ID) === id) : null;
+  if (id && !current) throw new Error("No se encontró la tarea que intentas editar. Recarga la vista e inténtalo de nuevo.");
+
+  const task = {
+    ID: current ? cleanText_(current.ID) : shortId_(),
+    ID_Curso: idCurso,
+    Titulo: titulo,
+    Contenido: contenido,
+    Fecha_Inicio: fechaInicio,
+    Fecha_Cierre: fechaCierre
+  };
+  if (current) Db.update(WEB.TASKS, Object.assign({}, current, task));
+  else Db.append(WEB.TASKS, [task]);
+
+  return {
+    task: {
+      id: task.ID,
+      idCurso: task.ID_Curso,
+      grupo: groupsMap_()[task.ID_Curso].label,
+      titulo: task.Titulo,
+      contenido: task.Contenido,
+      fechaInicio: task.Fecha_Inicio,
+      fechaCierre: task.Fecha_Cierre
+    },
+    message: current ? "Tarea actualizada." : "Tarea guardada."
+  };
+}
+
 // ============================================================
 // ALTAS DESDE LA WEB: grupos y alumnos
 // (escriben en Course / Students con los mismos encabezados de AppSheet)
@@ -4023,13 +4165,14 @@ const PURGE_PARTS = {
   students:   { label: "Inscripciones (Students y Roles)", tables: ["Students", "Roles"] },
   grades:     { label: "Calificaciones, proyectos y evidencias de la web", tables: ["W_Componentes", "W_Calificaciones", "W_Proyectos", "W_Equipos", "W_EvalEquipos", "W_Evidencias", "W_Enlaces"] },
   comments:   { label: "Comentarios", tables: ["W_Comentarios"] },
+  tasks:      { label: "Registro de tareas", tables: ["W_Tareas"] },
   courses:    { label: "Cursos (Course)", tables: ["Course"] }
 };
 
 function purgeOptions_(params) {
   const what = params.what || {};
   const out = {};
-  Object.keys(PURGE_PARTS).forEach(k => { out[k] = what[k] === undefined ? true : !!what[k]; });
+  Object.keys(PURGE_PARTS).forEach(k => { out[k] = what[k] === undefined ? k !== "tasks" : !!what[k]; });
   if (params.keepCourses) out.courses = false;   // compatibilidad
   return out;
 }

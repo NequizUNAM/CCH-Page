@@ -139,11 +139,17 @@ En **Asistencia → Exportar**:
 
 ## Asistencia y captura de calificaciones
 
-La tabla de **Asistencia** concentra la lista y la captura. El botón **Capturar calificaciones** habilita la edición de componentes manuales, con controles **Guardar** y **Descartar**. Los botones con icono **1** muestran la tabla completa; el icono **2** muestra solo ponderaciones y calificaciones. Si había quedado guardada la pestaña antigua **Captura**, se abre automáticamente la vista integrada de captura.
+La tabla de **Asistencia** concentra la lista y la captura. El botón **Capturar calificaciones** habilita la edición de componentes manuales y **Guardar** aplica los cambios. Ya no hay un botón visible **Descartar**; al salir con calificaciones pendientes se pide confirmación antes de perderlas. Guarda antes de exportar o importar. Los botones con icono **1** muestran la tabla completa; el icono **2** muestra solo ponderaciones y calificaciones. Si había quedado guardada la pestaña antigua **Captura**, se abre automáticamente la vista integrada.
 
 En la web HTML de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor. No se muestra popover en móvil ni en el APK. El botón **Leyenda** se retiró de la vista.
 
 El botón **Exportar** abre un modal con exportación a PSI, descarga/importación de plantilla Excel y el reporte completo del grupo. El libro `Reporte_grupo` conserva el orden de columnas y alumnos de `Reporte_`, incluye grupo, materia, ciclo y fecha de exportación, y excluye comentarios e indicadores calculados de la interfaz.
+
+## Tareas por grupo
+
+En **Admin → Tareas**, cada grupo aparece en un acordeón con el total de registros. Al desplegarlo se ven únicamente los títulos; selecciona uno para abrir el detalle y editarlo. **Nueva tarea** permite elegir un solo grupo, capturar el título, agregar contenido con formato básico y definir la fecha en que se deja (hoy por defecto) y una fecha de cierre opcional. El contenido puede quedar vacío. Las tareas son un registro independiente y no forman parte de calificaciones, proyectos ni ponderaciones.
+
+La hoja `W_Tareas` se crea automáticamente junto con las demás hojas `W_*` al iniciar sesión como administrador o al usar **Mantenimiento → Verificar / crear hojas y carpetas**. No requiere migrar las hojas de calificaciones ni cambiar `Reporte_*`. La misma vista está incluida en el APK. El respaldo por ciclo incluye sus registros en el ZIP y los conserva por defecto; puedes eliminarlos usando el interruptor **Registro de tareas** al respaldar y borrar ese ciclo.
 
 ## Respaldo por ciclo: qué se borra
 
@@ -156,6 +162,7 @@ Cada parte tiene su interruptor. Por defecto se **conserva el histórico del alu
 | Calificaciones, proyectos y evidencias de la web | se borra |
 | Inscripciones (Students y Roles) | **se conserva** |
 | Comentarios | **se conserva** |
+| Registro de tareas | **se conserva** |
 | Cursos (Course) | **se conserva** |
 
 Siempre se guarda primero el ZIP y un resumen por alumno en W_Historial.
@@ -206,7 +213,7 @@ El panel guarda en este navegador lo último que viste de cada grupo. Al abrirlo
 
 ## Alumnos nuevos (incluye Acta complementaria)
 
-**Asistencia → + Alumno**: cuenta, nombre (vacío = se toma de Students si ya existe) y **Estatus** (Regular, Acta complementaria…). Se agrega:
+**Asistencia → Nuevo alumno**: cuenta, nombre (vacío = se toma de Students si ya existe) y **Estatus** (Regular, Acta complementaria…). Se agrega:
 
 - una fila en **Students** con su Course y su Status;
 - una fila en su hoja **Reporte_**, con sus columnas enlazadas ya llenas;
@@ -276,7 +283,7 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 
 | Pestaña | Qué haces |
 |---|---|
-| Asistencia | Ver ✓ ✗ J, capturar calificaciones, alternar entre tabla completa y ponderaciones, **Exportar** (PSI, plantilla, importación o reporte Excel), **+ Alumno**, clic en un nombre para ver su **ficha** |
+| Asistencia | Ver ✓ ✗ J, capturar calificaciones, alternar entre tabla completa y ponderaciones, **Exportar** (PSI, plantilla, importación o reporte Excel), **Nuevo alumno**, clic en un nombre para ver su **ficha** |
 | Pase de lista | ✓ ✗ J por fecha (también escribe en Attendance Log) |
 | Ponderaciones | Calificaciones y evaluación |
 | Evidencias | Lo que suben los alumnos en **Extracurriculares**; vista Tarjetas o Tabla (Revisar abre un modal) |
@@ -287,7 +294,7 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 
 ## Novedades v7.2 — asistencia integrada y exportación
 
-**Asistencia — captura integrada.** La pestaña Captura se retiró; el botón **Capturar calificaciones** habilita los rubros manuales en la tabla. Los iconos **1** y **2** alternan entre toda la asistencia y solo las ponderaciones. Las calificaciones sin guardar se pueden guardar o descartar desde esa vista.
+**Asistencia — captura integrada.** La pestaña Captura se retiró; el botón **Capturar calificaciones** habilita los rubros manuales en la tabla. Los iconos **1** y **2** alternan entre toda la asistencia y solo las ponderaciones. Las calificaciones se guardan desde la tabla; salir con cambios pendientes solicita confirmación.
 
 **Asistencia — Exportar.** Un solo modal ofrece PSI, plantilla Excel, importación y el libro `Reporte_grupo` con la estructura completa de `Reporte_`, grupo, materia, ciclo y fecha; no añade comentarios ni indicadores de la interfaz.
 

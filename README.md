@@ -52,9 +52,13 @@ Asistencias y Bitácoras usan **Web Apps de Apps Script distintos**; cada uno ne
 
 ### Asistencias: tabla, captura y exportación
 
-En **Admin → Asistencia** la lista y la captura de calificaciones están unificadas. El botón **Capturar calificaciones** habilita la edición de rubros manuales; **Guardar** aplica los cambios y **Descartar** los cancela. Los botones de vista con iconos **1** y **2** alternan entre la tabla completa y solo los campos de ponderaciones. La pestaña independiente **Captura** y el botón **Leyenda** se retiraron. En la web de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor; no se usa ese popover en móvil ni en el APK.
+En **Admin → Asistencia** la lista y la captura de calificaciones están unificadas. **Capturar calificaciones** habilita la edición de rubros manuales y **Guardar** aplica los cambios. Se quitó el botón visible **Descartar**; si intentas salir con cambios pendientes, se pide confirmación antes de perderlos. Hay que guardar antes de exportar o importar. Los botones de vista con iconos **1** y **2** alternan entre la tabla completa y solo los campos de ponderaciones. La pestaña independiente **Captura** y el botón **Leyenda** se retiraron. **Nuevo alumno** usa el icono de persona con signo más. **Exportar**, con flecha hacia arriba, abre el modal de exportación e importación. En la web de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor; no se usa ese popover en móvil ni en el APK.
 
 El botón **Exportar** abre un modal con cuatro acciones: exportar a PSI, descargar la plantilla Excel de calificaciones, importar esa plantilla y descargar el reporte completo del grupo. `Reporte_grupo` es un libro Excel que conserva el orden de las columnas y alumnos de `Reporte_`, añade grupo, materia, ciclo y fecha de exportación, y no incluye comentarios ni los indicadores calculados que solo aparecen en la interfaz. La captura integrada y el modal de exportación también están disponibles en la versión APK.
+
+### Asistencias: registro de tareas
+
+La pestaña administrativa **Tareas** muestra todos los grupos en acordeones, con el total de tareas por grupo y solo los títulos en la lista. Cada registro pertenece a un grupo; al abrir un título se consultan sus detalles y se pueden editar. El formulario incluye título, contenido enriquecido opcional, fecha en que se deja (por defecto hoy) y fecha de cierre opcional. Estas tareas son recordatorios: no crean calificaciones ni modifican ponderaciones. Apps Script crea automáticamente la tabla `W_Tareas` al instalar o inicializar las tablas `W_*`. La vista está disponible también en el APK. El respaldo por ciclo incluye los registros de tareas y los conserva por defecto; pueden borrarse con el interruptor **Registro de tareas** después de generar el ZIP.
 
 ## Indicadores de carga y recargas
 

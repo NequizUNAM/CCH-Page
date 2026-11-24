@@ -12,7 +12,7 @@
 const CONFIG = {
   // URL del Web App para la página web. En el APK se solicita al iniciar.
   API_URL: "",
-  VERSION: "7.2",
+  VERSION: "7.3",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
   RISK_THRESHOLD: 6,        // calificación menor a esto = en riesgo
@@ -1076,7 +1076,7 @@ const Cache = {
 };
 
 // Acciones que solo leen; cualquier otra acción de admin invalida la caché de grupos
-const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
+const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "listTasks", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
 
 /* ============================================================
    EXPORTAR A PSI (psi.cch.unam.mx)
@@ -2045,7 +2045,11 @@ const Admin = {
         Prefs.set("admGroup", e.target.value);
         Admin.loadGroup();
       });
-      $("adm-refresh").addEventListener("click", () => Admin.loadGroup());
+      $("adm-refresh").addEventListener("click", async () => {
+        if (!(await Admin.leaveCapture())) return;
+        Admin.renderTab();
+        Admin.loadGroup();
+      });
       $("adm-sync").addEventListener("click", Admin.sync);
     }
     if (!Admin.boot) await Admin.loadBoot();
@@ -2108,6 +2112,7 @@ const Admin = {
 
   async loadGroup() {
     const id = $("adm-group").value;
+    if (!(await Admin.leaveCapture())) return;
     Admin.dirty = new Map();
     Admin.compDraft = null;
     if (!id) { Admin.group = null; Admin.renderTab(); return; }
@@ -2199,7 +2204,7 @@ const Admin = {
 
   async leaveCapture() {
     if (!Admin.dirty.size) return true;
-    const ok = await UI.confirm(`Tienes ${Admin.dirty.size} calificación(es) sin guardar. ¿Descartarlas?`, { okText: "Descartar", danger: true });
+    const ok = await UI.confirm(`Tienes ${Admin.dirty.size} calificación(es) sin guardar. Si continúas, los cambios se perderán. ¿Continuar sin guardar?`, { okText: "Continuar sin guardar", danger: true });
     if (ok) Admin.dirty = new Map();
     return ok;
   },
@@ -2238,7 +2243,7 @@ const Admin = {
     const scrolls = Array.from(content.querySelectorAll(".table-wrap")).map(el => ({ top: el.scrollTop, left: el.scrollLeft }));
     const restoreScrolls = () => content.querySelectorAll(".table-wrap").forEach((el, i) => { if (scrolls[i]) { el.scrollTop = scrolls[i].top; el.scrollLeft = scrolls[i].left; } });
 
-    const global = { evidencias: Admin.tabEvidence, alumnos: Admin.tabStudents, grupos: Admin.tabGroups, mantenimiento: Admin.tabMaintenance };
+    const global = { tareas: Admin.tabTasks, evidencias: Admin.tabEvidence, alumnos: Admin.tabStudents, grupos: Admin.tabGroups, mantenimiento: Admin.tabMaintenance };
     if (global[tab]) { global[tab](content); restoreScrolls(); return; }
 
     if (!Admin.group) {
@@ -2307,6 +2312,8 @@ const Admin = {
   async sync() {
     const g = Admin.group;
     if (!g || !g.group.sheet) return UI.toast("warning", "Este grupo no tiene hoja Reporte_ ligada (pestaña Grupos).");
+    if (!(await Admin.leaveCapture())) return;
+    Admin.renderTab();
     try {
       const r = await UI.busy($("adm-sync"), () => Api.call("syncAttendance", { sheetName: g.group.sheet }, "admin"));
       UI.toast("success", r.message, 9000);
@@ -2359,13 +2366,10 @@ const Admin = {
     const saveBtn = Admin.captureMode
       ? h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.saveCapture(saveBtn) })
       : null;
-    const discardBtn = Admin.captureMode
-      ? h("button", { class: "btn btn-sm btn-outline-secondary", type: "button", onclick: () => { Admin.dirty = new Map(); Admin.renderTab(); } }, "Descartar")
-      : null;
     const refreshCapture = () => {
       if (!saveBtn) return;
       saveBtn.replaceChildren(icon("save", "me-1"), `Guardar (${Admin.dirty.size})`);
-      saveBtn.disabled = discardBtn.disabled = !Admin.dirty.size;
+      saveBtn.disabled = !Admin.dirty.size;
     };
     const moveFocus = (input, delta) => {
       const all = Array.from(tbody.querySelectorAll(`input[data-comp="${input.dataset.comp}"]`));
@@ -2499,9 +2503,12 @@ const Admin = {
     const exportButton = h("button", {
       class: "btn btn-sm btn-outline-secondary",
       type: "button",
-      title: "Exportar o importar datos del grupo",
-      onclick: () => Admin.exportModal()
-    }, icon("download", "me-1"), "Exportar");
+      title: "Abrir el modal de exportación e importación",
+      onclick: () => {
+        if (Admin.dirty.size) return UI.toast("warning", "Guarda las calificaciones pendientes antes de exportar o importar.");
+        Admin.exportModal();
+      }
+    }, icon("box-arrow-up", "me-1"), "Exportar");
     refreshCapture();
 
     $("adm-toolbar").replaceChildren(h("div", { class: "vstack gap-2" },
@@ -2511,11 +2518,10 @@ const Admin = {
           viewButton("all", "1-circle", "Todo", "Mostrar asistencia y calificaciones"),
           viewButton("grades", "2-circle", "Ponderaciones", "Mostrar solo los campos de calificación")),
         captureButton,
-        Admin.captureMode ? discardBtn : null,
         saveBtn,
         exportButton,
-        h("button", { class: "btn btn-sm btn-outline-primary", type: "button", onclick: () => Admin.addStudentModal() }, icon("person-plus", "me-1"), "Alumno"),
-        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: () => Admin.columnsModal() }, icon("layout-three-columns", "me-1"), "Columnas")),
+        h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Agregar un alumno al grupo", onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.addStudentModal(); } } }, icon("person-plus", "me-1"), "Nuevo alumno"),
+        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.columnsModal(); } } }, icon("layout-three-columns", "me-1"), "Columnas")),
       h("div", { class: "d-flex flex-wrap align-items-center gap-2 small" },
         h("span", { class: "fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips)));
 
@@ -2567,7 +2573,7 @@ const Admin = {
           h("span", { class: "d-block small", text: "Cargar las calificaciones desde la plantilla descargada." }))),
       fileInput);
     modal = UI.modal({
-      title: [icon("download", "me-2"), `Exportar · ${Admin.group.group.label}`],
+      title: [icon("box-arrow-up", "me-2"), `Exportar · ${Admin.group.group.label}`],
       body: h("div", { class: "vstack gap-2" },
         option("send-check", "Exportar a PSI", "Preparar las sugerencias del grupo para PSI.", () => Admin.psiModal(), "btn-outline-success"),
         option("file-earmark-spreadsheet", "Plantilla Excel", "Descargar o capturar calificaciones por alumno.", () => Admin.gradesTemplate()),
@@ -3525,6 +3531,223 @@ const Admin = {
   },
 
   /* ---------------- Pestaña: Evidencias ---------------- */
+  sanitizeTaskHtml(value) {
+    const template = document.createElement("template");
+    template.innerHTML = String(value || "");
+    const allowed = new Set(["p", "div", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "h2", "h3", "h4", "a"]);
+    const blocked = new Set(["script", "style", "iframe", "object", "svg", "math", "template"]);
+    const clean = node => {
+      if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue);
+      if (node.nodeType !== Node.ELEMENT_NODE) return null;
+      const tag = node.tagName.toLowerCase();
+      if (blocked.has(tag)) return document.createDocumentFragment();
+      if (!allowed.has(tag)) {
+        const fragment = document.createDocumentFragment();
+        Array.from(node.childNodes).forEach(child => {
+          const safe = clean(child);
+          if (safe) fragment.append(safe);
+        });
+        return fragment;
+      }
+      const safe = document.createElement(tag);
+      if (tag === "a") {
+        const href = String(node.getAttribute("href") || "").trim();
+        if (/^(https?:\/\/|mailto:)[^\s<>"]+$/i.test(href)) safe.setAttribute("href", href);
+      }
+      Array.from(node.childNodes).forEach(child => {
+        const cleanChild = clean(child);
+        if (cleanChild) safe.append(cleanChild);
+      });
+      return safe;
+    };
+    const result = document.createElement("div");
+    Array.from(template.content.childNodes).forEach(node => {
+      const safe = clean(node);
+      if (safe) result.append(safe);
+    });
+    return result.innerHTML;
+  },
+
+  taskDateLabel(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return value || "Sin fecha";
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+    return date.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+  },
+
+  viewTask(task) {
+    const content = h("div", { class: "task-content" });
+    const safeHtml = Admin.sanitizeTaskHtml(task.contenido);
+    if (safeHtml) content.innerHTML = safeHtml;
+    else content.append(h("p", { class: "text-body-secondary fst-italic mb-0", text: "Sin contenido adicional." }));
+
+    const close = h("button", { class: "btn btn-secondary", type: "button", "data-bs-dismiss": "modal", text: "Cerrar" });
+    const edit = h("button", { class: "btn btn-primary", type: "button" }, icon("pencil", "me-1"), "Editar");
+    const modal = UI.modal({
+      title: [icon("journal-text", "me-2"), "Detalle de tarea"],
+      body: h("div", {},
+        h("h3", { class: "h5 mb-2", text: task.titulo }),
+        h("div", { class: "d-flex flex-wrap gap-2 small text-body-secondary mb-3" },
+          h("span", {}, icon("people", "me-1"), task.grupo),
+          h("span", {}, icon("calendar-event", "me-1"), "Asignada: ", Admin.taskDateLabel(task.fechaInicio)),
+          task.fechaCierre ? h("span", {}, icon("calendar-x", "me-1"), "Cierre: ", Admin.taskDateLabel(task.fechaCierre)) : null),
+        content),
+      footer: [close, edit],
+      size: "modal-lg"
+    });
+    edit.addEventListener("click", () => Admin.editTask(task));
+    return modal;
+  },
+
+  editTask(task) {
+    const groups = (Admin.boot && Admin.boot.groups) || [];
+    const localToday = () => {
+      const date = new Date();
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    };
+    const selectedGroup = task ? task.idCurso : (Admin.group && Admin.group.group.id) || (groups[0] && groups[0].id) || "";
+    const group = h("select", { class: "form-select", "aria-label": "Grupo" },
+      groups.map(g => h("option", { value: g.id, selected: g.id === selectedGroup, text: `${g.label}${g.ciclo ? ` (${g.ciclo})` : ""}` })));
+    const title = h("input", { class: "form-control", type: "text", maxlength: "200", required: true, value: task ? task.titulo : "", placeholder: "Título de la tarea", "aria-label": "Título de la tarea" });
+    const start = h("input", { class: "form-control", type: "date", required: true, value: task && task.fechaInicio ? task.fechaInicio : localToday(), "aria-label": "Fecha de asignación" });
+    const end = h("input", { class: "form-control", type: "date", value: task ? task.fechaCierre || "" : "", "aria-label": "Fecha de cierre" });
+    const editor = h("div", {
+      class: "form-control task-editor",
+      contenteditable: "true",
+      role: "textbox",
+      "aria-label": "Contenido de la tarea",
+      "aria-multiline": "true",
+      spellcheck: "true"
+    });
+    editor.id = "task-editor";
+    editor.innerHTML = Admin.sanitizeTaskHtml(task ? task.contenido : "");
+
+    const commandButton = (iconName, label, command) => h("button", {
+      class: "btn btn-sm btn-outline-secondary",
+      type: "button",
+      title: label,
+      "aria-label": label,
+      onmousedown: e => e.preventDefault(),
+      onclick: () => { editor.focus(); document.execCommand(command, false, null); }
+    }, icon(iconName));
+    const toolbar = h("div", { class: "btn-toolbar gap-1 mb-1", role: "toolbar", "aria-label": "Formato del contenido" },
+      commandButton("type-bold", "Negritas", "bold"),
+      commandButton("type-italic", "Cursivas", "italic"),
+      commandButton("type-underline", "Subrayado", "underline"),
+      commandButton("list-ul", "Lista con viñetas", "insertUnorderedList"),
+      commandButton("list-ol", "Lista numerada", "insertOrderedList"));
+    const field = (label, input, id) => h("div", { class: "mb-3" },
+      h("label", { class: "form-label", for: id, text: label }), input);
+    group.id = "task-group";
+    title.id = "task-title";
+    start.id = "task-start";
+    end.id = "task-end";
+
+    const save = h("button", { class: "btn btn-primary", type: "button" }, icon("save", "me-1"), "Guardar tarea");
+    const cancel = h("button", { class: "btn btn-secondary", type: "button", text: task ? "Volver al detalle" : "Cancelar" });
+    const modal = UI.modal({
+      title: [icon(task ? "pencil" : "plus-lg", "me-2"), task ? "Editar tarea" : "Nueva tarea"],
+      body: h("div", {},
+        field("Grupo", group, group.id),
+        field("Título", title, title.id),
+        h("div", { class: "row g-2" },
+          h("div", { class: "col-12 col-md-6" }, field("Fecha en que se deja", start, start.id)),
+          h("div", { class: "col-12 col-md-6" }, field("Fecha de cierre (opcional)", end, end.id))),
+        h("div", { class: "mb-3" },
+          h("label", { class: "form-label", for: "task-editor", text: "Contenido (opcional)" }),
+          toolbar,
+          editor,
+          h("div", { class: "form-text", text: "Usa la barra para aplicar formato. Las tareas son recordatorios y no generan calificación ni ponderación." })),
+      footer: [cancel, save],
+      size: "modal-lg"
+    });
+
+    cancel.addEventListener("click", () => {
+      if (task) Admin.viewTask(task);
+      else modal.close();
+    });
+    save.addEventListener("click", async () => {
+      if (!title.value.trim()) { title.focus(); return UI.toast("warning", "Escribe el título de la tarea."); }
+      if (!start.value) { start.focus(); return UI.toast("warning", "Selecciona la fecha en que se deja la tarea."); }
+      if (end.value && end.value < start.value) { end.focus(); return UI.toast("warning", "La fecha de cierre no puede ser anterior a la fecha de asignación."); }
+      if (editor.innerHTML.length > 16000) return UI.toast("warning", "El contenido no puede exceder 16,000 caracteres.");
+      const contenido = editor.textContent.trim() ? Admin.sanitizeTaskHtml(editor.innerHTML) : "";
+      try {
+        const result = await UI.busy(save, () => Api.call("saveTask", {
+          id: task ? task.id : "",
+          idCurso: group.value,
+          titulo: title.value,
+          contenido,
+          fechaInicio: start.value,
+          fechaCierre: end.value
+        }, "admin"));
+        UI.toast("success", result.message);
+        modal.close();
+        if (Prefs.get("admTab") === "tareas") Admin.renderTab();
+      } catch (error) {
+        if (error.code !== "AUTH") UI.toast("danger", error.message);
+      }
+    });
+  },
+
+  async tabTasks(content) {
+    const groups = (Admin.boot && Admin.boot.groups) || [];
+    const request = Admin.taskLoadToken = (Admin.taskLoadToken || 0) + 1;
+    const newTask = h("button", {
+      class: "btn btn-sm btn-primary",
+      type: "button",
+      disabled: !groups.length,
+      onclick: () => Admin.editTask(null)
+    }, icon("plus-lg", "me-1"), "Nueva tarea");
+    $("adm-toolbar").replaceChildren(newTask);
+    if (!groups.length) {
+      content.replaceChildren(UI.empty("people", "Crea un grupo antes de registrar tareas."));
+      return;
+    }
+
+    UI.loading(content, "Cargando tareas…");
+    try {
+      const result = await Api.call("listTasks", {}, "admin");
+      if (request !== Admin.taskLoadToken || Prefs.get("admTab") !== "tareas") return;
+      const tasks = result.tasks || [];
+      const accordion = h("div", { class: "accordion task-accordion", id: "task-groups" });
+      groups.forEach((g, index) => {
+        const groupTasks = tasks.filter(task => task.idCurso === g.id);
+        const collapseId = `task-collapse-${request}-${index}`;
+        const open = index === 0;
+        const titles = groupTasks.length
+          ? h("div", { class: "list-group list-group-flush" }, groupTasks.map(task => h("button", {
+            class: "list-group-item list-group-item-action text-start",
+            type: "button",
+            onclick: () => Admin.viewTask(task)
+          }, task.titulo)))
+          : h("div", { class: "small text-body-secondary p-3", text: "Aún no hay tareas en este grupo." });
+        accordion.append(h("div", { class: "accordion-item" },
+          h("h2", { class: "accordion-header" },
+            h("button", {
+              class: `accordion-button ${open ? "" : "collapsed"}`,
+              type: "button",
+              "data-bs-toggle": "collapse",
+              "data-bs-target": `#${collapseId}`,
+              "aria-expanded": String(open),
+              "aria-controls": collapseId
+            },
+              h("span", { class: "fw-semibold", text: g.label }),
+              h("span", { class: "badge rounded-pill text-bg-secondary ms-auto me-2", text: `${groupTasks.length} ${groupTasks.length === 1 ? "tarea" : "tareas"}` }))),
+          h("div", {
+            id: collapseId,
+            class: `accordion-collapse collapse ${open ? "show" : ""}`,
+            "data-bs-parent": "#task-groups"
+          }, h("div", { class: "accordion-body p-0" }, titles))));
+      });
+      content.replaceChildren(
+        h("p", { class: "small text-body-secondary mb-2", text: "Cada tarea pertenece a un grupo. Selecciona un título para ver y editar sus detalles." }),
+        accordion);
+    } catch (error) {
+      if (error.code !== "AUTH" && request === Admin.taskLoadToken) content.replaceChildren(UI.empty("wifi-off", error.message));
+    }
+  },
+
   async tabEvidence(content) {
     const estado = h("select", { class: "form-select form-select-sm w-auto", "aria-label": "Estado" },
       [["Pendiente", "Pendientes"], ["Aplicada", "Aplicadas"], ["Rechazada", "Rechazadas"], ["", "Todas"]].map(([v, t]) => h("option", { value: v, selected: Prefs.get("evFilter") === v, text: t })));
@@ -4102,7 +4325,7 @@ const Admin = {
 
     const purge = h("input", { class: "form-check-input", type: "checkbox", id: "bk-purge", checked: true });
     // Por defecto se conserva el histórico del alumno (inscripciones, comentarios, cursos)
-    const DEFAULT_WHAT = { attendance: true, reports: true, grades: true, students: false, comments: false, courses: false };
+    const DEFAULT_WHAT = { attendance: true, reports: true, grades: true, students: false, comments: false, tasks: false, courses: false };
     const what = {};
     const parts = (info.purgeParts || []).map(pt => {
       what[pt.key] = !!DEFAULT_WHAT[pt.key];
