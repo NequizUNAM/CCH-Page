@@ -127,8 +127,6 @@ const DEFAULT_RUBRICS = [
 
 const SETTINGS = {
   ADMIN_PASSWORD_KEY: "CCH_ADMIN_PASSWORD",
-  GOOGLE_WEB_CLIENT_ID_KEY: "APK_GOOGLE_WEB_CLIENT_ID",
-  ADMIN_EMAILS_KEY: "APK_ADMIN_EMAILS",
   FACTORY_PASSWORD: "123456789",                 // solo mientras NO exista CCH_ADMIN_PASSWORD (instalación nueva / demo)
   FACTORY_WORD: "RESTAURAR",
   EVIDENCE_FOLDER_KEY: "CCH_EVIDENCE_FOLDER_ID",
@@ -142,7 +140,7 @@ const SETTINGS = {
   CLEAR_ALL_WORD: "BORRAR TODO",
 
   // ---- Sesiones ----
-  ADMIN_TOKEN_TTL_S: 6 * 60 * 60,    // 6 h (máximo de CacheService)
+  ADMIN_TOKEN_TTL_S: 24 * 60 * 60,   // 24 h; se guarda en Script Properties, no en CacheService
   STUDENT_TOKEN_TTL_S: 2 * 60 * 60,  // 2 h
   LOGIN_MAX_ATTEMPTS: 5,             // intentos fallidos antes de bloquear
   LOGIN_LOCK_S: 10 * 60,             // bloqueo de 10 min
@@ -248,7 +246,6 @@ function routes_() {
   ping:               { auth: "public",  fn: () => ({ message: "WebApp activo ✅", version: API_VERSION }) },
   studentLogin:       { auth: "public",  fn: studentLogin_ },
   adminLogin:         { auth: "public",  fn: adminLogin_ },
-  adminGoogleLogin:   { auth: "public",  fn: adminGoogleLogin_ },
   logout:             { auth: "public",  fn: logout_ },
 
   // ---- Alumno ----
@@ -508,11 +505,47 @@ function instalarTodo() {
 // ============================================================
 // SESIONES
 //
-// - Admin: contraseña en la propiedad CCH_ADMIN_PASSWORD → token (6 h)
+// - Admin: contraseña en la propiedad CCH_ADMIN_PASSWORD → token (24 h)
 // - Alumno: SOLO número de cuenta registrado en Students → token (2 h)
-// Los tokens viven en CacheService; nunca se guarda la contraseña.
+// La sesión administrativa vive en Script Properties; la contraseña nunca se guarda en la sesión.
 // Tras LOGIN_MAX_ATTEMPTS intentos fallidos se bloquea LOGIN_LOCK_S segundos.
 // ============================================================
+
+const ADMIN_SESSION_PREFIX = "CCH_ADMIN_SESSION_";
+
+function adminPasswordFingerprint_() {
+  const password = adminPassword_().value;
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password));
+}
+
+function cleanExpiredAdminSessions_() {
+  const props = PropertiesService.getScriptProperties();
+  const values = props.getProperties();
+  const now = Date.now();
+  const passwordFingerprint = adminPasswordFingerprint_();
+  Object.keys(values).forEach(key => {
+    if (!key.startsWith(ADMIN_SESSION_PREFIX)) return;
+    try {
+      const session = JSON.parse(values[key]);
+      if (!session.expiresAt || session.expiresAt <= now || session.passwordFingerprint !== passwordFingerprint) {
+        props.deleteProperty(key);
+      }
+    } catch (error) {
+      props.deleteProperty(key);
+    }
+  });
+}
+
+function createAdminSession_() {
+  cleanExpiredAdminSessions_();
+  const token = Utilities.getUuid() + "-" + Utilities.getUuid();
+  const expiresAt = Date.now() + SETTINGS.ADMIN_TOKEN_TTL_S * 1000;
+  PropertiesService.getScriptProperties().setProperty(ADMIN_SESSION_PREFIX + token, JSON.stringify({
+    expiresAt,
+    passwordFingerprint: adminPasswordFingerprint_()
+  }));
+  return { token, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S };
+}
 
 function adminLogin_(params) {
   const cache = CacheService.getScriptCache();
@@ -526,53 +559,21 @@ function adminLogin_(params) {
   }
 
   cache.remove(rateKey);
-  const token = Utilities.getUuid();
-  cache.put("adm_" + token, "1", SETTINGS.ADMIN_TOKEN_TTL_S);
+  const session = createAdminSession_();
 
   // Primer ingreso: asegura que existan las hojas W_*
   withScriptLock_(() => setupWeb_());
 
-  return { token, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S, factoryPassword: expected.factory };
-}
-
-function adminGoogleLogin_(params) {
-  const email = verifyGoogleAdminIdToken_(params.idToken);
-  const token = Utilities.getUuid();
-  CacheService.getScriptCache().put("adm_" + token, "1", SETTINGS.ADMIN_TOKEN_TTL_S);
-  withScriptLock_(() => setupWeb_());
-  return { token, email, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S, factoryPassword: false };
-}
-
-function verifyGoogleAdminIdToken_(idToken) {
-  const properties = PropertiesService.getScriptProperties();
-  const clientId = String(properties.getProperty(SETTINGS.GOOGLE_WEB_CLIENT_ID_KEY) || "").trim();
-  const allowedEmails = String(properties.getProperty(SETTINGS.ADMIN_EMAILS_KEY) || "")
-    .split(",").map(email => email.trim().toLowerCase()).filter(Boolean);
-  if (!clientId || !allowedEmails.length) {
-    throw new Error("Configura APK_GOOGLE_WEB_CLIENT_ID y APK_ADMIN_EMAILS en las propiedades del script.");
-  }
-  const identityToken = String(idToken || "").trim();
-  if (identityToken.length < 100 || identityToken.length > 8192) {
-    throw new Error("Token de Google inválido.");
-  }
-  const response = UrlFetchApp.fetch(
-    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(identityToken),
-    { muteHttpExceptions: true }
-  );
-  if (response.getResponseCode() !== 200) throw new Error("Google no pudo validar la cuenta.");
-  const claims = JSON.parse(response.getContentText());
-  const email = String(claims.email || "").trim().toLowerCase();
-  const expiration = Number(claims.exp || 0);
-  if (claims.aud !== clientId || !["accounts.google.com", "https://accounts.google.com"].includes(claims.iss) ||
-      String(claims.email_verified) !== "true" || expiration <= Math.floor(Date.now() / 1000)) {
-    throw new Error("La identidad de Google no es válida para esta aplicación.");
-  }
-  if (!allowedEmails.includes(email)) throw new Error("Esta cuenta de Google no está autorizada como administradora.");
-  return email;
+  return Object.assign(session, { factoryPassword: expected.factory });
 }
 
 function requireAdmin_(token) {
-  if (!token || !CacheService.getScriptCache().get("adm_" + token)) {
+  const props = PropertiesService.getScriptProperties();
+  const key = ADMIN_SESSION_PREFIX + String(token || "");
+  let session = null;
+  try { session = token ? JSON.parse(props.getProperty(key) || "null") : null; } catch (error) { session = null; }
+  if (!session || session.expiresAt <= Date.now() || session.passwordFingerprint !== adminPasswordFingerprint_()) {
+    if (token) props.deleteProperty(key);
     throw appError_("Tu sesión de administrador expiró. Vuelve a entrar.", "AUTH");
   }
 }
@@ -607,7 +608,7 @@ function requireStudent_(token) {
 function logout_(params) {
   if (params.token) {
     const cache = CacheService.getScriptCache();
-    cache.remove("adm_" + params.token);
+    PropertiesService.getScriptProperties().deleteProperty(ADMIN_SESSION_PREFIX + params.token);
     cache.remove("stu_" + params.token);
   }
   return { message: "Sesión cerrada." };

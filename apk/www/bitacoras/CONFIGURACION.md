@@ -226,7 +226,7 @@ abajo. No lo pegues en esta guía, en un chat, ni en ningún archivo del repo.
    los registros que no incluyan `id`.
 
 La página web no utiliza este token: su login continúa usando tokens de sesión
-con vigencia de **6 horas**. El token de servicio no caduca por tiempo ni se
+con vigencia de **24 horas**, persistido en Script Properties. El token de servicio no caduca por tiempo ni se
 invalida al cambiar la contraseña web; solo se invalida al revocarlo o
 reemplazarlo. Como alternativa avanzada, `fijarTokenServicioMuse()` permite
 definir un token propio; después de ejecutarla, borra inmediatamente el valor

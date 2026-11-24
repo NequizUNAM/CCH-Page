@@ -496,7 +496,7 @@ Bitacoras/
 
 - `MUSE_SERVICE_TOKEN_HASH` guarda solo `hashConSal_()` del token; el token generado se muestra una sola vez en el log y nunca se incorpora al HTML, JSON o documentación.
 - `generarTokenServicioMuse()` emite dos UUID unidos; generar otro reemplaza al anterior. `fijarTokenServicioMuse()` es alternativa temporal y su valor debe borrarse del código después de ejecutarla. `revocarTokenServicioMuse()` elimina la propiedad inmediatamente.
-- `verificarToken_()` distingue `sesion` y `servicio`. El token de sesión mantiene vigencia de 6 horas y época; el de servicio no caduca por tiempo ni depende de la época.
+- `verificarToken_()` distingue `sesion` y `servicio`. El token de sesión se persiste en Script Properties por 24 horas y se invalida con la época; el de servicio no caduca por tiempo ni depende de la época.
 - Alcance permitido: `leer`, `leerProyecto`, `guardarSesion`, `guardarPendiente`, `cerrarPendiente`, `guardarHito`, `subirEvidencia`, `crearProyecto`, `guardar`, `verEvidencia`, `registrarPuntaje`.
 - Todo lo demás se rechaza para el token de servicio antes de ejecutar la acción, incluyendo login/cambio de contraseña, `crearEstructura`, `guardarConfigCiclo`, `verificarEstructura` y las acciones dedicadas para editar o borrar. La sesión web normal no usa el token de servicio.
 - `doPost` acepta el token del body JSON o de `e.parameter.token` como alternativa de integración. El query string puede filtrarse en registros/historiales: no compartas ni registres URLs con el token. `doGet` no valida acciones con este token; la web sigue enviándolo en el body.

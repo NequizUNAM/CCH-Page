@@ -29,7 +29,7 @@
  *     elimina la propiedad temporal después de guardar el hash y la sal.
  *   - Los proyectos activos se cargan desde INDICE-bitacoras.json.
  *   - El token de sesión es un string aleatorio (UUID) guardado en
- *     CacheService con expiración de 6 horas. Todas las acciones de
+ *     Script Properties con expiración de 24 horas. Todas las acciones de
  *     escritura Y DE LECTURA de datos exigen un token válido, salvo
  *     login, ping y el HTML mínimo de estado (C5, corregido 2026-11-18).
  *     Auditoría v2 Paso 7e: el token ya NO viaja en la URL; en POST va en el body.
@@ -99,8 +99,6 @@ var CONFIG = {
   // Clave en Script Properties donde vive el hash SHA-256 de la contraseña web.
   PASS_HASH_KEY: 'WEB_PASS_HASH',
   PASS_SETUP_KEY: 'WEB_PASS_SETUP',
-  GOOGLE_WEB_CLIENT_ID_KEY: 'APK_GOOGLE_WEB_CLIENT_ID',
-  ADMIN_EMAILS_KEY: 'APK_ADMIN_EMAILS',
 
   // M2: sal aleatoria (Script Properties, clave WEB_PASS_SALT) con la que
   // se calcula el hash: SHA-256(sal + ':' + contraseña). Se genera sola
@@ -109,7 +107,7 @@ var CONFIG = {
   MUSE_SERVICE_TOKEN_HASH_KEY: 'MUSE_SERVICE_TOKEN_HASH',
 
   // Seguridad de sesión / login.
-  TOKEN_HORAS: 6,          // Vigencia del token de sesión (CacheService).
+  TOKEN_HORAS: 24,         // Vigencia de la sesión persistida en Script Properties.
   INTENTOS_MAX: 5,         // Intentos fallidos de login antes del bloqueo.
   BLOQUEO_MINUTOS: 5,      // Duración del bloqueo tras INTENTOS_MAX fallos.
   ZONA_HORARIA: 'America/Mexico_City'
@@ -305,9 +303,6 @@ function doPost(e) {
     if (accion === 'login') {
       return responder_(login_(datos.password || '', datos.cliente || ''));
     }
-    if (accion === 'loginGoogle') {
-      return responder_(loginGoogle_(datos.idToken || ''));
-    }
     if (accion === 'ping') {
       return responder_({ ok: true, accion: 'ping', fecha: ahoraISO_() });
     }
@@ -323,6 +318,7 @@ function doPost(e) {
     // Paso 7d: cerrar sesión revoca el token (no necesita bloqueo de escritura).
     if (accion === 'cerrarSesion') {
       CacheService.getScriptCache().remove('sesion_' + datos.token);
+      PropertiesService.getScriptProperties().deleteProperty(claveSesion_(datos.token));
       return responder_({ ok: true, mensaje: 'Sesión cerrada.' });
     }
 
@@ -459,54 +455,43 @@ function login_(password, cliente) {
       .setProperty(CONFIG.PASS_HASH_KEY, hashConSal_(password));
   }
 
-  // 4) Éxito: limpiar intentos de ESTE cliente y emitir token (6 horas).
+  // 4) Éxito: limpiar intentos y emitir un token persistente de 24 horas.
   cache.remove(claveIntentos);
   cache.remove(claveBloqueo);
   var token = Utilities.getUuid() + '-' + Utilities.getUuid();
-  cache.put('sesion_' + token, epoca_(), CONFIG.TOKEN_HORAS * 3600);
+  limpiarSesionesExpiradas_();
+  PropertiesService.getScriptProperties().setProperty(claveSesion_(token), JSON.stringify({
+    epoca: epoca_(),
+    expira: ahora + CONFIG.TOKEN_HORAS * 3600000
+  }));
   return { ok: true, token: token, expira_horas: CONFIG.TOKEN_HORAS };
-}
-
-function loginGoogle_(idToken) {
-  var properties = PropertiesService.getScriptProperties();
-  var clientId = String(properties.getProperty(CONFIG.GOOGLE_WEB_CLIENT_ID_KEY) || '').trim();
-  var allowedEmails = String(properties.getProperty(CONFIG.ADMIN_EMAILS_KEY) || '')
-    .split(',').map(function (email) { return email.trim().toLowerCase(); }).filter(Boolean);
-  if (!clientId || !allowedEmails.length) {
-    throw new Error('Configura APK_GOOGLE_WEB_CLIENT_ID y APK_ADMIN_EMAILS en Script Properties.');
-  }
-  var identityToken = String(idToken || '').trim();
-  if (identityToken.length < 100 || identityToken.length > 8192) {
-    throw new Error('Token de Google inválido.');
-  }
-  var response = UrlFetchApp.fetch(
-    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(identityToken),
-    { muteHttpExceptions: true }
-  );
-  if (response.getResponseCode() !== 200) throw new Error('Google no pudo validar la cuenta.');
-  var claims = JSON.parse(response.getContentText());
-  var email = String(claims.email || '').trim().toLowerCase();
-  var expiration = Number(claims.exp || 0);
-  if (claims.aud !== clientId ||
-      ['accounts.google.com', 'https://accounts.google.com'].indexOf(claims.iss) === -1 ||
-      String(claims.email_verified) !== 'true' ||
-      expiration <= Math.floor(new Date().getTime() / 1000)) {
-    throw new Error('La identidad de Google no es válida para esta aplicación.');
-  }
-  if (allowedEmails.indexOf(email) === -1) {
-    throw new Error('Esta cuenta de Google no está autorizada como administradora.');
-  }
-  var token = Utilities.getUuid() + '-' + Utilities.getUuid();
-  CacheService.getScriptCache().put('sesion_' + token, epoca_(), CONFIG.TOKEN_HORAS * 3600);
-  return { ok: true, token: token, email: email, expira_horas: CONFIG.TOKEN_HORAS };
 }
 
 /** Época de sesión; el token de servicio no depende de esta época. */
 /* Paso 7d: época de sesión. Todos los tokens guardan la época vigente;
-   al cambiar la contraseña la época cambia y los tokens viejos dejan de
-   valer, aunque no hayan expirado (6 h). */
+  al cambiar la contraseña la época cambia y los tokens viejos dejan de
+  valer, aunque no hayan expirado (24 h). */
 function epoca_() {
   return PropertiesService.getScriptProperties().getProperty('SESSION_EPOCH') || '1';
+}
+
+function claveSesion_(token) {
+  return 'BITACORAS_SESSION_' + String(token || '');
+}
+
+function limpiarSesionesExpiradas_() {
+  var props = PropertiesService.getScriptProperties();
+  var values = props.getProperties();
+  var ahora = new Date().getTime();
+  Object.keys(values).forEach(function (key) {
+    if (key.indexOf('BITACORAS_SESSION_') !== 0) return;
+    try {
+      var session = JSON.parse(values[key]);
+      if (!session.expira || session.expira <= ahora || session.epoca !== epoca_()) props.deleteProperty(key);
+    } catch (error) {
+      props.deleteProperty(key);
+    }
+  });
 }
 /* Paso 7c: libera el freno global de login (ejecutar desde el editor). */
 function limpiarBloqueos() {
@@ -518,7 +503,12 @@ function verificarToken_(token) {
   var hashServicio = PropertiesService.getScriptProperties()
     .getProperty(CONFIG.MUSE_SERVICE_TOKEN_HASH_KEY);
   if (hashServicio && hashConSal_(token) === hashServicio) return 'servicio';
-  if (CacheService.getScriptCache().get('sesion_' + token) === epoca_()) return 'sesion';
+  var props = PropertiesService.getScriptProperties();
+  var key = claveSesion_(token);
+  var session = null;
+  try { session = JSON.parse(props.getProperty(key) || 'null'); } catch (error) { session = null; }
+  if (session && session.epoca === epoca_() && session.expira > new Date().getTime()) return 'sesion';
+  if (session) props.deleteProperty(key);
   return null;
 }
 

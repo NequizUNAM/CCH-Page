@@ -192,10 +192,9 @@ const Examenes = (function () {
     const clave = String(d.clave || '').trim();
     if (!clave) return { ok: false, code: 'incorrecta' };
     if (clave && clave === adminPass_()) {
-      const token = Utilities.getUuid();
-      CacheService.getScriptCache().put('adm_' + token, '1', 21600);          // sesión de 6 horas
+      const session = createAdminSession_();
       CacheService.getScriptCache().remove('fl_' + dev);
-      return { ok: true, role: 'admin', token: token };
+      return { ok: true, role: 'admin', token: session.token };
     }
     const cfg = getCfg_(m);
     for (const p of [1, 2]) {
@@ -280,7 +279,7 @@ const Examenes = (function () {
 
   /* ---------------------------------- Administrador ---------------------------------- */
   function adminOnly_(d, m, fn) {
-    if (!d.token || !CacheService.getScriptCache().get('adm_' + d.token)) return { ok: false, code: 'auth' };
+    try { requireAdmin_(d.token); } catch (error) { return { ok: false, code: 'auth' }; }
     return fn(d, m);
   }
   function iso_(v) { return v instanceof Date ? v.toISOString() : (v ? String(v) : ''); }

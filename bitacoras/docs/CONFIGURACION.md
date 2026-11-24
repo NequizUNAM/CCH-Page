@@ -91,7 +91,7 @@ La página tiene login con contraseña aparte. La contraseña **nunca va en el H
 5. Si olvidas o necesitas cambiar la contraseña, usa **Mantenimiento → Cambiar contraseña** estando autenticado. No escribas la contraseña en archivos del proyecto.
 5. El login y el mantenimiento (§24 y §25 del checklist) quedan bloqueados sin sesión: sin haber hecho login, la página no debe dejar entrar a mantenimiento.
 
-> Esta contraseña sigue aplicando a las páginas HTML web. El APK usa inicio de sesión de Google con validación en Apps Script; configura `APK_GOOGLE_WEB_CLIENT_ID` y `APK_ADMIN_EMAILS` en las Script Properties, según el apartado [de acceso del APK](../../README.md#acceso-administrativo-del-apk-con-google).
+> Esta misma contraseña aplica a las páginas web y al APK. En el APK, configura primero la URL `/exec` de Bitácoras; después el login valida la contraseña en Apps Script y conserva la sesión por 24 horas.
 
 ## 6) AppSheet: conectar a las hojas de Drive
 
@@ -227,7 +227,7 @@ abajo. No lo pegues en esta guía, en un chat, ni en ningún archivo del repo.
    los registros que no incluyan `id`.
 
 La página web no utiliza este token: su login continúa usando tokens de sesión
-con vigencia de **6 horas**. El token de servicio no caduca por tiempo ni se
+con vigencia de **24 horas**, persistido en Script Properties. El token de servicio no caduca por tiempo ni se
 invalida al cambiar la contraseña web; solo se invalida al revocarlo o
 reemplazarlo. Como alternativa avanzada, `fijarTokenServicioMuse()` permite
 definir un token propio; después de ejecutarla, borra inmediatamente el valor

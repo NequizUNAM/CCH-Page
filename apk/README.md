@@ -35,7 +35,7 @@ apk/
 
 ## Requisitos en Windows
 
-1. Node.js LTS 20 o 22.
+1. Node.js 20.19 o superior, o 22.12 o superior (requisito de Vite 7).
 2. Android Studio actualizado.
 3. Android SDK Platform 35 o superior.
 4. Android SDK Build-Tools.

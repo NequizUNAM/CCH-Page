@@ -1063,7 +1063,7 @@ const Cache = {
 };
 
 // Acciones que solo leen; cualquier otra acción de admin invalida la caché de grupos
-const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "adminGoogleLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
+const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
 
 /* ============================================================
    EXPORTAR A PSI (psi.cch.unam.mx)
@@ -1280,7 +1280,7 @@ const App = {
     $("btn-logout").addEventListener("click", App.logout);
     $("sync-status").addEventListener("click", () => ApiQueue.showDetails());
     $("btn-prefs").addEventListener("click", App.openPrefs);
-    $("admin-google-login").addEventListener("click", App.submitAdminGoogleLogin);
+    $("admin-login").addEventListener("submit", App.submitAdminLogin);
     $("student-login").addEventListener("submit", Student.login);
     $("roll-back-courses").addEventListener("click", () => PaseLista.showCourses());
     $("roll-refresh").addEventListener("click", () => PaseLista.refresh());
@@ -1481,17 +1481,19 @@ const App = {
     bootstrap.Modal.getOrCreateInstance($("modal-admin")).show();
   },
 
-  async submitAdminGoogleLogin() {
+  async submitAdminLogin(event) {
+    event.preventDefault();
     const errorBox = $("admin-error");
     errorBox.classList.add("d-none");
     try {
-      await UI.busy($("admin-google-login"), async () => {
-        if (!window.CCHGoogleAuth) throw new Error("No se pudo cargar el inicio de sesión seguro de Google.");
-        const idToken = await window.CCHGoogleAuth.getIdToken();
-        const result = await Api.call("adminGoogleLogin", { idToken });
+      await UI.busy($("admin-login-submit"), async () => {
+        const password = $("admin-password").value;
+        if (!password) throw new Error("Escribe la contraseña de administrador.");
+        const result = await Api.call("adminLogin", { password });
         Session.set("admin", result.token);
-        Session.set("factory", false);
+        Session.set("factory", !!result.factoryPassword);
       });
+      $("admin-password").value = "";
       bootstrap.Modal.getOrCreateInstance($("modal-admin")).hide();
       App.route();
     } catch (error) {
@@ -1509,10 +1511,6 @@ const App = {
     if (Admin.dirty && Admin.dirty.size && !(await UI.confirm("Tienes calificaciones sin guardar. ¿Salir de todos modos?", { okText: "Salir", danger: true }))) return;
     const tokens = [Session.get("admin"), (Session.get("student") || {}).token].filter(Boolean);
     tokens.forEach(token => Api.call("logout", { token }).catch(() => {}));
-    if (window.CCHGoogleAuth && Session.get("admin")) {
-      try { await window.CCHGoogleAuth.signOut(); }
-      catch (error) { UI.toast("warning", `Se cerró la sesión de la aplicación, pero Google no pudo cerrarse: ${error.message}`); }
-    }
     Session.clear();
     Cache.clear();
     Admin.reset();

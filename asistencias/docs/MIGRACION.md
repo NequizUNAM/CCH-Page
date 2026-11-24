@@ -47,7 +47,7 @@ El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
 
 **URL para los alumnos:** el QR de la página de inicio ya lleva la URL del servidor (`?api=…`), así que el alumno no configura nada. Si prefieres dejarla fija para todos, pégala en `API_URL` al inicio de `script.js`. La copia incluida en el APK tiene almacenamiento separado y también debe configurarse una vez en cada dispositivo.
 
-**Login administrativo del APK:** el HTML web conserva su contraseña `CCH_ADMIN_PASSWORD`; solo el APK usa Google para las funciones administrativas. Para configurarlo, sigue el apartado [Acceso administrativo del APK con Google](../../README.md#acceso-administrativo-del-apk-con-google). El servidor valida el ID token, compara el cliente OAuth y permite únicamente los correos de `APK_ADMIN_EMAILS` en Script Properties. El login de alumnos con número de cuenta no cambia.
+**Login administrativo del APK:** después de configurar la URL `/exec`, usa la contraseña `CCH_ADMIN_PASSWORD` de Apps Script, igual que la página web. Apps Script conserva el token administrativo por 24 horas; cambiar la contraseña invalida las sesiones existentes. El login de alumnos con número de cuenta no cambia.
 
 ## Restaurar a fábrica (DEMO)
 

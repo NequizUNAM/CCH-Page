@@ -14,8 +14,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
-    "@capacitor/core": "^7.4.3",
-    "@capgo/capacitor-social-login": "7.18.0"
+    "@capacitor/core": "^7.4.3"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
