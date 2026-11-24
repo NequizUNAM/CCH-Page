@@ -27,6 +27,17 @@ Se mantiene un solo README fuera de `apk/`: este documento reúne el mapa de amb
 
 La carpeta `apk/` no se sincroniza automáticamente con estas fuentes web. Para compilarla, usa `npm run android:apk` desde `apk/`; las instrucciones específicas siguen en su README.
 
+### Acceso administrativo del APK con Google
+
+El APK usa inicio de sesión de Google para las funciones administrativas de Asistencias, el pase de lista y Bitácoras. Las páginas HTML web conservan sus logins actuales; el acceso de alumnos con número de cuenta también se mantiene. La URL `/exec` sigue siendo necesaria para conectar, pero no autentica por sí sola.
+
+Para habilitarlo:
+
+1. En Google Cloud crea un cliente OAuth **Web** y un cliente **Android** para `mx.unam.cch.proyectos`, registrando el SHA-1 de cada certificado que uses (debug y distribución).
+2. Copia el ID del cliente OAuth Web en `apk/google-auth-config.js`.
+3. En las **Script Properties de ambos proyectos** de Apps Script agrega `APK_GOOGLE_WEB_CLIENT_ID` con ese mismo ID y `APK_ADMIN_EMAILS` con los correos administradores permitidos, separados por comas. Si la lista está vacía, el acceso se rechaza.
+4. Publica una nueva versión de ambos Web Apps y compila el APK. El ID de cliente no es un secreto; no agregues client secrets ni tokens al repositorio.
+
 ### Bitácoras: datos, seguridad y operación
 
 - La interfaz de Bitácoras es una página independiente con su propio Apps Script. Los datos de producción viven en Google Drive y Sheets; `bitacoras/data/` contiene plantillas de referencia, no una copia viva de los datos.
@@ -34,6 +45,7 @@ La carpeta `apk/` no se sincroniza automáticamente con estas fuentes web. Para 
 - Las revisiones de concurrencia son por documento: las operaciones offline se guardan en IndexedDB, se procesan en orden y ante una revisión obsoleta quedan detenidas para comparación manual. No se debe reintentar un guardado completo sin reconciliarlo.
 - Las evidencias de Drive son privadas de forma predeterminada. Word/PDF se generan localmente; el programa no cambia permisos de Drive ni comparte informes.
 - El login web y los tokens se administran en Apps Script. La contraseña web se configura temporalmente con `WEB_PASS_SETUP`; `fijarPasswordWebDesdePropiedad()` la elimina y conserva solo `WEB_PASS_HASH` y `WEB_PASS_SALT` en Script Properties. No guardes contraseñas ni tokens reales en este repositorio. El token de Muse tiene una lista de acciones permitidas; las integraciones que escriben deben enviar la revisión obtenida al leer el proyecto.
+- El login con contraseña de Bitácoras sigue activo en sus HTML web. En el APK, Apps Script valida el token de Google y exige que el correo esté en `APK_ADMIN_EMAILS`.
 
 Para una instalación o actualización, sigue [la configuración de Bitácoras](bitacoras/docs/CONFIGURACION.md); para revisar las hojas y columnas de AppSheet, usa su [guía](bitacoras/docs/guia-configuracion-appsheet.md).
 
@@ -57,7 +69,7 @@ En el APK de Asistencias, las escrituras se procesan en orden FIFO, una a la vez
 
 Cada escritura de Asistencias lleva un identificador idempotente que Apps Script conserva temporalmente para reconocer reintentos. La cola de un alumno solo se reanuda con la misma cuenta. La sesión debe seguir activa para que la cola envíe solicitudes protegidas; por eso no se permite cerrar sesión mientras haya escrituras pendientes.
 
-El acceso **Pasar asistencia** del APK abre una vista exclusiva para el profesor: cursos activos con íconos SVG por materia, alumnos, cuenta, faltas y los dos controles de asistencia/falta. Reutiliza la sesión de administrador de Asistencias (no añade un segundo login); si no hay sesión activa, se usa el acceso habitual del módulo. Cada marca se guarda localmente en la misma cola IndexedDB y se sincroniza al recuperar conexión; para consultar cursos y alumnos sin conexión, primero deben haberse cargado una vez.
+El acceso **Pasar asistencia** del APK abre una vista exclusiva para el profesor: cursos activos con íconos SVG, descripción opcional de `Course`, alumnos, cuenta y faltas; más de tres faltas se resaltan en rojo discreto. Al marcar el estado del día, se deshabilitan ambos botones; el servidor conserva la primera marca y no permite sobrescribirla desde la vista APK. Cada marca se guarda localmente en la cola IndexedDB y se sincroniza al recuperar conexión; la sesión administrativa del APK usa Google. Para consultar cursos y alumnos sin conexión, primero deben haberse cargado una vez.
 
 ## Alcance offline verificado
 

@@ -127,6 +127,8 @@ const DEFAULT_RUBRICS = [
 
 const SETTINGS = {
   ADMIN_PASSWORD_KEY: "CCH_ADMIN_PASSWORD",
+  GOOGLE_WEB_CLIENT_ID_KEY: "APK_GOOGLE_WEB_CLIENT_ID",
+  ADMIN_EMAILS_KEY: "APK_ADMIN_EMAILS",
   FACTORY_PASSWORD: "123456789",                 // solo mientras NO exista CCH_ADMIN_PASSWORD (instalación nueva / demo)
   FACTORY_WORD: "RESTAURAR",
   EVIDENCE_FOLDER_KEY: "CCH_EVIDENCE_FOLDER_ID",
@@ -246,6 +248,7 @@ function routes_() {
   ping:               { auth: "public",  fn: () => ({ message: "WebApp activo ✅", version: API_VERSION }) },
   studentLogin:       { auth: "public",  fn: studentLogin_ },
   adminLogin:         { auth: "public",  fn: adminLogin_ },
+  adminGoogleLogin:   { auth: "public",  fn: adminGoogleLogin_ },
   logout:             { auth: "public",  fn: logout_ },
 
   // ---- Alumno ----
@@ -532,6 +535,42 @@ function adminLogin_(params) {
   return { token, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S, factoryPassword: expected.factory };
 }
 
+function adminGoogleLogin_(params) {
+  const email = verifyGoogleAdminIdToken_(params.idToken);
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put("adm_" + token, "1", SETTINGS.ADMIN_TOKEN_TTL_S);
+  withScriptLock_(() => setupWeb_());
+  return { token, email, expiresIn: SETTINGS.ADMIN_TOKEN_TTL_S, factoryPassword: false };
+}
+
+function verifyGoogleAdminIdToken_(idToken) {
+  const properties = PropertiesService.getScriptProperties();
+  const clientId = String(properties.getProperty(SETTINGS.GOOGLE_WEB_CLIENT_ID_KEY) || "").trim();
+  const allowedEmails = String(properties.getProperty(SETTINGS.ADMIN_EMAILS_KEY) || "")
+    .split(",").map(email => email.trim().toLowerCase()).filter(Boolean);
+  if (!clientId || !allowedEmails.length) {
+    throw new Error("Configura APK_GOOGLE_WEB_CLIENT_ID y APK_ADMIN_EMAILS en las propiedades del script.");
+  }
+  const identityToken = String(idToken || "").trim();
+  if (identityToken.length < 100 || identityToken.length > 8192) {
+    throw new Error("Token de Google inválido.");
+  }
+  const response = UrlFetchApp.fetch(
+    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(identityToken),
+    { muteHttpExceptions: true }
+  );
+  if (response.getResponseCode() !== 200) throw new Error("Google no pudo validar la cuenta.");
+  const claims = JSON.parse(response.getContentText());
+  const email = String(claims.email || "").trim().toLowerCase();
+  const expiration = Number(claims.exp || 0);
+  if (claims.aud !== clientId || !["accounts.google.com", "https://accounts.google.com"].includes(claims.iss) ||
+      String(claims.email_verified) !== "true" || expiration <= Math.floor(Date.now() / 1000)) {
+    throw new Error("La identidad de Google no es válida para esta aplicación.");
+  }
+  if (!allowedEmails.includes(email)) throw new Error("Esta cuenta de Google no está autorizada como administradora.");
+  return email;
+}
+
 function requireAdmin_(token) {
   if (!token || !CacheService.getScriptCache().get("adm_" + token)) {
     throw appError_("Tu sesión de administrador expiró. Vuelve a entrar.", "AUTH");
@@ -746,7 +785,8 @@ function courseMap_() {
   const col = name => findColumn_(headers, name);
   const iId = col("ID_Curso"), iName = col("Nombre Curso"), iGroup = col("Grupo"),
         iSchedule = col("Horario"), iCiclo = col("Ciclo_Escolar"),
-        iSheet = col("Hoja_Reporte"), iActive = col("Activo");
+        iSheet = col("Hoja_Reporte"), iActive = col("Activo"),
+        iDescription = col("Descripción");
 
   const map = {};
   data.slice(1).forEach(row => {
@@ -757,6 +797,7 @@ function courseMap_() {
       name: iName !== -1 ? cleanText_(row[iName]) : id,
       group: iGroup !== -1 ? cleanText_(row[iGroup]) : "",
       schedule: iSchedule !== -1 ? cleanText_(row[iSchedule]) : "",
+      description: iDescription !== -1 ? cleanText_(row[iDescription]) : "",
       ciclo: iCiclo !== -1 ? normalizeCiclo_(row[iCiclo]) : "",
       sheet: iSheet !== -1 ? cleanText_(row[iSheet]) : "",
       active: iActive !== -1 ? toBool_(row[iActive]) : false
@@ -823,6 +864,7 @@ function groupsMap_() {
       ciclo: c.ciclo,
       active: c.active,
       courseName: c.name,
+      description: c.description,
       group: c.group
     };
   });
@@ -2073,6 +2115,27 @@ function saveRollCall_(params) {
   const values = range.getValues();
   const backgrounds = range.getBackgrounds();
   const formulas = range.getFormulas();
+
+  if (params.lockIfMarked === true) {
+    const seenAccounts = new Set();
+    const validStatuses = rollStatuses_().map(normalizeKey_);
+    const alreadyMarked = [];
+    marks.forEach(m => {
+      if (seenAccounts.has(m.cuenta)) throw new Error(`La cuenta ${m.cuenta} está repetida en la solicitud.`);
+      seenAccounts.add(m.cuenta);
+      const r = rowOf[m.cuenta] - (firstRow - 1);
+      if (r >= 0 && r < count && !formulas[r][0] && validStatuses.includes(normalizeKey_(values[r][0]))) {
+        alreadyMarked.push({ cuenta: m.cuenta, status: String(values[r][0]) });
+      }
+    });
+    if (alreadyMarked.length) {
+      return {
+        written: 0,
+        alreadyMarked,
+        message: `No se cambió la marca: ya había un registro para esta fecha.`
+      };
+    }
+  }
 
   let written = 0;
   marks.forEach(m => {

@@ -1063,7 +1063,7 @@ const Cache = {
 };
 
 // Acciones que solo leen; cualquier otra acción de admin invalida la caché de grupos
-const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
+const READ_ACTIONS = new Set(["adminBootstrap", "groupData", "listEvidence", "columnsInfo", "studentProfile", "searchStudents", "maintenanceInfo", "backupPreview", "diagnose", "getReports", "adminLogin", "adminGoogleLogin", "studentLogin", "studentData", "ping", "logout", "examLinks", "examAdmin"]);
 
 /* ============================================================
    EXPORTAR A PSI (psi.cch.unam.mx)
@@ -1280,7 +1280,7 @@ const App = {
     $("btn-logout").addEventListener("click", App.logout);
     $("sync-status").addEventListener("click", () => ApiQueue.showDetails());
     $("btn-prefs").addEventListener("click", App.openPrefs);
-    $("admin-login").addEventListener("submit", App.submitAdminLogin);
+    $("admin-google-login").addEventListener("click", App.submitAdminGoogleLogin);
     $("student-login").addEventListener("submit", Student.login);
     $("roll-back-courses").addEventListener("click", () => PaseLista.showCourses());
     $("roll-refresh").addEventListener("click", () => PaseLista.refresh());
@@ -1393,6 +1393,7 @@ const App = {
       if (Session.get("admin")) return PaseLista.open();
       document.body.classList.remove("rollcall-only");
       App.show("view-login");
+      App.openAdmin();
       App.loadExamLinks();
       return;
     }
@@ -1476,29 +1477,26 @@ const App = {
 
   openAdmin() {
     if (Session.get("admin")) return App.route();
-    $("admin-login").reset();
     $("admin-error").classList.add("d-none");
     bootstrap.Modal.getOrCreateInstance($("modal-admin")).show();
-    setTimeout(() => $("admin-pass").focus(), 300);
   },
 
-  async submitAdminLogin(event) {
-    event.preventDefault();
+  async submitAdminGoogleLogin() {
     const errorBox = $("admin-error");
     errorBox.classList.add("d-none");
     try {
-      await UI.busy($("admin-submit"), async () => {
-        const result = await Api.call("adminLogin", { password: $("admin-pass").value });
+      await UI.busy($("admin-google-login"), async () => {
+        if (!window.CCHGoogleAuth) throw new Error("No se pudo cargar el inicio de sesión seguro de Google.");
+        const idToken = await window.CCHGoogleAuth.getIdToken();
+        const result = await Api.call("adminGoogleLogin", { idToken });
         Session.set("admin", result.token);
-        Session.set("factory", !!result.factoryPassword);
+        Session.set("factory", false);
       });
       bootstrap.Modal.getOrCreateInstance($("modal-admin")).hide();
       App.route();
     } catch (error) {
       errorBox.textContent = error.message;
       errorBox.classList.remove("d-none");
-    } finally {
-      $("admin-pass").value = "";
     }
   },
 
@@ -1511,6 +1509,10 @@ const App = {
     if (Admin.dirty && Admin.dirty.size && !(await UI.confirm("Tienes calificaciones sin guardar. ¿Salir de todos modos?", { okText: "Salir", danger: true }))) return;
     const tokens = [Session.get("admin"), (Session.get("student") || {}).token].filter(Boolean);
     tokens.forEach(token => Api.call("logout", { token }).catch(() => {}));
+    if (window.CCHGoogleAuth && Session.get("admin")) {
+      try { await window.CCHGoogleAuth.signOut(); }
+      catch (error) { UI.toast("warning", `Se cerró la sesión de la aplicación, pero Google no pudo cerrarse: ${error.message}`); }
+    }
     Session.clear();
     Cache.clear();
     Admin.reset();
@@ -4224,7 +4226,7 @@ const PaseLista = {
   async open() {
     if (!Session.get("admin")) {
       document.body.classList.remove("rollcall-only");
-      App.show("view-login");
+      App.openAdmin();
       return;
     }
     document.body.classList.add("rollcall-only");
@@ -4286,7 +4288,9 @@ const PaseLista = {
     },
     h("span", { class: "roll-course-main" },
       this.courseIcon(group.label || group.id),
-      h("span", { class: "roll-course-name", text: group.label || group.id })),
+      h("span", { class: "roll-course-copy" },
+        h("span", { class: "roll-course-name", text: group.label || group.id }),
+        group.description ? h("span", { class: "roll-course-description", text: group.description }) : null)),
     icon("chevron-right", "text-body-secondary"))));
   },
 
@@ -4428,7 +4432,8 @@ const PaseLista = {
     const value = index < 0 ? "" : ((student.statuses || [])[index] || "");
     const status = Fmt.normalize(value);
     return status === "asistencia" || status === "retardo" ? "Asistencia"
-      : status === "falta" ? "Falta" : "";
+      : status === "falta" ? "Falta"
+        : status.startsWith("justific") ? "Justificante" : "";
   },
 
   renderRoster() {
@@ -4448,12 +4453,14 @@ const PaseLista = {
       const account = String(student.cuenta || "");
       const absences = Number(student.counts && student.counts.falta) || 0;
       const current = this.studentStatus(student, group, date);
+      const alreadyMarked = !!current;
       const button = (status, iconName, label, color) => h("button", {
         class: `btn roll-mark-button ${current === status ? `btn-${color}` : `btn-outline-${color}`}`,
         type: "button",
-        title: label,
+        title: alreadyMarked ? "La asistencia de hoy ya está registrada" : label,
         "aria-label": `${label}: ${student.nombre || account}`,
         "aria-pressed": String(current === status),
+        disabled: alreadyMarked,
         onclick: () => this.mark(account, status)
       }, icon(iconName));
       return h("article", { class: "roll-student-card" },
@@ -4461,7 +4468,10 @@ const PaseLista = {
           h("div", { class: "roll-student-name", text: student.nombre || account }),
           h("div", { class: "roll-student-details" },
             h("span", { class: "roll-student-account", text: account }),
-            h("span", { class: "roll-student-absences", text: `${absences} falta${absences === 1 ? "" : "s"}` }))),
+            h("span", {
+              class: `roll-student-absences${absences > 3 ? " roll-student-absences-alert" : ""}`,
+              text: `${absences} falta${absences === 1 ? "" : "s"}`
+            }))),
         h("div", { class: "roll-mark-actions", role: "group", "aria-label": `Asistencia de ${student.nombre || account}` },
           button("Asistencia", "check-lg", "Asistencia", "success"),
           button("Falta", "x-lg", "Falta", "danger")));
@@ -4510,7 +4520,7 @@ const PaseLista = {
     const id = this.groupId;
     const date = this.today();
     const student = group && group.students.find(item => String(item.cuenta) === String(account));
-    if (!student || this.studentStatus(student, group, date) === status) return;
+    if (!student || this.studentStatus(student, group, date)) return;
 
     const key = `${id}|${date}|${account}`;
     const previous = this.studentStatus(student, group, date);
@@ -4522,8 +4532,16 @@ const PaseLista = {
     Api.call("saveRollCall", {
       idCurso: id,
       date,
+      lockIfMarked: true,
       marks: [{ cuenta: account, status }]
-    }, "admin").then(() => this.refreshSelectedGroup()).catch(error => {
+    }, "admin").then(result => {
+      if (result && Array.isArray(result.alreadyMarked)) {
+        result.alreadyMarked.forEach(mark => this.updateLocalStatus(mark.cuenta, date, mark.status));
+        this.renderRoster();
+        UI.toast("warning", result.message);
+      }
+      return this.refreshSelectedGroup();
+    }).catch(error => {
       if (error.code === "NETWORK" || error.code === "AUTH") return;
       if (this.markVersions.get(key) === version && this.groupId === id) {
         this.updateLocalStatus(account, date, previous);

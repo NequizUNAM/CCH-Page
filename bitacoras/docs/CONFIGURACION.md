@@ -91,6 +91,8 @@ La página tiene login con contraseña aparte. La contraseña **nunca va en el H
 5. Si olvidas o necesitas cambiar la contraseña, usa **Mantenimiento → Cambiar contraseña** estando autenticado. No escribas la contraseña en archivos del proyecto.
 5. El login y el mantenimiento (§24 y §25 del checklist) quedan bloqueados sin sesión: sin haber hecho login, la página no debe dejar entrar a mantenimiento.
 
+> Esta contraseña sigue aplicando a las páginas HTML web. El APK usa inicio de sesión de Google con validación en Apps Script; configura `APK_GOOGLE_WEB_CLIENT_ID` y `APK_ADMIN_EMAILS` en las Script Properties, según el apartado [de acceso del APK](../../README.md#acceso-administrativo-del-apk-con-google).
+
 ## 6) AppSheet: conectar a las hojas de Drive
 
 1. Sigue [`guia-configuracion-appsheet.md`](guia-configuracion-appsheet.md) (checklist §26). Ahí están las hojas, las columnas y las vistas.

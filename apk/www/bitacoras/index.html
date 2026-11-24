@@ -1531,7 +1531,7 @@ async function enviarAppsScript(accion, datos){
   // (Apps Script no responde al preflight de application/json).
   // C2: el token viaja en el body en TODAS las acciones salvo login y ping.
   const body = Object.assign({ accion }, datos || {});
-  if(accion !== 'login' && accion !== 'ping'){
+  if(accion !== 'login' && accion !== 'loginGoogle' && accion !== 'ping'){
     body.token = obtenerToken();
   }
   const opciones = { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) };
@@ -1770,14 +1770,50 @@ function abrirLogin(){
     estado.sesiones = []; estado.pendientes = []; estado.hitos = []; estado.puntaje = [];
     refrescarSesionUI(); renderTodo(); avisar('Sesión cerrada.', 'verde'); return;
   }
-  abrirModal('<h2>Iniciar sesión</h2><p class="muted">La contraseña se valida en Apps Script. Puedes guardar la sesión en este dispositivo para no tener que escribirla de nuevo.</p>' +
-    '<label>Contraseña</label><input type="password" id="loginPass" autocomplete="current-password">' +
-    '<div style="margin:12px 0 6px;display:flex;align-items:center;gap:8px">' +
-      '<input type="checkbox" id="loginRecordar" checked style="width:18px;height:18px;cursor:pointer">' +
-      '<label for="loginRecordar" style="font-size:13px;font-weight:normal;cursor:pointer;margin:0;color:var(--texto)">Guardar sesión en este celular (no pedir de nuevo)</label>' +
-    '</div>' +
-    '<p id="loginError" class="muted" style="color:var(--rojo)"></p>' +
-    '<div class="fila" style="margin-top:12px"><button class="btn" id="loginEnviar">Entrar</button><button class="btn blanco" id="loginCancelar">Cancelar</button></div>');
+  const apkNativo = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  const contenido = apkNativo
+    ? '<h2>Iniciar sesión</h2><p class="muted">Continúa con la cuenta de Google autorizada para Bitácoras.</p>' +
+      '<p id="loginError" class="muted" style="color:var(--rojo)"></p>' +
+      '<div class="fila" style="margin-top:12px"><button class="btn" id="loginGoogle">Continuar con Google</button><button class="btn blanco" id="loginCancelar">Cancelar</button></div>'
+    : '<h2>Iniciar sesión</h2><p class="muted">La contraseña se valida en Apps Script. Puedes guardar la sesión en este dispositivo para no tener que escribirla de nuevo.</p>' +
+      '<label>Contraseña</label><input type="password" id="loginPass" autocomplete="current-password">' +
+      '<div style="margin:12px 0 6px;display:flex;align-items:center;gap:8px">' +
+        '<input type="checkbox" id="loginRecordar" checked style="width:18px;height:18px;cursor:pointer">' +
+        '<label for="loginRecordar" style="font-size:13px;font-weight:normal;cursor:pointer;margin:0;color:var(--texto)">Guardar sesión en este celular (no pedir de nuevo)</label>' +
+      '</div>' +
+      '<p id="loginError" class="muted" style="color:var(--rojo)"></p>' +
+      '<div class="fila" style="margin-top:12px"><button class="btn" id="loginEnviar">Entrar</button><button class="btn blanco" id="loginCancelar">Cancelar</button></div>';
+  abrirModal(contenido);
+  if(apkNativo){
+    $('#loginGoogle').onclick = async () => {
+      const boton = $('#loginGoogle');
+      const error = $('#loginError');
+      boton.disabled = true;
+      error.textContent = '';
+      try{
+        if(!window.CCHGoogleAuth) throw new Error('No se pudo cargar el inicio de sesión seguro de Google.');
+        const idToken = await window.CCHGoogleAuth.getIdToken();
+        const respuesta = await enviarAppsScript('loginGoogle', { idToken });
+        if(!respuesta || !respuesta.ok || !respuesta.token) throw new Error((respuesta && respuesta.error) || 'No se pudo iniciar sesión con Google.');
+        guardarToken(respuesta.token, true);
+        cerrarModal(); refrescarSesionUI();
+        marcarLecturaReciente(); mostrarCargaPantalla('Cargando proyectos y bitácoras…');
+        try {
+          await cargarDatos(); marcarLecturaReciente(); renderTodo(); procesarColaCambios();
+          avisar('Sesión iniciada con Google.', 'verde');
+        } catch(e){
+          renderTodo();
+          avisar('Sesión iniciada, pero no se pudieron cargar los datos: ' + e.message, 'rojo');
+        } finally { ocultarCargaPantalla(); }
+      }catch(e){
+        error.textContent = e.message;
+      }finally{
+        boton.disabled = false;
+      }
+    };
+    $('#loginCancelar').onclick = cerrarModal;
+    return;
+  }
   $('#loginEnviar').onclick = async () => {
     if(Date.now() < bloqueoHasta){ $('#loginError').textContent = 'Bloqueado temporalmente. Intenta de nuevo en ' + Math.ceil((bloqueoHasta - Date.now())/60000) + ' min.'; return; }
     const pass = $('#loginPass').value;
@@ -3945,5 +3981,6 @@ iniciarAplicacion();
   } catch(err) {}
 })();
 </script>
+<script type="module" src="../assets/google-auth.js"></script>
 </body>
 </html>

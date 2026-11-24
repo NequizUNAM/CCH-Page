@@ -241,16 +241,15 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <form class="modal-content" id="admin-login" autocomplete="off">
         <div class="modal-header">
-          <h5 class="modal-title" id="modal-admin-title"><i class="bi bi-lock me-2"></i>Panel de administrador</h5>
+          <h5 class="modal-title" id="modal-admin-title"><i class="bi bi-google me-2"></i>Panel de administrador</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
-          <label for="admin-pass" class="form-label">Contraseña</label>
-          <input type="password" class="form-control" id="admin-pass" required autocomplete="current-password">
+          <p class="small text-body-secondary mb-0">Continúa con la cuenta de Google autorizada para administrar esta aplicación.</p>
           <div id="admin-error" class="text-danger small mt-2 d-none"></div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary w-100" id="admin-submit"><i class="bi bi-unlock me-1"></i>Entrar</button>
+          <button type="button" class="btn btn-primary w-100" id="admin-google-login"><i class="bi bi-google me-1"></i>Continuar con Google</button>
         </div>
       </form>
     </div>
@@ -287,6 +286,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script type="module" src="../assets/google-auth.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>

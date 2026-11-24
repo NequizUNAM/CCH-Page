@@ -47,6 +47,8 @@ El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
 
 **URL para los alumnos:** el QR de la página de inicio ya lleva la URL del servidor (`?api=…`), así que el alumno no configura nada. Si prefieres dejarla fija para todos, pégala en `API_URL` al inicio de `script.js`. La copia incluida en el APK tiene almacenamiento separado y también debe configurarse una vez en cada dispositivo.
 
+**Login administrativo del APK:** el HTML web conserva su contraseña `CCH_ADMIN_PASSWORD`; solo el APK usa Google para las funciones administrativas. Para configurarlo, sigue el apartado [Acceso administrativo del APK con Google](../../README.md#acceso-administrativo-del-apk-con-google). El servidor valida el ID token, compara el cliente OAuth y permite únicamente los correos de `APK_ADMIN_EMAILS` en Script Properties. El login de alumnos con número de cuenta no cambia.
+
 ## Restaurar a fábrica (DEMO)
 
 **Mantenimiento → Restaurar a fábrica** (escribe RESTAURAR):
@@ -58,7 +60,7 @@ El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
 
 ## Celular
 
-- **Pase de lista:** en el celular se ve una tarjeta por alumno con botones grandes ✓ ✗ J y una barra fija abajo con el contador y **Guardar**. Si giras el celular no se pierden las marcas.
+- **Pase de lista:** en el panel web se ve la lista por fecha. El pase simplificado del APK usa Google para el acceso administrativo, muestra faltas con alerta roja cuando superan tres y bloquea los botones después de una marca del día.
 - **Proyectos:** en el celular se califica **un equipo a la vez**: ‹ › o desliza el dedo; al presionar **Calificar** pasa solo al siguiente. Los puntos verdes son los equipos ya calificados.
 
 ## Pasar asistencia desde la ficha (v7.0)

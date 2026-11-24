@@ -99,6 +99,8 @@ var CONFIG = {
   // Clave en Script Properties donde vive el hash SHA-256 de la contraseña web.
   PASS_HASH_KEY: 'WEB_PASS_HASH',
   PASS_SETUP_KEY: 'WEB_PASS_SETUP',
+  GOOGLE_WEB_CLIENT_ID_KEY: 'APK_GOOGLE_WEB_CLIENT_ID',
+  ADMIN_EMAILS_KEY: 'APK_ADMIN_EMAILS',
 
   // M2: sal aleatoria (Script Properties, clave WEB_PASS_SALT) con la que
   // se calcula el hash: SHA-256(sal + ':' + contraseña). Se genera sola
@@ -303,6 +305,9 @@ function doPost(e) {
     if (accion === 'login') {
       return responder_(login_(datos.password || '', datos.cliente || ''));
     }
+    if (accion === 'loginGoogle') {
+      return responder_(loginGoogle_(datos.idToken || ''));
+    }
     if (accion === 'ping') {
       return responder_({ ok: true, accion: 'ping', fecha: ahoraISO_() });
     }
@@ -460,6 +465,40 @@ function login_(password, cliente) {
   var token = Utilities.getUuid() + '-' + Utilities.getUuid();
   cache.put('sesion_' + token, epoca_(), CONFIG.TOKEN_HORAS * 3600);
   return { ok: true, token: token, expira_horas: CONFIG.TOKEN_HORAS };
+}
+
+function loginGoogle_(idToken) {
+  var properties = PropertiesService.getScriptProperties();
+  var clientId = String(properties.getProperty(CONFIG.GOOGLE_WEB_CLIENT_ID_KEY) || '').trim();
+  var allowedEmails = String(properties.getProperty(CONFIG.ADMIN_EMAILS_KEY) || '')
+    .split(',').map(function (email) { return email.trim().toLowerCase(); }).filter(Boolean);
+  if (!clientId || !allowedEmails.length) {
+    throw new Error('Configura APK_GOOGLE_WEB_CLIENT_ID y APK_ADMIN_EMAILS en Script Properties.');
+  }
+  var identityToken = String(idToken || '').trim();
+  if (identityToken.length < 100 || identityToken.length > 8192) {
+    throw new Error('Token de Google inválido.');
+  }
+  var response = UrlFetchApp.fetch(
+    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(identityToken),
+    { muteHttpExceptions: true }
+  );
+  if (response.getResponseCode() !== 200) throw new Error('Google no pudo validar la cuenta.');
+  var claims = JSON.parse(response.getContentText());
+  var email = String(claims.email || '').trim().toLowerCase();
+  var expiration = Number(claims.exp || 0);
+  if (claims.aud !== clientId ||
+      ['accounts.google.com', 'https://accounts.google.com'].indexOf(claims.iss) === -1 ||
+      String(claims.email_verified) !== 'true' ||
+      expiration <= Math.floor(new Date().getTime() / 1000)) {
+    throw new Error('La identidad de Google no es válida para esta aplicación.');
+  }
+  if (allowedEmails.indexOf(email) === -1) {
+    throw new Error('Esta cuenta de Google no está autorizada como administradora.');
+  }
+  var token = Utilities.getUuid() + '-' + Utilities.getUuid();
+  CacheService.getScriptCache().put('sesion_' + token, epoca_(), CONFIG.TOKEN_HORAS * 3600);
+  return { ok: true, token: token, email: email, expira_horas: CONFIG.TOKEN_HORAS };
 }
 
 /** Época de sesión; el token de servicio no depende de esta época. */

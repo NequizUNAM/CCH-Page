@@ -12,7 +12,11 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(projectRoot, 'www/index.html')
+        main: resolve(projectRoot, 'www/index.html'),
+        'google-auth': resolve(projectRoot, 'src/google-auth-entry.js')
+      },
+      output: {
+        entryFileNames: 'assets/[name].js'
       }
     }
   }

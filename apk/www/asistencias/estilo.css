@@ -333,6 +333,7 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 }
 .roll-course-card:active { transform: scale(.99); }
 .roll-course-main { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+.roll-course-copy { display: flex; flex-direction: column; min-width: 0; gap: .12rem; }
 .roll-course-icon {
   display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px;
   border-radius: 14px; background: #f1f5f9;
@@ -347,6 +348,7 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .roll-course-icon-humanities { color: #b45309; background: #fffbeb; }
 .roll-course-icon-general { color: var(--acc); background: var(--acc-soft); }
 .roll-course-name { min-width: 0; font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+.roll-course-description { min-width: 0; color: var(--muted); font-size: .78rem; line-height: 1.25; overflow-wrap: anywhere; }
 .roll-course-title { min-width: 0; font-size: clamp(1.55rem, 6vw, 2.15rem); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
 .roll-roster { display: flex; flex-direction: column; gap: .55rem; padding-bottom: 1rem; }
 .roll-student-card {
@@ -358,11 +360,13 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .roll-student-name { font-size: 1rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .roll-student-details { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; margin-top: .2rem; }
 .roll-student-account, .roll-student-absences { color: var(--muted); font-size: .78rem; line-height: 1.2; }
+.roll-student-absences-alert { color: #b42332 !important; background: #fff1f2; border-radius: 999px; padding: .08rem .4rem; }
 .roll-mark-actions { display: flex; flex-shrink: 0; gap: .45rem; }
 .roll-mark-button {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 46px; height: 46px; padding: 0; border-radius: 12px; font-size: 1.15rem;
+  width: 42px; height: 42px; padding: 0; border-radius: 11px; font-size: 1.08rem;
 }
+.roll-mark-button:disabled { opacity: .58; }
 body.rollcall-only .navbar-brand,
 body.rollcall-only #btn-prefs,
 body.rollcall-only #btn-admin,
@@ -418,7 +422,7 @@ body.rollcall-only main.container-xl { padding-top: 1rem !important; }
   .welcome-hero { padding: 1.2rem 1rem; }
   .roll-student-card { gap: .5rem; padding: .65rem .7rem; }
   .roll-mark-actions { gap: .35rem; }
-  .roll-mark-button { width: 44px; height: 44px; }
+  .roll-mark-button { width: 42px; height: 42px; }
 }
 @media (max-width: 576px) {
   .table-cch .name-cell { max-width: 190px; }
