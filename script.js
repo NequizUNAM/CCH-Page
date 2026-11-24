@@ -10,8 +10,8 @@
    ============================================================ */
 
 const CONFIG = {
-  // Se configura en la primera visita y se guarda en el navegador; el QR comparte ?api=.
-  API_URL: "",
+  // URL del Web App para la página web. En el APK se solicita al iniciar.
+  API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
   VERSION: "7.1",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
@@ -22,6 +22,8 @@ const CONFIG = {
   PREFS_KEY: "cch.prefs",
   SESSION_KEY: "cch.session"
 };
+const ES_APK = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
+let API_URL_CONFIRMADA_EN_ESTA_SESION = false;
 
 /* ============================================================
    ALMACENAMIENTO (siempre con try/catch: la página funciona sin él)
@@ -74,12 +76,13 @@ const Session = {
   clear(key) { if (key) delete this.data[key]; else this.data = {}; this.save(); }
 };
 
-/** Dirección del servidor (Apps Script): CONFIG.API_URL o la que se guardó en este navegador. */
+/** URL del servidor: CONFIG.API_URL en web; URL local solicitada al iniciar en APK. */
 const ApiUrl = {
   KEY: "cch.apiUrl",
   valid: u => /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec$/.test(String(u || "").trim()),
   get() {
-    if (CONFIG.API_URL) return CONFIG.API_URL;
+    if (!ES_APK && CONFIG.API_URL) return CONFIG.API_URL;
+    if (this.memory) return this.memory;
     try { return localStorage.getItem(this.KEY) || ""; } catch (e) { return this.memory || ""; }
   },
   set(url) {
@@ -90,8 +93,8 @@ const ApiUrl = {
   fromQuery() {
     const params = new URLSearchParams(location.search);
     const url = params.get("api");
+    if (url && !ES_APK && ApiUrl.valid(url) && !CONFIG.API_URL) ApiUrl.set(url);
     if (!url) return;
-    if (ApiUrl.valid(url) && !CONFIG.API_URL) ApiUrl.set(url);
     history.replaceState(null, "", location.pathname + location.hash);
   }
 };
@@ -1254,7 +1257,7 @@ const App = {
     const box = $("page-qr");
     if (!box) return;
     // Sin URL fija en script.js, el QR lleva el servidor para que el alumno no tenga que configurarlo
-    const url = location.origin + location.pathname + (!CONFIG.API_URL && ApiUrl.get() ? `?api=${encodeURIComponent(ApiUrl.get())}` : "");
+    const url = location.origin + location.pathname + (!ES_APK && !CONFIG.API_URL && ApiUrl.get() ? `?api=${encodeURIComponent(ApiUrl.get())}` : "");
     box.title = url;
     if (typeof QRCode === "undefined") {
       box.replaceChildren(h("a", { href: url, class: "small", text: url }));
@@ -1273,6 +1276,7 @@ const App = {
   },
 
   route() {
+    if (ES_APK && !API_URL_CONFIRMADA_EN_ESTA_SESION) return App.showSetup();
     if (!ApiUrl.get()) return App.showSetup();
     if (Session.get("admin")) return Admin.open();
     if (Session.get("student")) return Student.open();
@@ -1292,7 +1296,7 @@ const App = {
     } catch (e) { box.classList.add("d-none"); }
   },
 
-  /** Instalación nueva: pide la URL del Web App y la prueba antes de guardarla. */
+  /** Pide y prueba la URL en Android; en web solo se usa como respaldo si falta CONFIG.API_URL. */
   showSetup(onDone) {
     const input = h("input", { class: "form-control mono", id: "setup-url", type: "url", placeholder: "https://script.google.com/macros/s/…/exec", value: ApiUrl.get(), autocomplete: "off" });
     const out = h("div", { class: "small mt-2" });
@@ -1306,6 +1310,7 @@ const App = {
         ApiUrl.set(url);
         try {
           const r = await UI.busy(btn, () => Api.call("ping"));
+          API_URL_CONFIRMADA_EN_ESTA_SESION = true;
           UI.toast("success", `Conectado: ${r.message} (v${r.version})`);
           bootstrap.Modal.getOrCreateInstance($("modal-generic")).hide();
           App.renderQr();
@@ -1320,8 +1325,9 @@ const App = {
       h("label", { class: "form-label", for: "setup-url", text: "URL del Web App" }), input, out,
       h("div", { class: "d-flex justify-content-end mt-3" }, btn),
       h("p", { class: "small text-body-secondary mt-3 mb-0" },
-        "Se guarda en este navegador. Los alumnos que entren con el QR de la página ya la reciben. ",
-        "Para dejarla fija para todos, pégala en ", h("code", { text: "API_URL" }), " al inicio de script.js."));
+        ES_APK
+          ? "Se guarda en este dispositivo como sugerencia y se volverá a pedir al abrir el módulo."
+          : "Configura la URL permanente en ", h("code", { text: "API_URL" }), " al inicio de script.js."));
     App.show("view-login");
     UI.modal({ title: [icon("plug", "me-2"), "Conectar con el servidor"], body: form });
     setTimeout(() => input.focus(), 300);

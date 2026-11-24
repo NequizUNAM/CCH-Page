@@ -63,22 +63,22 @@ Resumen y estructura en el [README principal](../../README.md). El checklist de 
    - **Execute as: Me** (tu cuenta).
    - **Who has access:** Anyone (cualquiera con el enlace) o según lo que indique `Codigo.gs`; la página es la que llama a la app, no los usuarios directamente.
    - Haz clic en **Deploy** y autoriza los permisos de Drive y de las hojas cuando Google lo pida.
-7. Copia la URL que termina en **`/exec`**. Esa es la URL del backend. Es la que vas a pegar en el paso siguiente.
+7. Copia la URL que termina en **`/exec`**. Esa es la URL del backend que configurarás en `URL_APPS_SCRIPT_WEB` dentro de `index.html`.
 8. Cada vez que modifiques `Codigo.gs`, **edita el despliegue existente** (D6): Deploy → Manage deployments → ✎ (editar el despliegue) → **New version**. NO crees un despliegue nuevo: un despliegue nuevo genera otra URL `/exec` y tendrías que volver a pegarla en `index.html`; editar el existente conserva la misma URL.
 
-## 4) Pegar la URL en UN solo lugar: `index.html`
+## 4) Configurar la URL web en `index.html`
 
 1. Abre `bitacoras/index.html` (el archivo de este repositorio, o edítalo en GitHub).
-2. Busca el objeto `CONFIG` y pon la URL del paso 3 en **ese único lugar**:
+2. Busca la variable `URL_APPS_SCRIPT_WEB` y pon la URL del paso 3 ahí:
    ```js
-   const CONFIG = {
-     appsScriptUrl: "TU_URL_APPS_SCRIPT_AQUI"
-   };
+   const URL_APPS_SCRIPT_WEB = "TU_URL_APPS_SCRIPT_AQUI";
    ```
    Es decir, sustituye `TU_URL_APPS_SCRIPT_AQUI` por tu URL `/exec` real.
-3. **No pegues la URL en ningún otro archivo.** Solo aquí.
+3. **No pegues la URL web en ningún otro archivo.** Solo aquí.
 4. Sube el `index.html` actualizado al repo (commit y push, o súbelo en la web de GitHub). Espera 1–2 minutos a que Pages se actualice.
-5. Sin URL (con `appsScriptUrl` vacía), la página funciona en **modo local**: guarda en el navegador sin sincronizar con Drive. Con la URL puesta, sincroniza con Drive a través de Apps Script.
+5. Si la variable está vacía, la página puede usar una URL guardada en ese navegador o el modo local. Con la variable puesta, sincroniza con Drive usando esa URL.
+
+> En el APK, Bitácoras no usa esta variable: solicita y prueba el `/exec` cada vez que se abre el módulo. La última URL se conserva en el dispositivo solo como sugerencia.
 
 ## 5) Contraseña web: fijarla en Apps Script Properties (nunca en el HTML)
 
@@ -91,7 +91,7 @@ La página tiene login con contraseña aparte. La contraseña **nunca va en el H
 5. Si olvidas o necesitas cambiar la contraseña, usa **Mantenimiento → Cambiar contraseña** estando autenticado. No escribas la contraseña en archivos del proyecto.
 5. El login y el mantenimiento (§24 y §25 del checklist) quedan bloqueados sin sesión: sin haber hecho login, la página no debe dejar entrar a mantenimiento.
 
-> Esta misma contraseña aplica a las páginas web y al APK. En el APK, configura primero la URL `/exec` de Bitácoras; después el login valida la contraseña en Apps Script y conserva la sesión por 24 horas.
+> Esta misma contraseña aplica a las páginas web y al APK. La web lee el `/exec` desde `URL_APPS_SCRIPT_WEB`; el APK solicita y prueba su URL cada vez que se abre Bitácoras, con la última dirección como sugerencia.
 
 ## 6) AppSheet: conectar a las hojas de Drive
 
@@ -111,7 +111,7 @@ Con la página publicada y la URL de Apps Script puesta:
 4. Crea una sesión en ese proyecto y recarga la página. Debe seguir visible; comprueba que su `bitacora.json`, la carpeta `Evidencias/` y las hojas se actualizaron.
 5. Haz las pruebas de creación, sincronización y conflicto descritas en [Validación de Bitácoras](../../README.md#validación-de-bitácoras), además de comprobar calendario y exportaciones.
 
-Si algo falla, anota en qué paso, con qué proyecto y qué mensaje apareció. Confirma que el nuevo `index.html` está publicado en GitHub Pages y que `Codigo.gs` está implementado como nueva versión; la URL `/exec` debe seguir pegada en `CONFIG.appsScriptUrl`.
+Si algo falla, anota en qué paso, con qué proyecto y qué mensaje apareció. Confirma que el nuevo `index.html` está publicado en GitHub Pages y que `Codigo.gs` está implementado como nueva versión; revisa la URL `/exec` en `URL_APPS_SCRIPT_WEB`.
 
 ---
 
@@ -119,7 +119,7 @@ Si algo falla, anota en qué paso, con qué proyecto y qué mensaje apareció. C
 
 | Placeholder | Qué poner | Dónde va |
 |---|---|---|
-| `TU_URL_APPS_SCRIPT_AQUI` | La URL `/exec` del despliegue Web App de Apps Script (paso 3) | En `index.html`, en un solo lugar: `CONFIG.appsScriptUrl` |
+| `TU_URL_APPS_SCRIPT_AQUI` | La URL `/exec` del despliegue Web App de Apps Script (paso 3) | En `index.html`, en `URL_APPS_SCRIPT_WEB` |
 | `WEB_PASS_SETUP` | Contraseña temporal (mínimo 12 caracteres) para la configuración inicial | Script Properties; `fijarPasswordWebDesdePropiedad()` la elimina y guarda solo `WEB_PASS_HASH` y `WEB_PASS_SALT` |
 | `TU_REPO_AQUI` | El nombre de tu repositorio de GitHub (sugerencia: `bitacoras`) | En el nombre del repo y en la URL de GitHub Pages: `https://TU_USUARIO.github.io/TU_REPO_AQUI/` |
 

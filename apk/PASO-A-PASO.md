@@ -60,6 +60,8 @@ Cuando termine el Gradle Sync:
 
 ## Paso 7 — Probar Asistencias
 
+- [ ] Al abrir Asistencias en el APK, pega y prueba la URL `/exec`; vuelve a solicitarla cada vez que abras el módulo.
+- [ ] Comprueba que la última URL aparece como sugerencia en el siguiente inicio.
 - [ ] Abre el módulo.
 - [ ] Consulta con número de cuenta.
 - [ ] Inicia el panel Admin.
@@ -70,6 +72,8 @@ Cuando termine el Gradle Sync:
 
 ## Paso 8 — Probar Bitácoras
 
+- [ ] Al abrir Bitácoras en el APK, pega y prueba su URL `/exec`; vuelve a solicitarla cada vez que abras el módulo.
+- [ ] Comprueba que la última URL aparece como sugerencia en el siguiente inicio.
 - [ ] Inicia sesión.
 - [ ] Selecciona o crea un proyecto.
 - [ ] Crea una sesión.

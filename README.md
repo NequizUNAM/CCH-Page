@@ -46,9 +46,9 @@ Para una instalación o actualización, sigue [la configuración de Bitácoras](
 
 Asistencias y Bitácoras usan **Web Apps de Apps Script distintos**; cada uno necesita su propia URL que termine en `/exec`.
 
-- **Asistencias (web y APK):** al abrir por primera vez solicita la URL, la prueba con `ping` y la guarda en `localStorage` como `cch.apiUrl`. Los exámenes leen esa misma configuración.
-- **Bitácoras (web y APK):** en el primer inicio solicita su URL, la prueba con `ping` y la guarda como `bitacoras.appsScriptUrl`. También ofrece continuar explícitamente en modo local, sin login ni sincronización con Drive.
-- La configuración se guarda por navegador/dispositivo. GitHub Pages y el APK no comparten almacenamiento; configura cada uno una vez. Cambiar de navegador o reinstalar el APK también requiere configurarlo de nuevo.
+- **Asistencias web:** lee la URL desde `CONFIG.API_URL` al inicio de `script.js`. **Bitácoras web:** lee `URL_APPS_SCRIPT_WEB` en `bitacoras/index.html`. Define ahí la URL `/exec` correspondiente a cada Web App; esos valores tienen prioridad sobre la configuración guardada localmente.
+- **APK:** Asistencias y Bitácoras solicitan y prueban su URL `/exec` cada vez que se abre el módulo. La última URL queda guardada solo como sugerencia prellenada; el APK no usa las variables de las páginas web. El APK requiere conexión a Apps Script y no ofrece modo local para omitir el servidor.
+- La web y el APK son entornos separados. El almacenamiento del navegador no se comparte con el APK.
 
 ## Indicadores de carga y recargas
 

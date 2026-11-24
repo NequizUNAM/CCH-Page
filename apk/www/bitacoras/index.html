@@ -383,7 +383,11 @@ details.menu summary::-webkit-details-marker{display:none}
    ===================================================================== */
 const CLAVE_URL_APPS_SCRIPT = 'bitacoras.appsScriptUrl';
 const CLAVE_MODO_LOCAL = 'bitacoras.modoLocal';
+const ES_APK = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+let URL_APPS_SCRIPT_CONFIRMADA_EN_ESTA_SESION = false;
+const URL_APPS_SCRIPT_WEB = ''; // En el APK esta variable se ignora; la URL se solicita al abrir el módulo.
 function leerUrlAppsScript(){
+  if(!ES_APK && URL_APPS_SCRIPT_WEB.trim()) return URL_APPS_SCRIPT_WEB.trim();
   try { return localStorage.getItem(CLAVE_URL_APPS_SCRIPT) || ''; }
   catch(e){ return ''; }
 }
@@ -1635,12 +1639,14 @@ async function guardarConfigCiclo(){
 
 /* ---------- Sesión / Login ---------- */
 function mostrarConfiguracionAppsScript(){
+  const opcionLocal = ES_APK ? '' : '<button class="btn blanco" id="urlAppsScriptLocal">Continuar solo en este dispositivo</button>';
+  const avisoLocal = ES_APK ? '' : '<p class="muted" style="margin-top:10px">El modo local no valida usuarios ni sincroniza datos con Drive.</p>';
   abrirModal('<h2>Conectar Bitácoras</h2>' +
-    '<p class="muted">Pega la URL de la aplicación web de Apps Script (termina en <code>/exec</code>). Se probará con <code>ping</code> y se guardará solo en este navegador o dispositivo.</p>' +
+    '<p class="muted">Pega la URL de la aplicación web de Apps Script (termina en <code>/exec</code>). Se probará con <code>ping</code> y se guardará solo en este navegador o dispositivo.' + (ES_APK ? ' Se pedirá de nuevo al abrir Bitácoras.' : '') + '</p>' +
     '<label for="urlAppsScript">URL del Web App</label><input id="urlAppsScript" type="url" autocomplete="url" placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(CONFIG.appsScriptUrl) + '">' +
     '<p id="urlAppsScriptError" class="muted" style="color:var(--rojo)" role="alert"></p>' +
-    '<div class="fila" style="margin-top:12px"><button class="btn" id="urlAppsScriptGuardar">Probar y guardar</button><button class="btn blanco" id="urlAppsScriptLocal">Continuar solo en este dispositivo</button></div>' +
-    '<p class="muted" style="margin-top:10px">El modo local no valida usuarios ni sincroniza datos con Drive.</p>');
+    '<div class="fila" style="margin-top:12px"><button class="btn" id="urlAppsScriptGuardar">Probar y guardar</button>' + opcionLocal + '</div>' +
+    avisoLocal);
   $('#urlAppsScriptGuardar').onclick = async () => {
     const url = $('#urlAppsScript').value.trim();
     const error = $('#urlAppsScriptError');
@@ -1675,19 +1681,26 @@ function mostrarConfiguracionAppsScript(){
       try { resultado = await respuesta.json(); }
       catch(e){ throw new Error('La respuesta del Web App no es JSON válido.'); }
       if(!resultado || resultado.ok !== true) throw new Error((resultado && resultado.error) || 'El Web App no confirmó la acción ping.');
-      borrarToken();
+      if(CONFIG.appsScriptUrl !== url) borrarToken();
       try {
         localStorage.setItem(CLAVE_URL_APPS_SCRIPT, url);
         localStorage.removeItem(CLAVE_MODO_LOCAL);
       } catch(e){ throw new Error('No se pudo guardar la URL en este navegador: ' + e.message); }
-      location.reload();
+      if(ES_APK){
+        CONFIG.appsScriptUrl = url;
+        TIENE_APPS_SCRIPT = true;
+        URL_APPS_SCRIPT_CONFIRMADA_EN_ESTA_SESION = true;
+        CONFIG_APPS_SCRIPT_OBLIGATORIA = false;
+        cerrarModal();
+        await iniciarAplicacion();
+      } else location.reload();
     } catch(e){ error.textContent = e.message; }
     finally {
       if(temporizador) clearTimeout(temporizador);
       button.disabled = false;
     }
   };
-  $('#urlAppsScriptLocal').onclick = () => {
+  if(!ES_APK) $('#urlAppsScriptLocal').onclick = () => {
     try {
       localStorage.setItem(CLAVE_MODO_LOCAL, '1');
       borrarToken();
@@ -1705,7 +1718,7 @@ function refrescarSesionUI(){
   $('#btnExportarProyecto').disabled = !ok;
 }
 async function iniciarAplicacion(){
-  if(!TIENE_APPS_SCRIPT && !modoLocalElegido()){
+  if((ES_APK && !URL_APPS_SCRIPT_CONFIRMADA_EN_ESTA_SESION) || (!TIENE_APPS_SCRIPT && !modoLocalElegido())){
     CONFIG_APPS_SCRIPT_OBLIGATORIA = true;
     $('#btnLogin').textContent = 'Configurar servidor';
     $('#btnNuevaSesion').disabled = true;
