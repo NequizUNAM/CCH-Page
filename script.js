@@ -3459,6 +3459,7 @@ const Admin = {
       commandButton("type-bold", "Negritas", "bold"),
       commandButton("type-italic", "Cursivas", "italic"),
       commandButton("type-underline", "Subrayado", "underline"),
+      commandButton("eraser", "Borrar formato", "removeFormat"),
       commandButton("list-ul", "Lista con viñetas", "insertUnorderedList"),
       commandButton("list-ol", "Lista numerada", "insertOrderedList"));
     const field = (label, input, id) => h("div", { class: "mb-3" },
