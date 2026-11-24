@@ -30,7 +30,7 @@ let API_URL_CONFIRMADA_EN_ESTA_SESION = false;
    ============================================================ */
 const Prefs = {
   defaults: {
-    theme: "auto",          // auto | light | dark
+    theme: "light",         // light | auto | dark
     compact: false,         // tablas compactas
     rows: 60,               // alumnos visibles por tabla antes del scroll (0 = todos)
     showHidden: true,       // admin: mostrar columnas "Oculto" del reporte
