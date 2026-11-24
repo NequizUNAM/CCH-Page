@@ -2225,11 +2225,11 @@ const Admin = {
     const risk = finals.filter(v => v < CONFIG.RISK_THRESHOLD).length;
     const faltas = g.students.filter(s => s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL).length;
     $("adm-stats").replaceChildren(...kids(
-      h("span", { class: "stat" }, icon("people"), h("b", { text: g.students.length })),
-      h("span", { class: "stat", title: "Promedio del grupo (sobre lo evaluado)" }, icon("graph-up"), h("b", { text: Fmt.grade(avg) })),
-      h("span", { class: "stat", title: `Promedio menor a ${CONFIG.RISK_THRESHOLD}` }, icon("exclamation-triangle", "text-danger"), h("b", { text: risk })),
-      h("span", { class: "stat", title: `Más de ${CONFIG.FALTAS_UMBRAL} faltas` }, icon("calendar-x", "text-danger"), h("b", { text: faltas })),
-      refreshing ? h("span", { class: "stat text-body-secondary", title: "Mostrando datos guardados; actualizando…" }, h("span", { class: "spinner-border spinner-border-sm" })) : null
+      h("span", { class: "stat" }, icon("people"), h("b", { text: g.students.length }), h("small", { class: "stat-label", text: "Alumnos" })),
+      h("span", { class: "stat", title: "Promedio del grupo (sobre lo evaluado)" }, icon("graph-up"), h("b", { text: Fmt.grade(avg) }), h("small", { class: "stat-label", text: "Promedio" })),
+      h("span", { class: "stat", title: `Promedio menor a ${CONFIG.RISK_THRESHOLD}` }, icon("exclamation-triangle", "text-danger"), h("b", { text: risk }), h("small", { class: "stat-label", text: "En riesgo" })),
+      h("span", { class: "stat", title: `Más de ${CONFIG.FALTAS_UMBRAL} faltas` }, icon("calendar-x", "text-danger"), h("b", { text: faltas }), h("small", { class: "stat-label", text: `Faltas +${CONFIG.FALTAS_UMBRAL}` })),
+      refreshing ? h("span", { class: "stat stat-refresh text-body-secondary", title: "Mostrando datos guardados; actualizando…" }, h("span", { class: "spinner-border spinner-border-sm" })) : null
     ));
   },
 
@@ -2371,7 +2371,7 @@ const Admin = {
 
     const tbody = h("tbody");
     const tableHead = h("thead");
-    const table = h("table", { class: "table table-bordered table-hover table-cch att-table" }, tableHead, tbody);
+    const table = h("table", { class: "table table-bordered table-hover table-cch att-table apk-matrix-table" }, tableHead, tbody);
     const saveBtn = Admin.captureMode
       ? h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.saveCapture(saveBtn) })
       : null;
@@ -2422,27 +2422,34 @@ const Admin = {
       }
       return h("td", { class: "computed" }, Parts.gradeWithBonus(item, comp));
     };
+    const matrixStudentCell = s => {
+      const cell = Admin.nameCell(s);
+      cell.classList.remove("sticky-name");
+      cell.classList.add("apk-matrix-student");
+      cell.append(h("span", { class: "apk-matrix-account mono", text: s.cuenta }));
+      return cell;
+    };
     const draw = (q = Admin._attQuery || "") => {
       Admin._attQuery = q;
       const rows = g.students
         .filter(s => (!q || s.cuenta.includes(q) || Fmt.normalize(s.nombre).includes(q)) && matchFilter(s))
         .map(s => {
-          const cuenta = h("td", { class: "sticky-col cuenta-cell", text: s.cuenta });
+          const studentCell = matrixStudentCell(s);
           if (view === "grades") {
-            return h("tr", {}, cuenta, Admin.nameCell(s),
+            return h("tr", {}, studentCell,
               g.components.map(comp => gradeCell(s, comp)),
               h("td", { class: `final-cell sticky-right cap-final ${s.final !== null && s.final < CONFIG.RISK_THRESHOLD ? "grade-low" : ""}`, text: Fmt.grade(s.final) }),
               h("td", { class: "text-body-secondary sticky-right cap-strict", text: Fmt.grade(s.finalStrict) }),
               h("td", { class: "fw-semibold sticky-right cap-entera", text: s.entero ?? "" }));
           }
-          Parts.applyFaltas(cuenta, s.counts && s.counts.falta);
+          Parts.applyFaltas(studentCell.querySelector(".apk-matrix-account"), s.counts && s.counts.falta);
           const r = Parts.risk(s);
           const dot = r.level ? h("span", { class: `risk-dot risk-${r.level}`, role: "img", title: `Riesgo ${r.level}: ${r.reasons.join(" · ")}`, "aria-label": `Riesgo ${r.level}: ${r.reasons.join(", ")}` }) : "";
           const reportCells = otherCols.map(x => {
             const comp = componentByColumn.get(Fmt.normalize(x.o.label));
             return comp && Admin.captureMode ? gradeCell(s, comp) : h("td", { text: s.others[x.i] || "" });
           });
-          return h("tr", {}, cuenta, Admin.nameCell(s),
+          return h("tr", {}, studentCell,
             h("td", { class: "risk-cell" }, dot),
             h("td", { class: s.counts && s.counts.falta > CONFIG.FALTAS_UMBRAL ? "fw-bold text-danger" : "", text: s.counts ? s.counts.falta : "" }),
             h("td", { text: s.counts ? s.counts.justificante : "" }),
@@ -2451,7 +2458,7 @@ const Admin = {
             reportCells,
             standaloneComponents.map(comp => gradeCell(s, comp)));
         });
-      const colspan = view === "grades" ? 5 + g.components.length : 6 + dateCols.length + otherCols.length + standaloneComponents.length;
+      const colspan = view === "grades" ? 4 + g.components.length : 5 + dateCols.length + otherCols.length + standaloneComponents.length;
       tbody.replaceChildren(...(rows.length ? rows : [h("tr", {}, h("td", { colspan, class: "text-body-secondary py-4", text: "Sin coincidencias." }))]));
     };
 
@@ -2520,27 +2527,33 @@ const Admin = {
     }, icon("box-arrow-up", "me-1"), "Exportar");
     refreshCapture();
 
-    $("adm-toolbar").replaceChildren(h("div", { class: "vstack gap-2" },
-      h("div", { class: "d-flex flex-wrap align-items-center gap-2" },
+    const viewButtons = h("div", { class: "btn-group apk-view-buttons", role: "group", "aria-label": "Vista de la tabla" },
+      viewButton("all", "1-circle", "Todo", "Mostrar asistencia y calificaciones"),
+      viewButton("grades", "2-circle", "Ponderaciones", "Mostrar solo los campos de calificación"));
+    const addStudentButton = h("button", {
+      class: "btn btn-sm btn-outline-primary", type: "button", title: "Agregar un alumno al grupo",
+      onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.addStudentModal(); } }
+    }, icon("person-plus", "me-1"), "Nuevo alumno");
+    const columnsButton = h("button", {
+      class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte",
+      onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.columnsModal(); } }
+    }, icon("layout-three-columns", "me-1"), "Columnas");
+    $("adm-toolbar").replaceChildren(h("div", { class: "apk-att-toolbar" },
+      h("div", { class: "apk-att-control-row" },
         Admin.searchBox("Buscar cuenta o nombre…", draw, Admin._attQuery || ""),
-        h("div", { class: "btn-group", role: "group", "aria-label": "Vista de la tabla" },
-          viewButton("all", "1-circle", "Todo", "Mostrar asistencia y calificaciones"),
-          viewButton("grades", "2-circle", "Ponderaciones", "Mostrar solo los campos de calificación")),
-        captureButton,
-        saveBtn,
-        exportButton,
-        h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Agregar un alumno al grupo", onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.addStudentModal(); } } }, icon("person-plus", "me-1"), "Nuevo alumno"),
-        h("button", { class: "btn btn-sm btn-outline-dark", type: "button", title: "Visibilidad y enlaces de columnas del reporte", onclick: async () => { if (await Admin.leaveCapture()) { Admin.renderTab(); Admin.columnsModal(); } } }, icon("layout-three-columns", "me-1"), "Columnas")),
-      h("div", { class: "d-flex flex-wrap align-items-center gap-2 small" },
-        h("span", { class: "fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips)));
+        viewButtons),
+      h("div", { class: "apk-action-grid" }, captureButton, exportButton, addStudentButton, columnsButton),
+      saveBtn ? h("div", { class: "apk-capture-save" }, saveBtn) : null,
+      h("div", { class: "apk-triage-row" },
+        h("span", { class: "apk-triage-label fw-semibold text-body-secondary", text: "Necesitan atención:" }), ...chips)));
 
     tableHead.replaceChildren(view === "grades"
-      ? h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"),
+      ? h("tr", {}, th("Alumno", true, "text-start sticky-col apk-matrix-student-head"),
         g.components.map(componentTh),
         th("Final", true, "sticky-right cap-final"),
         th("Estricta", true, "sticky-right cap-strict", "Lo no evaluado cuenta 0"),
         th("Entera", true, "sticky-right cap-entera", "Suma de porcentajes sin redondear"))
-      : h("tr", {}, th("Cuenta", true, "sticky-col"), th("Nombre", true, "text-start sticky-col sticky-name"),
+      : h("tr", {}, th("Alumno", true, "text-start sticky-col apk-matrix-student-head"),
         th("⚠", true, "risk-col", "Riesgo: promedio menor a 6, más de 4 faltas o 3 faltas seguidas"),
         th("F", true), th("J", true), th("%", true, "", "Porcentaje de asistencia"),
         dateCols.map(x => th(x.d.label, x.d.visible)),
@@ -2952,12 +2965,12 @@ const Admin = {
     const draftKey = `${g.group.id}|${date}`;
     const marks = Admin.rollDraft && Admin.rollDraft.key === draftKey ? Admin.rollDraft.marks : Object.assign({}, original);
     Admin.rollDraft = { key: draftKey, marks };
-    const mobile = Mobile.is();
+    const mobile = ES_APK || Mobile.is();
     const size = mobile ? "btn-lg" : "btn-sm";
 
     const OPTIONS = [
       { v: "Asistencia", k: "✓", icon: "check-lg", cls: "success" },
-      { v: "Falta", k: "✗", icon: "x-lg", cls: "danger" },
+      { v: "Falta", k: "✕", icon: "x-lg", cls: "danger" },
       { v: "Justificante", k: "J", icon: "file-earmark-medical", cls: "info" }
     ];
 
@@ -2985,17 +2998,17 @@ const Admin = {
     const list = h("div", { class: "roll-list" });
     const mobileItem = s => {
       const faltas = s.counts ? s.counts.falta : 0;
-      const item = h("div", { class: "roll-card" },
-        h("div", { class: "d-flex justify-content-between align-items-center gap-2" },
-          h("div", { class: "fw-semibold roll-name flex-grow-1 text-truncate", title: s.nombre || s.cuenta, text: s.nombre || s.cuenta }),
-          h("div", { class: "btn-group roll-btns roll-icons flex-shrink-0", role: "group", "aria-label": `Asistencia de ${s.nombre || s.cuenta}` },
+      const item = h("article", { class: "roll-card apk-roll-student" },
+        h("div", { class: "apk-roll-student-info" },
+          h("div", { class: "fw-semibold roll-name", title: s.nombre || s.cuenta, text: s.nombre || s.cuenta }),
+          h("div", { class: "roll-student-details" },
+            h("span", { class: "small mono text-body-secondary", text: s.cuenta }),
+            h("span", { class: `badge ${faltas > CONFIG.FALTAS_UMBRAL ? "text-bg-danger" : "text-bg-light border"}`, text: `${faltas} falta${faltas === 1 ? "" : "s"}` }))),
+        h("div", { class: "btn-group roll-btns roll-icons apk-roll-student-actions", role: "group", "aria-label": `Asistencia de ${s.nombre || s.cuenta}` },
             OPTIONS.map(o => h("button", {
-              type: "button", class: "btn roll-icon-btn", dataset: { v: o.v }, title: o.v, "aria-label": o.v,
+              type: "button", class: "btn roll-icon-btn", dataset: { v: o.v }, title: o.v, "aria-label": `${o.v}: ${s.nombre || s.cuenta}`,
               onclick: () => { marks[s.cuenta] = marks[s.cuenta] === o.v ? "" : o.v; paintRow(item, s.cuenta); refresh(); }
-            }, o.icon ? icon(o.icon) : o.k)))),
-        h("div", { class: "d-flex align-items-center gap-2 mt-1" },
-          h("span", { class: "small mono text-body-secondary", text: s.cuenta }),
-          faltas ? h("span", { class: `badge ${faltas > CONFIG.FALTAS_UMBRAL ? "text-bg-danger" : "text-bg-light border"}`, text: `${faltas} falta${faltas > 1 ? "s" : ""}` }) : null));
+            }, h("span", { class: "roll-icon-symbol", text: o.k })))));
       paintRow(item, s.cuenta);
       return item;
     };
@@ -3315,12 +3328,12 @@ const Admin = {
     const g = Admin.group;
     const projectComps = g.components.filter(c => c.tipo === "proyectos");
 
-    const view = Prefs.get("projView") === "tabla" ? "tabla" : "tarjetas";
+    const view = ES_APK ? "tarjetas" : Prefs.get("projView") === "tabla" ? "tabla" : "tarjetas";
     const viewBtn = (v, iconName, label) => h("button", {
       class: `btn btn-sm ${view === v ? "btn-dark" : "btn-outline-secondary"}`, type: "button", "aria-pressed": String(view === v),
       onclick: () => { Prefs.set("projView", v); Admin.renderTab(); }
     }, icon(iconName, "me-1"), label);
-    const mobile = Mobile.is();
+    const mobile = ES_APK || Mobile.is();
     $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap gap-2" },
       h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => Admin.editProject(null) }, icon("plus-lg", "me-1"), "Nuevo proyecto"),
       mobile ? null : h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"))));
@@ -3905,14 +3918,14 @@ const Admin = {
     estado.addEventListener("change", load);
     onlyGroup.addEventListener("change", load);
 
-    const view = Prefs.get("evView") === "tabla" ? "tabla" : "tarjetas";
+    const view = ES_APK ? "tarjetas" : Prefs.get("evView") === "tabla" ? "tabla" : "tarjetas";
     const viewBtn = (v, iconName, label) => h("button", {
       class: `btn btn-sm ${view === v ? "btn-dark" : "btn-outline-secondary"}`, type: "button", "aria-pressed": String(view === v),
       onclick: () => { Prefs.set("evView", v); Admin.drawEvidence(content); viewBtns.querySelectorAll("button").forEach(b => { const on = b.dataset.v === Prefs.get("evView"); b.className = `btn btn-sm ${on ? "btn-dark" : "btn-outline-secondary"}`; }); },
       dataset: { v }
     }, icon(iconName, "me-1"), label);
-    const viewBtns = h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"));
-    $("adm-toolbar").replaceChildren(h("div", { class: "d-flex flex-wrap align-items-center gap-3" }, estado,
+    const viewBtns = ES_APK ? null : h("div", { class: "btn-group ms-auto", role: "group", "aria-label": "Vista" }, viewBtn("tarjetas", "grid-3x2-gap", "Tarjetas"), viewBtn("tabla", "table", "Tabla"));
+    $("adm-toolbar").replaceChildren(h("div", { class: "apk-evidence-toolbar d-flex flex-wrap align-items-center gap-3" }, estado,
       h("div", { class: "form-check mb-0" }, onlyGroup, h("label", { class: "form-check-label small", for: "ev-only-group", text: "Solo el grupo seleccionado" })),
       viewBtns));
     await load();
@@ -3953,7 +3966,7 @@ const Admin = {
     const who = ev => h("a", { href: "#", class: "link-body-emphasis", onclick: e => { e.preventDefault(); Admin.openProfile(ev.cuenta); } }, `${ev.cuenta} · ${ev.nombre}`);
     const fileBtn = ev => ev.url ? h("a", { class: "btn btn-sm btn-outline-primary", href: ev.url, target: "_blank", rel: "noopener noreferrer", title: ev.archivo || "Abrir" }, icon("box-arrow-up-right")) : null;
 
-    if (Prefs.get("evView") === "tabla") {
+    if (!ES_APK && Prefs.get("evView") === "tabla") {
       content.replaceChildren(h("div", { class: "table-wrap auto-h" }, h("table", { class: "table table-sm table-hover table-cch mb-0" },
         h("thead", {}, h("tr", {}, ["Alumno", "Grupo", "Tipo", "Actividad", "Enviada", "Estado", "Puntos", ""].map((t, i) => h("th", { class: i < 4 ? "text-start" : "", text: t })))),
         h("tbody", {}, items.map(ev => h("tr", {},
@@ -4286,11 +4299,11 @@ const Admin = {
 
     const showAll = !!Admin.showAllCourses;
     const list = boot.groups.filter(g => showAll || g.active || g.sheet);
-    const rows = list.map(g => {
+    const cards = list.map(g => {
       const sheet = h("select", { class: "form-select form-select-sm", "aria-label": "Hoja de reporte" }, reportOptions(g.sheet));
-      const ciclo = h("input", { class: "form-control form-control-sm", value: g.ciclo, style: { width: "6rem" }, "aria-label": "Ciclo" });
+      const ciclo = h("input", { class: "form-control form-control-sm", value: g.ciclo, "aria-label": "Ciclo" });
       const active = h("input", { class: "form-check-input", type: "checkbox", checked: g.active, "aria-label": "Activo" });
-      const save = h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Guardar" }, icon("save"));
+      const save = h("button", { class: "btn btn-sm btn-outline-primary", type: "button", title: "Guardar", "aria-label": `Guardar cambios de ${g.label}` }, icon("save"));
       save.addEventListener("click", async () => {
         try {
           const r = await UI.busy(save, () => Api.call("saveGroup", { idCurso: g.id, hojaReporte: sheet.value, ciclo: ciclo.value, activo: active.checked }, "admin"));
@@ -4300,14 +4313,21 @@ const Admin = {
           Admin.renderTab();
         } catch (error) { if (error.code !== "AUTH") UI.toast("danger", error.message); }
       });
-      return h("tr", {},
-        h("td", { class: "text-start fw-semibold", style: { minWidth: "160px" }, text: g.label }),
-        h("td", { class: "mono small", text: g.id }),
-        h("td", { style: { minWidth: "200px" } }, sheet),
-        h("td", {}, ciclo),
-        h("td", {}, h("div", { class: "form-check form-switch d-flex justify-content-center mb-0" }, active)),
-        h("td", { text: g.students }),
-        h("td", {}, save));
+      return h("article", { class: "card card-soft apk-group-card" },
+        h("div", { class: "card-body" },
+          h("div", { class: "apk-group-summary" },
+            h("div", { class: "min-w-0" },
+              h("h3", { class: "h6 mb-1", text: g.label }),
+              h("div", { class: "mono small text-body-secondary text-break", text: g.id })),
+            h("span", { class: "badge text-bg-light border", text: `${g.students} alumnos` })),
+          h("div", { class: "apk-group-fields" },
+            h("label", { class: "apk-group-field" },
+              h("span", { class: "form-label small mb-1", text: "Hoja Reporte_" }), sheet),
+            h("label", { class: "apk-group-field" },
+              h("span", { class: "form-label small mb-1", text: "Ciclo" }), ciclo)),
+          h("div", { class: "apk-group-actions" },
+            h("label", { class: "form-check form-switch mb-0" }, active, h("span", { class: "form-check-label", text: "Activo" })),
+            save)));
     });
 
     const hiddenCount = boot.groups.length - list.length;
@@ -4359,10 +4379,9 @@ const Admin = {
       h("div", { class: "card card-soft mb-3" }, h("div", { class: "card-body" },
         h("h2", { class: "h6", text: "Grupos (hoja Course)" }),
         h("p", { class: "small text-body-secondary mb-0", text: "Cada fila es un curso de Course. Las columnas Hoja_Reporte y Activo de Course definen su hoja de asistencia y si los alumnos lo ven." }))),
-      h("div", { class: "table-wrap auto-h mb-3" }, h("table", { class: "table table-cch mb-0" },
-        h("thead", {}, h("tr", {}, ["Curso", "ID_Curso", "Hoja Reporte_", "Ciclo", "Activo", "Alumnos", ""].map(t => h("th", { text: t })))),
-        h("tbody", {}, rows))),
-      h("div", { class: "d-flex flex-wrap gap-2 align-items-center" },
+      h("div", { class: "apk-management-list mb-3" },
+        ...(cards.length ? cards : [UI.empty("people", "No hay grupos para mostrar.")])),
+      h("div", { class: "apk-management-toolbar d-flex flex-wrap gap-2 align-items-center" },
         toggleAll,
         createReport, diagnose,
         h("span", { class: "small text-body-secondary ms-auto", text: `API v${boot.version}` }))
@@ -4947,7 +4966,7 @@ const PaseLista = {
       const absences = Number(student.counts && student.counts.falta) || 0;
       const current = this.studentStatus(student, group, date);
       const alreadyMarked = !!current;
-      const button = (status, iconName, label, color) => h("button", {
+      const button = (status, symbol, label, color) => h("button", {
         class: `btn roll-mark-button ${current === status ? `btn-${color}` : `btn-outline-${color}`}`,
         type: "button",
         title: alreadyMarked ? "La asistencia de hoy ya está registrada" : label,
@@ -4955,7 +4974,7 @@ const PaseLista = {
         "aria-pressed": String(current === status),
         disabled: alreadyMarked,
         onclick: () => this.mark(account, status)
-      }, icon(iconName));
+      }, h("span", { class: "roll-mark-symbol", text: symbol }));
       return h("article", { class: "roll-student-card" },
         h("div", { class: "roll-student-info" },
           h("div", { class: "roll-student-name", text: student.nombre || account }),
@@ -4966,8 +4985,9 @@ const PaseLista = {
               text: `${absences} falta${absences === 1 ? "" : "s"}`
             }))),
         h("div", { class: "roll-mark-actions", role: "group", "aria-label": `Asistencia de ${student.nombre || account}` },
-          button("Asistencia", "check-lg", "Asistencia", "success"),
-          button("Falta", "x-lg", "Falta", "danger")));
+          button("Asistencia", "✓", "Asistencia", "success"),
+          button("Falta", "✕", "Falta", "danger"),
+          button("Justificante", "J", "Justificante", "info")));
     }));
   },
 
