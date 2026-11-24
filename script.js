@@ -3391,6 +3391,14 @@ const Admin = {
     return date.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
   },
 
+  taskExpiryLabel(value) {
+    const date = String(value || "");
+    if (!date) return "";
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return `${date < today ? "Venció" : "Vence"}: ${Admin.taskDateLabel(date)}`;
+  },
+
   viewTask(task) {
     const content = h("div", { class: "task-content" });
     const safeHtml = Admin.sanitizeTaskHtml(task.contenido);
@@ -3607,7 +3615,10 @@ const Admin = {
             class: "list-group-item list-group-item-action text-start",
             type: "button",
             onclick: () => Admin.viewTask(task)
-          }, task.titulo)));
+          },
+            h("span", { class: "d-flex flex-wrap justify-content-between align-items-center gap-2" },
+              h("span", { class: "text-break", text: task.titulo }),
+              task.fechaCierre ? h("span", { class: "small text-body-secondary text-nowrap", text: Admin.taskExpiryLabel(task.fechaCierre) }) : null))));
         accordion.append(h("div", { class: "accordion-item" },
           h("h2", { class: "accordion-header" },
             h("button", {
