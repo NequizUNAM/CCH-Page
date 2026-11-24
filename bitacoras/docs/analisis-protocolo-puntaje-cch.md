@@ -2,7 +2,7 @@
 
 **Fecha del análisis:** 2026-11-18
 **Fuente del usuario:** JSON pegado por Nequiz en el chat de bitácoras (2026-11-18 12:04 CST), con `documento_1` (Protocolo de Equivalencias 2020) y `documento_2` (Instructivo de Asignación de Horarios 2023).
-**Archivo guardado (verbatim, sin reescribir valores):** `workspace/goals/ordenar-mis-minutas-y-pendientes/files/protocolo-puntaje-cch.json`
+**Archivo guardado (verbatim, sin reescribir valores):** `historico/protocolo-puntaje-cch-v1.json`
 - Tamaño: 38 856 bytes. SHA-256: `d2f04f019a667b89589d665e600c3795241345c9b315a9d45d45160e5e0e9366`
 - Validación: `python3 -m json.tool` OK, sin errores de sintaxis. **No hizo falta ninguna corrección al guardar.**
 - Extracción: JSON exacto del mensaje del usuario (chat `cbe4b775-093a-4a31-b312-cfc37d126b7f`, leído con `chat.read_messages`); solo se recortó el texto introductorio previo al `{`.
@@ -18,7 +18,7 @@
 - El JSON del usuario es **usable tal cual como catálogo de referencia**, con 2 correcciones de etiqueta y varios vacíos que completar (ver §5 y §6). No hay errores de sintaxis ni valores de puntos inconsistentes en el nivel (A siempre 25, B siempre 50, C siempre 150: verificado con Python).
 - **Lo más importante que el JSON no trae y el PDF sí exige:** (1) las condiciones de nivel mínimo por categoría —«al menos una actividad de nivel B/C»— y la condición de Asociados de que los puntos del Rubro I «no sean de una misma actividad»; (2) la etiqueta `min_apoyo_investigacion_pct` es engañosa: el mínimo de 150/200 puntos de Titular A/B/C es en Rubro I **o** II (A) / I **o** II **o** III (B/C), no solo investigación; (3) el mismo trabajo no se puede contar en dos rubros ni dos veces: «las constancias de una misma actividad se ubicarán en un solo rubro» (Instructivo, Art. 29, nota 2) y el Protocolo no valora por separado las partes de un trabajo integral.
 - El documento_2 (horarios) está **bien capturado en lo numérico**: horas por plantel y desgloses de los criterios II, III, IV y V coinciden con el PDF en los puntos revisados. Lo que le falta es el proceso: 5 etapas, comisiones mixtas, plazos (3 días hábiles para formalizar) y qué pasa con las horas no asignadas.
-- Propuesta de enlace con la página de bitácoras: un catálogo de puntos ya guardado (`protocolo-puntaje-cch.json`) + campos nuevos por sesión/evidencia (rubro, actividad, nivel, puntos, alcance, constancia/dictamen) + una bitácora-hub propuesta `#PuntajeCch` (requiere autorización de Nequiz; no se crea sola). Ver §8.
+- Propuesta de enlace con la página de bitácoras: un catálogo de puntos ya guardado (`historico/protocolo-puntaje-cch-v1.json`) + campos nuevos por sesión/evidencia (rubro, actividad, nivel, puntos, alcance, constancia/dictamen) + una bitácora-hub propuesta `#PuntajeCch` (requiere autorización de Nequiz; no se crea sola). Ver §8.
 
 ---
 
@@ -272,11 +272,11 @@ Sur concentra el 21.5% del total (9 576 / 44 592) y Naucalpan el 19.0% (8 452 / 
 
 ## 8. Propuesta de enlace con la página de bitácoras
 
-Referencia: `workspace/goals/ordenar-mis-minutas-y-pendientes/files/checklist-bitacora-web.md` (24 secciones; arquitectura: GitHub Pages + Apps Script + Drive; hashtags `#Estadistica1`, `#Estadistica2`, `#CchPage`, `#ControlFacturas`, `#AsistenciaCch`, `#MoodleDgtic`; plantillas versionadas; banco de peticiones v2 con 17 comandos). **No se construyó la página; solo se propone.**
+Referencia: `checklist-bitacora-web.md` (27 secciones; arquitectura: GitHub Pages + Apps Script + Drive; hashtags `#Estadistica1`, `#Estadistica2`, `#CchPage`, `#ControlFacturas`, `#AsistenciaCch`, `#MoodleDgtic`; plantillas versionadas; banco de peticiones v2 con 17 comandos). **No se construyó la página; solo se propone.**
 
 ### 8.1 Dónde vive el protocolo en el sistema
 
-- El archivo guardado (`protocolo-puntaje-cch.json`) es el **catálogo de referencia** del sistema: se sube a Drive en `Bitacoras/protocolo-puntaje-cch.json` y la página lo lee como tabla de consulta (no se edita desde la página; solo se actualiza si cambia el Protocolo oficial).
+- El archivo histórico guardado (`historico/protocolo-puntaje-cch-v1.json`) es el **catálogo original de referencia**. El catálogo v2 público que carga la página está en `../protocolo-puntaje-cch-v2.json`.
 - Se propone una **bitácora-hub nueva, `#PuntajeCch`** (slug `puntaje-cch`), solo para el seguimiento de la promoción: ahí viven el avance por categoría, las actividades registradas y el cálculo de puntos. **No se crea sola: requiere autorización de Nequiz** (regla del banco de peticiones: `#nuevaBitacora` solo prepara la propuesta).
 
 ### 8.2 Tabla de enlace categoría → rubro → hashtag de proyecto
@@ -354,9 +354,9 @@ El archivo guardado **no se modificó** para preservar el original del usuario; 
 
 ## 10. Archivos entregados
 
-- `workspace/goals/ordenar-mis-minutas-y-pendientes/files/protocolo-puntaje-cch.json` — JSON exacto del usuario, verbatim, validado con `python3 -m json.tool` (38 856 bytes, SHA-256 `d2f04f019a667b89589d665e600c3795241345c9b315a9d45d45160e5e0e9366`).
-- `workspace/goals/ordenar-mis-minutas-y-pendientes/files/analisis-protocolo-puntaje-cch.md` — este informe.
+- `historico/protocolo-puntaje-cch-v1.json` — JSON exacto del usuario, verbatim, validado con `python3 -m json.tool` (38 856 bytes, SHA-256 `d2f04f019a667b89589d665e600c3795241345c9b315a9d45d45160e0e9366`).
+- `analisis-protocolo-puntaje-cch.md` — este informe.
 
 ## Addendum 2026-11-18 — Normatividad unificada (v2)
 
-Nequiz subió `cch_normatividad_unificada_2020_2023.json`. El catálogo v2 está en `protocolo-puntaje-cch/protocolo-puntaje-cch-v2.json` y el detalle completo en `protocolo-puntaje-cch/ACTUALIZACION-normatividad-unificada.md`. Resumen: glosario de 107 términos con definición/ejemplo/sede/digital; se resolvieron las variantes faltantes (Organización I-B, Revista en Rubro I) y la contradicción de Jornadas (I o III, A); siguen pendientes los reportes de investigación/validación (sin término propio en el glosario), la errata de Titular B y el directorio desactualizado (Graue por Lomelí).
+Nequiz subió `cch_normatividad_unificada_2020_2023.json`. El catálogo v2 está en `../protocolo-puntaje-cch/protocolo-puntaje-cch-v2.json` y el detalle completo en `../protocolo-puntaje-cch/ACTUALIZACION-normatividad-unificada.md`. Resumen: glosario de 107 términos con definición/ejemplo/sede/digital; se resolvieron las variantes faltantes (Organización I-B, Revista en Rubro I) y la contradicción de Jornadas (I o III, A); siguen pendientes los reportes de investigación/validación (sin término propio en el glosario), la errata de Titular B y el directorio desactualizado (Graue por Lomelí).

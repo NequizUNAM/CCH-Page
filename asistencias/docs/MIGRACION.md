@@ -7,7 +7,7 @@
 | GitHub (tu página) | `index.html`, `estilo.css`, `script.js` |
 | GitHub (exámenes) | `examenes_cibernetica.html`, `examenes_estadistica.html` (solo el examen del alumno) |
 | GitHub (paneles de examen) | `panel_examen_cibernetica.js`, `panel_examen_estadistica.js` (los usa el Dashboard) |
-| Apps Script | `apps-script/Codigo.gs`, `apps-script/Examenes.gs` (archivo aparte) y `appsscript.json` |
+| Apps Script | `asistencias/apps-script/Codigo.gs`, `asistencias/apps-script/Examenes.gs` (archivo aparte) y `asistencias/apps-script/appsscript.json` |
 
 ## Exámenes en línea (mismo proyecto, misma URL)
 

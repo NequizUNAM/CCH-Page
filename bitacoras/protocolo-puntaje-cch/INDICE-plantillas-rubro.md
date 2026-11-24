@@ -6,7 +6,7 @@
 
 **Fecha:** 2026-11-18
 **Fuentes:** PDFs subidos por Nequiz el 2026-11-18 — Protocolo de Equivalencias 2020 (60 págs.) e Instructivo de Asignación de Horarios 2023 (22 págs.) — validados contra el Cuadro pp. 53-57 (revisión visual de las 5 páginas) y contra las fuentes oficiales de internet (ver URLs abajo).
-**Archivo original sin modificar:** `../protocolo-puntaje-cch.json` (JSON del usuario, 158 actividades). Las listas de estas plantillas siguen el **Cuadro del PDF (165 actividades)**, no el JSON; las diferencias están en `protocolo-puntaje-cch-CORRECCIONES.md`.
+**Archivo original sin modificar:** `../docs/historico/protocolo-puntaje-cch-v1.json` (JSON del usuario, 158 actividades). Las listas de estas plantillas siguen el **Cuadro del PDF (165 actividades)**, no el JSON; las diferencias están en `protocolo-puntaje-cch-CORRECCIONES.md`.
 
 ## Tabla rubro → archivo → actividades → a quién va dirigido
 

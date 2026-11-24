@@ -8,8 +8,8 @@
 
 - `Codigo.gs`: generación, hash, validación, autorización y revocación del token; despacho de acciones y sincronización `guardar`.
 - `index.html`: comprobación de que la interfaz no incorpora el token de servicio.
-- `README.md`, `CONFIGURACION.md` y `checklist-bitacora-web.md`: documentación del token, permisos y sesión web.
-- `banco-peticiones.md` y `banco-peticiones.json`: autorización explícita requerida para `#nuevaBitacora`.
+- `../../../README.md`, `../CONFIGURACION.md` y `../checklist-bitacora-web.md`: documentación del token, permisos y sesión web.
+- `../../integraciones/muse/banco-peticiones.md` y `../../integraciones/muse/banco-peticiones.json`: autorización explícita requerida para `#nuevaBitacora`.
 
 No se generó ni incluyó ningún token real.
 

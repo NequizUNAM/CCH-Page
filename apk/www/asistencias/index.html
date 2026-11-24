@@ -2,7 +2,7 @@
 <html lang="es" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dashboard CCH</title>
   <meta name="description" content="Asistencias, calificaciones, equipos y evidencias de los grupos del profesor Nequiz (CCH).">
 
@@ -15,9 +15,14 @@
   <!-- ============ NAVBAR ============ -->
   <nav class="navbar app-nav sticky-top" data-bs-theme="dark">
     <div class="container-xl gap-2">
-      <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="#" id="home-link">
-        <i class="bi bi-mortarboard-fill"></i><span>Dashboard CCH</span>
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-outline-light d-flex align-items-center gap-1" href="../index.html" id="btn-volver-menu" title="Volver al menú principal" aria-label="Volver al menú principal">
+          <i class="bi bi-chevron-left"></i><span>Menú</span>
+        </a>
+        <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="#" id="home-link">
+          <i class="bi bi-mortarboard-fill"></i><span>Dashboard CCH</span>
+        </a>
+      </div>
 
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-light d-none" id="sync-status" type="button" aria-live="polite">
@@ -37,6 +42,7 @@
   </nav>
 
   <main class="container-xl py-3 py-md-4">
+    <div id="offline-notice" class="alert alert-warning small d-none" role="status" aria-live="polite"></div>
 
     <!-- ============ BIENVENIDA / LOGIN ALUMNO ============ -->
     <section id="view-login" class="view">

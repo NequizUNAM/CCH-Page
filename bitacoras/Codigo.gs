@@ -17,7 +17,7 @@
  *       Los proyectos heredados conservan su ubicación actual.
  *   - Hojas de cálculo: un libro "Bitacoras" con las pestañas
  *     Bitacoras, Sesiones, Pendientes, Hitos y Puntaje.
- *     Las mismas hojas las puede leer AppSheet (ver guia-configuracion-appsheet.md).
+ *     Las mismas hojas las puede leer AppSheet (ver docs/guia-configuracion-appsheet.md).
  *
  * SEGURIDAD (sin credenciales reales en este archivo)
  *   - La contraseña web NO se guarda en texto plano: se guarda su hash
@@ -81,7 +81,6 @@
  * del body, nunca en una cabecera.
  * ============================================================================
  */
-
 // ---------------------------------------------------------------------------
 // CONFIG
 // ---------------------------------------------------------------------------
@@ -602,6 +601,7 @@ function leerTodo_() {
     // proyecto: bitacora + plantilla + formato; 12 lecturas de sobra).
     var c = getCarpetaProyecto_(p.slug);
     var bit = (c && leerJSON_(c, 'bitacora.json')) || bitacoraVacia_(p.slug);
+    bit.revision = revisionBitacora_(bit);
     // v4: el folio del índice manda si lo trae; si no, el del catálogo.
     var folio = p.folio || '';
     if (indice && Array.isArray(indice.projects)) {
@@ -633,6 +633,7 @@ function leerProyecto_(slug) {
   if (!bitacora) {
     bitacora = bitacoraVacia_(slug);
   }
+  bitacora.revision = revisionBitacora_(bitacora);
   var plantilla = carpeta ? leerJSON_(carpeta, 'plantilla-sesion.json') : null;
   var formato = carpeta ? leerJSON_(carpeta, 'formato-exportacion.json') : null;
   return { bitacora: bitacora, plantilla: plantilla, formato: formato };
@@ -658,8 +659,12 @@ function guardarBitacora_(datos) {
     return { ok: false, error: 'Falta el objeto "bitacora" con los datos completos.' };
   }
   var carpeta = getOrCreateCarpetaProyecto_(slug);
+  var existente = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(existente, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var bitacora = datos.bitacora;
   bitacora.slug = slug; // el slug manda: nunca se guarda con otro slug
+  bitacora.revision = revisionBitacora_(existente) + 1;
   if (!Array.isArray(bitacora.sesiones)) bitacora.sesiones = [];
   if (!Array.isArray(bitacora.pendientes)) bitacora.pendientes = [];
   if (!Array.isArray(bitacora.hitos)) bitacora.hitos = [];
@@ -668,7 +673,7 @@ function guardarBitacora_(datos) {
   var respaldo = escribirJSON_(carpeta, 'bitacora.json', bitacora, true);
   asegurarFilaProyecto_(slug);
   return { ok: true, mensaje: 'Bitácora de ' + slug + ' guardada.',
-    respaldo: respaldo };
+    revision: bitacora.revision, respaldo: respaldo };
 }
 
 function fusionarValorMuseSinBorrar_(actual, recibido) {
@@ -740,7 +745,8 @@ function guardarBitacoraServicio_(datos) {
   var existente = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
   var bitacora = fusionarValorMuseSinBorrar_(existente, entrante);
   bitacora.slug = slug;
-  return guardarBitacora_({ slug: slug, bitacora: bitacora });
+  return guardarBitacora_({ slug: slug, bitacora: bitacora,
+    revisionEsperada: revisionBitacora_(existente) });
 }
 
 /**
@@ -763,11 +769,17 @@ function guardarSesion_(datos) {
 
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   // Paso 5: rechazar id duplicado (la página ya usa uid(), esto es el freno del servidor).
   for (var i = 0; i < bitacora.sesiones.length; i++) {
-    if (bitacora.sesiones[i].id === sesion.id) return { ok: false, error: 'Ya existe una sesión con el id ' + sesion.id + '.' };
+    if (bitacora.sesiones[i].id === sesion.id) return { ok: false, code: 'CONFLICT',
+      conflictTipo: 'id',
+      error: 'Ya existe una sesión con el id ' + sesion.id + '.',
+      revisionActual: revisionBitacora_(bitacora), actual: bitacora.sesiones[i] };
   }
   bitacora.sesiones.push(sesion);
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
 
   agregarFila_('Sesiones', [
@@ -777,7 +789,7 @@ function guardarSesion_(datos) {
     Array.isArray(sesion.acuerdos) ? sesion.acuerdos.length : 0,
     sesion.plantilla_version
   ]);
-  return { ok: true, mensaje: 'Sesión guardada.', id: sesion.id };
+  return { ok: true, mensaje: 'Sesión guardada.', id: sesion.id, revision: bitacora.revision };
 }
 
 /**
@@ -799,6 +811,8 @@ function guardarPendiente_(datos) {
 
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   // D11: no duplicar: si ya existe un pendiente con el mismo texto en la
   // misma sesión, se devuelve el existente en vez de crear otro.
   var textoNorm = String(pendiente.texto).trim().toLowerCase();
@@ -806,11 +820,21 @@ function guardarPendiente_(datos) {
     var ex = bitacora.pendientes[i];
     if (String(ex.sesion_id || '') === String(pendiente.sesion_id || '') &&
         String(ex.texto || '').trim().toLowerCase() === textoNorm) {
-      return { ok: true, mensaje: 'Ese pendiente ya existía.', id: ex.id, duplicado: true };
+      bitacora.revision = revisionBitacora_(bitacora) + 1;
+      escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
+      return { ok: true, mensaje: 'Ese pendiente ya existía.', id: ex.id,
+        duplicado: true, revision: bitacora.revision };
     }
   }
   if (!pendiente.id) pendiente.id = nuevoId_(slug, ahoraISO_());
+  if (bitacora.pendientes.some(function (p) { return p.id === pendiente.id; })) {
+    var pendienteExistente = bitacora.pendientes.find(function (p) { return p.id === pendiente.id; });
+    return { ok: false, code: 'CONFLICT', conflictTipo: 'id',
+      error: 'Ya existe un pendiente con ese id.',
+      revisionActual: revisionBitacora_(bitacora), actual: pendienteExistente };
+  }
   bitacora.pendientes.push(pendiente);
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
 
   agregarFila_('Pendientes', [
@@ -819,7 +843,7 @@ function guardarPendiente_(datos) {
     pendiente.prioridad || '', pendiente.estado, pendiente.minuta_origen || '',
     pendiente.fecha_cierre || '', pendiente.notas || ''
   ]);
-  return { ok: true, mensaje: 'Pendiente guardado.', id: pendiente.id };
+  return { ok: true, mensaje: 'Pendiente guardado.', id: pendiente.id, revision: bitacora.revision };
 }
 
 /**
@@ -838,17 +862,23 @@ function cerrarPendiente_(datos) {
 
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var encontrado = false;
   var fechaCierre = (estado === 'Cerrado') ? ahoraISO_().slice(0, 10) : '';
   bitacora.pendientes.forEach(function (p) {
     if (p.id === id) { p.estado = estado; p.fecha_cierre = fechaCierre; encontrado = true; }
   });
   if (!encontrado) {
-    return { ok: false, error: 'No existe un pendiente con id ' + id + ' en ' + slug + '.' };
+    return { ok: false, code: 'CONFLICT', conflictTipo: 'registro',
+      error: 'El pendiente ya no existe; recarga antes de reintentar.',
+      revisionActual: revisionBitacora_(bitacora), actual: null };
   }
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
   actualizarFilaPorId_('Pendientes', id, { 8: estado, 10: fechaCierre });
-  return { ok: true, mensaje: 'Pendiente marcado como ' + estado + '.', id: id };
+  return { ok: true, mensaje: 'Pendiente marcado como ' + estado + '.', id: id,
+    revision: bitacora.revision };
 }
 
 /**
@@ -872,14 +902,22 @@ function guardarHito_(datos) {
 
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
+  var hitoExistente = bitacora.hitos.find(function (h) { return h.id === hito.id; });
+  if (hitoExistente) return { ok: false, code: 'CONFLICT',
+    conflictTipo: 'id',
+    error: 'Ya existe un hito con ese id.', revisionActual: revisionBitacora_(bitacora),
+    actual: hitoExistente };
   bitacora.hitos.push(hito);
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
 
   agregarFila_('Hitos', [
     hito.id, slug, hito.titulo, hito.fecha || '', hito.descripcion || '',
     hito.estado, hito.fecha_cierre || ''
   ]);
-  return { ok: true, mensaje: 'Hito guardado.', id: hito.id };
+  return { ok: true, mensaje: 'Hito guardado.', id: hito.id, revision: bitacora.revision };
 }
 
 /**
@@ -903,6 +941,8 @@ function editarHito_(datos) {
 
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var encontrado = false;
   bitacora.hitos.forEach(function (h) {
     if (h.id === hito.id) {
@@ -912,12 +952,15 @@ function editarHito_(datos) {
     }
   });
   if (!encontrado) {
-    return { ok: false, error: 'No existe un hito con id ' + hito.id + ' en ' + slug + '.' };
+    return { ok: false, code: 'CONFLICT', conflictTipo: 'registro',
+      error: 'El hito ya no existe; recarga antes de reintentar.',
+      revisionActual: revisionBitacora_(bitacora), actual: null };
   }
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
   actualizarFilaPorId_('Hitos', hito.id, { 3: hito.titulo, 4: hito.fecha || '',
     5: hito.descripcion || '', 6: hito.estado, 7: hito.fecha_cierre || '' });
-  return { ok: true, mensaje: 'Hito actualizado.', id: hito.id };
+  return { ok: true, mensaje: 'Hito actualizado.', id: hito.id, revision: bitacora.revision };
 }
 
 /**
@@ -933,21 +976,26 @@ function eliminarHito_(datos) {
   if (!id) return { ok: false, error: 'Falta el id del hito.' };
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var antes = bitacora.hitos.length;
   bitacora.hitos = bitacora.hitos.filter(function (h) { return h.id !== id; });
   if (bitacora.hitos.length === antes) {
-    return { ok: false, error: 'No existe un hito con id ' + id + ' en ' + slug + '.' };
+    return { ok: false, code: 'CONFLICT', conflictTipo: 'registro',
+      error: 'El hito ya no existe; recarga antes de reintentar.',
+      revisionActual: revisionBitacora_(bitacora), actual: null };
   }
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
   eliminarFilaPorId_('Hitos', id);
-  return { ok: true, mensaje: 'Hito eliminado.', id: id };
+  return { ok: true, mensaje: 'Hito eliminado.', id: id, revision: bitacora.revision };
 }
 
 /**
  * editarSesion — auditoría v2, Paso 2. Actualiza UNA sesión por id en
  * bitacora.json (merge en el servidor), sin pisar el resto del proyecto
- * ni los cambios de AppSheet/Muse. Si no existe, la agrega (así editar
- * también sirve para reenviar una sesión marcada 'Sin sincronizar').
+ * ni los cambios de AppSheet/Muse. Si ya no existe, devuelve un conflicto
+ * para evitar resucitar un registro eliminado desde otra sesión.
  * También actualiza su fila en la hoja Sesiones.
  */
 function editarSesion_(datos) {
@@ -957,12 +1005,18 @@ function editarSesion_(datos) {
   if (!s.id) return { ok: false, error: 'Falta el id de la sesión.' };
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bit = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bit, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var hallada = false;
   bit.sesiones = bit.sesiones.map(function (x) {
     if (x.id === s.id) { hallada = true; return Object.assign({}, x, s); }
     return x;
   });
-  if (!hallada) bit.sesiones.push(s);
+  if (!hallada) return { ok: false, code: 'CONFLICT',
+    conflictTipo: 'registro',
+    error: 'La sesión ya no existe; recarga antes de editar.',
+    revisionActual: revisionBitacora_(bit), actual: null };
+  bit.revision = revisionBitacora_(bit) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bit, false);
   var asist = Array.isArray(s.asistentes) ? s.asistentes.join(', ') : (s.asistentes || '');
   var fila = { 3: s.fecha || '', 4: s.titulo || '', 5: s.tipo || '', 6: s.texto || '',
@@ -970,7 +1024,7 @@ function editarSesion_(datos) {
   if (!actualizarFilaPorId_('Sesiones', s.id, fila)) {
     agregarFila_('Sesiones', [s.id, slug, fila[3], fila[4], fila[5], fila[6], fila[7], fila[8], fila[9]]);
   }
-  return { ok: true, mensaje: 'Sesión actualizada.', id: s.id };
+  return { ok: true, mensaje: 'Sesión actualizada.', id: s.id, revision: bit.revision };
 }
 
 /**
@@ -983,15 +1037,20 @@ function eliminarSesion_(datos) {
   if (!id) return { ok: false, error: 'Falta el id de la sesión.' };
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bit = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bit, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   var antes = bit.sesiones.length;
   bit.sesiones = bit.sesiones.filter(function (x) { return x.id !== id; });
-  if (bit.sesiones.length === antes) return { ok: false, error: 'No existe la sesión ' + id + '.' };
+  if (bit.sesiones.length === antes) return { ok: false, code: 'CONFLICT',
+    conflictTipo: 'registro', error: 'La sesión ya no existe; recarga antes de reintentar.',
+    revisionActual: revisionBitacora_(bit), actual: null };
   var idsPend = bit.pendientes.filter(function (p) { return p.sesion_id === id; }).map(function (p) { return p.id; });
   bit.pendientes = bit.pendientes.filter(function (p) { return p.sesion_id !== id; });
+  bit.revision = revisionBitacora_(bit) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bit, true);
   eliminarFilaPorId_('Sesiones', id);
   idsPend.forEach(function (pid) { eliminarFilaPorId_('Pendientes', pid); });
-  return { ok: true, mensaje: 'Sesión eliminada.', id: id };
+  return { ok: true, mensaje: 'Sesión eliminada.', id: id, revision: bit.revision };
 }
 
 /**
@@ -1146,8 +1205,16 @@ function registrarPuntaje_(datos) {
   // recargar / en otro navegador (antes solo iba a la hoja Puntaje).
   var carpeta = getOrCreateCarpetaProyecto_(slug);
   var bitacora = leerJSON_(carpeta, 'bitacora.json') || bitacoraVacia_(slug);
+  var conflicto = conflictoRevisionBitacora_(bitacora, datos.revisionEsperada);
+  if (conflicto) return conflicto;
   if (!Array.isArray(bitacora.puntaje)) bitacora.puntaje = [];
+  var puntajeExistente = bitacora.puntaje.find(function (x) { return x.id === p.id; });
+  if (puntajeExistente) return { ok: false, code: 'CONFLICT',
+    conflictTipo: 'id',
+    error: 'Ya existe un registro de puntaje con ese id.',
+    revisionActual: revisionBitacora_(bitacora), actual: puntajeExistente };
   bitacora.puntaje.push(p);
+  bitacora.revision = revisionBitacora_(bitacora) + 1;
   escribirJSON_(carpeta, 'bitacora.json', bitacora, false);
 
   agregarFila_('Puntaje', [
@@ -1155,7 +1222,8 @@ function registrarPuntaje_(datos) {
     p.alcance || '', p.constancia || '', p.dictamen || '',
     p.periodo || '', p.categoria_objetivo || '', p.glosario_id || ''
   ]);
-  return { ok: true, mensaje: 'Actividad de puntaje registrada.', id: p.id };
+  return { ok: true, mensaje: 'Actividad de puntaje registrada.', id: p.id,
+    revision: bitacora.revision };
 }
 
 // ---------------------------------------------------------------------------
@@ -1678,7 +1746,29 @@ function actualizarEstadoProyectoEnHoja_(slug, estado) {
 
 /** Estructura vacía de bitacora.json para un proyecto. */
 function bitacoraVacia_(slug) {
-  return { slug: slug, sesiones: [], pendientes: [], hitos: [], puntaje: [] };
+  return { slug: slug, revision: 0, sesiones: [], pendientes: [], hitos: [], puntaje: [] };
+}
+
+function revisionBitacora_(bitacora) {
+  var revision = Number(bitacora && bitacora.revision);
+  return Number.isInteger(revision) && revision >= 0 ? revision : 0;
+}
+
+function conflictoRevisionBitacora_(bitacora, revisionEsperada) {
+  var actual = revisionBitacora_(bitacora);
+  var esperada = revisionEsperada === null || revisionEsperada === undefined || revisionEsperada === ''
+    ? NaN : Number(revisionEsperada);
+  if (!Number.isInteger(esperada) || esperada !== actual) {
+    return {
+      ok: false,
+      code: 'CONFLICT',
+      conflictTipo: 'revision',
+      error: 'La bitácora cambió en el servidor. Revisa los datos antes de reintentar.',
+      revisionActual: actual,
+      actual: bitacora || null
+    };
+  }
+  return null;
 }
 
 /** Contenido inicial de ficha.md de un proyecto. */

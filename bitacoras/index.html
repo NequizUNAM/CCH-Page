@@ -240,7 +240,7 @@ details.menu summary::-webkit-details-marker{display:none}
   <button class="btn dorado" id="btnNuevaSesion">+ Nueva sesión</button>
   <button class="btn blanco" id="btnLogin">Login</button>
   <button class="btn blanco oculto" id="btnMantenimiento">Mantenimiento</button>
-  <span id="estadoModo" class="chip" style="background:#fff;color:var(--texto)">● Local</span>
+  <button id="estadoModo" class="chip" type="button" aria-label="Estado de sincronización" style="background:#fff;color:var(--texto)">● Local</button>
 </header>
 <button class="btn dorado oculto" id="btnNuevaFlotante" style="display:none">+ Sesión</button>
 <div id="avisoEsperaRecarga" class="aviso oculto" role="status" aria-live="polite"></div>
@@ -434,6 +434,55 @@ const FORMATO_DEFECTO = {
 
 /* ---------- Estado ---------- */
 let estado = { proyectos: PROYECTOS_BASE, sesiones: [], pendientes: [], hitos: [], formatos: {}, puntaje: [], configCiclo: configCicloPorDefecto(), ejemploBorrado: false };
+const ACCIONES_CON_REVISION = new Set(['guardar','guardarSesion','editarSesion','eliminarSesion',
+  'guardarPendiente','cerrarPendiente','guardarHito','editarHito','eliminarHito','registrarPuntaje']);
+function revisionProyecto(slug){
+  const proyecto = estado.proyectos.find(x => x.slug === slug);
+  let revision = Number(proyecto && proyecto.revision);
+  if(!Number.isInteger(revision) || revision < 0) revision = 0;
+  colaOperaciones.forEach(op => {
+    if(op.datos && op.datos.slug === slug && ACCIONES_CON_REVISION.has(op.accion)){
+      const esperada = Number(op.datos.revisionEsperada);
+      if(Number.isInteger(esperada) && esperada >= 0) revision = Math.max(revision, esperada + 1);
+    }
+  });
+  return revision;
+}
+function actualizarRevisionProyecto(slug, revision){
+  if(!Number.isInteger(Number(revision)) || Number(revision) < 0) return;
+  const proyecto = estado.proyectos.find(x => x.slug === slug);
+  if(proyecto) proyecto.revision = Math.max(Number(proyecto.revision) || 0, Number(revision));
+}
+function registroActualDeConflicto(op){
+  const actual = op.actual;
+  if(!actual || typeof actual !== 'object') return null;
+  const local = op.local || {}, id = local.id || (local.valor && local.valor.id);
+  const coleccion = { sesion:'sesiones', pendiente:'pendientes', hito:'hitos', puntaje:'puntaje' }[local.tipo];
+  if(coleccion && Array.isArray(actual[coleccion])) return actual[coleccion].find(x => x.id === id) || null;
+  return actual;
+}
+async function prepararReintentoConflicto(op){
+  if(op.conflictTipo !== 'revision' || op.accion === 'guardar' ||
+      !op.datos || !op.datos.slug || !Number.isInteger(Number(op.revisionActual))) return false;
+  const actual = Number(op.revisionActual);
+  const anterior = Number(op.datos.revisionEsperada);
+  const desplazamiento = Number.isInteger(anterior) ? actual - anterior : null;
+  op.datos.revisionEsperada = actual;
+  const ordenadas = colaOperaciones.slice().sort(compararOperacionesCola);
+  const indice = ordenadas.findIndex(x => x.id === op.id);
+  if(indice < 0) return false;
+  let siguiente = actual + 1;
+  for(const otra of ordenadas.slice(indice + 1)){
+    if(!otra.datos || otra.datos.slug !== op.datos.slug || !ACCIONES_CON_REVISION.has(otra.accion)) continue;
+    const esperada = Number(otra.datos.revisionEsperada);
+    otra.datos.revisionEsperada = desplazamiento !== null && Number.isInteger(esperada)
+      ? Math.max(siguiente, esperada + desplazamiento) : siguiente;
+    siguiente = otra.datos.revisionEsperada + 1;
+    await guardarOperacionCola(otra);
+  }
+  actualizarRevisionProyecto(op.datos.slug, siguiente);
+  return true;
+}
 const PALETA_PROYECTOS = ['#002663','#0B3D91','#7C3AED','#0F766E','#B45309','#BE123C','#1D4ED8','#15803D','#A21CAF','#C2410C'];
 let proyectoSel = 'todos';
 let vistaActual = 'bitacoras';
@@ -986,10 +1035,14 @@ function programarAvisoCola(){
   const primero = colaOperaciones.slice().sort(compararOperacionesCola)[0];
   const vence = Math.max(primero.creado + COLA_ESPERA_AVISO, colaAvisoPospuestoHasta);
   colaAvisoTimer = setTimeout(() => {
-    if(colaOperaciones.length) mostrarToastCola();
+    const siguiente = colaOperaciones.slice().sort(compararOperacionesCola)[0];
+    if(siguiente && siguiente.estado !== 'conflicto') mostrarToastCola();
   }, Math.max(0, vence - Date.now()));
 }
 function marcarSincronizada(op, resultado){
+  if(op.datos && op.datos.slug && resultado && Number.isInteger(Number(resultado.revision))){
+    actualizarRevisionProyecto(op.datos.slug, Number(resultado.revision));
+  }
   const local = op.local || {};
   if(local.tipo === 'bitacora'){
     const otraPendiente = colaOperaciones.some(x => x.id !== op.id && x.datos && x.datos.slug === local.slug);
@@ -1153,7 +1206,7 @@ async function procesarColaBajoBloqueo(){
       await recargarColaEnMemoria(false);
       if(!colaOperaciones.length) break;
       const op = colaOperaciones[0];
-      if(op.estado === 'error') break;
+      if(op.estado === 'error' || op.estado === 'conflicto') break;
       op.estado = 'enviando';
       await guardarOperacionCola(op);
       try {
@@ -1174,14 +1227,24 @@ async function procesarColaBajoBloqueo(){
         guardar();
         renderTodo();
       } catch(e){
-        op.estado = 'error';
+        op.estado = e.code === 'CONFLICT' ? 'conflicto' : 'error';
+        op.reintentable = e.code === 'NETWORK';
         op.error = e.message || String(e);
+        if(e.code === 'CONFLICT'){
+          op.revisionActual = e.revisionActual;
+          op.conflictTipo = e.conflictTipo;
+          op.actual = e.actual || null;
+        }
         op.falloEn = Date.now();
         await guardarOperacionCola(op);
-        if(colaReintentoSolicitado){
+        if(colaReintentoSolicitado && e.code !== 'CONFLICT'){
           colaReintentoSolicitado = false;
           op.estado = 'pendiente';
           delete op.error;
+          delete op.actual;
+          delete op.revisionActual;
+          delete op.conflictTipo;
+          delete op.reintentable;
           await guardarOperacionCola(op);
           continue;
         }
@@ -1197,13 +1260,16 @@ async function procesarColaBajoBloqueo(){
     actualizarEstadoModo();
   }
 }
-async function reintentarColaCambios(){
+async function reintentarColaCambios(automatico = false){
   if(!navigator.onLine){ avisar('No hay conexión. Los cambios se conservan en este dispositivo.', 'rojo'); return; }
   if(TIENE_APPS_SCRIPT && !sesionAutenticada()){ avisar('Inicia sesión para volver a sincronizar los cambios.', 'rojo'); return; }
   if(colaProcesando){ colaReintentoSolicitado = true; return; }
   const primero = colaOperaciones.slice().sort(compararOperacionesCola)[0];
+  if(primero && primero.estado === 'conflicto') return;
   if(primero && primero.estado === 'error'){
+    if(automatico && !primero.reintentable) return;
     primero.estado = 'pendiente';
+    delete primero.reintentable;
     delete primero.error;
     try { await guardarOperacionCola(primero); }
     catch(e){ avisar('No se pudo preparar el reintento: ' + e.message, 'rojo'); return; }
@@ -1212,9 +1278,13 @@ async function reintentarColaCambios(){
 }
 async function guardarCambioEnCola(accion, datos, local){
   const op = { id:uid('sync'), creado:Date.now(), secuencia:++secuenciaCola, accion, datos, local, estado:'pendiente' };
+  const revision = TIENE_APPS_SCRIPT && ACCIONES_CON_REVISION.has(accion) && datos.slug
+    ? revisionProyecto(datos.slug) : null;
+  if(revision !== null) op.datos.revisionEsperada = revision;
   if(TIENE_APPS_SCRIPT){
     if(!sesionAutenticada()) throw new Error('Inicia sesión antes de guardar cambios.');
     await guardarOperacionCola(op);
+    if(revision !== null) actualizarRevisionProyecto(datos.slug, revision + 1);
     colaOperaciones.push(op);
     proyectarOperacionLocal(op);
     programarAvisoCola();
@@ -1239,7 +1309,7 @@ async function cargarColaCambios(){
     avisar('No se pudo recuperar la cola de cambios: ' + e.message, 'rojo');
   }
 }
-window.addEventListener('online', () => { if(sesionAutenticada()) reintentarColaCambios(); });
+window.addEventListener('online', () => { if(sesionAutenticada()) reintentarColaCambios(true); });
 function cargarLocal(){
   try {
     const raw = localStorage.getItem(CONFIG.claveLocal);
@@ -1346,7 +1416,7 @@ async function cargarDatos(){
           .map(p => ({ slug: p.slug, hashtag: p.hashtag, nombre: p.nombre,
             color: p.color || '#002663', folio: p.folio || '',
             estado: p.estado || 'Activo', cerrado_en: p.cerrado_en || '',
-            campos: p.campos_propios || [] }));
+            campos: p.campos_propios || [], revision: Number(p.bitacora && p.bitacora.revision) || 0 }));
         estado.configCiclo = normalizarFolios(estado.proyectos, estado.configCiclo);
         if(conSesion) guardar();
       }
@@ -1365,7 +1435,12 @@ async function llamar(accion, datos){
   const r = await enviarAppsScript(accion, datos);
   if(r && r.ok === false){
     if(/Token/i.test(r.error || '')){ sessionStorage.removeItem('bitacoras_token'); refrescarSesionUI(); }
-    throw new Error(r.error || 'Error desconocido');
+    const error = new Error(r.error || 'Error desconocido');
+    error.code = r.code || '';
+    error.conflictTipo = r.conflictTipo || '';
+    error.revisionActual = r.revisionActual;
+    error.actual = r.actual;
+    throw error;
   }
   return r;
 }
@@ -1842,6 +1917,7 @@ async function recargarProyectoSeleccionado(){
       const r = await llamar('leerProyecto', { slug: proyectoSel });
       if(!r || !r.datos) throw new Error('El servidor no devolvió los datos del proyecto.');
       const b = r.datos.bitacora || {};
+      actualizarRevisionProyecto(proyectoSel, b.revision);
       const sesiones = (b.sesiones || []).map(s => sesionDesdeBackend(s, proyectoSel)).filter(Boolean);
       const pendientes = (b.pendientes || []).map(p => pendienteDesdeBackend(p, proyectoSel)).filter(Boolean);
       const hitos = (b.hitos || []).map(h => hitoDesdeBackend(h, proyectoSel)).filter(Boolean);
@@ -1903,8 +1979,73 @@ function renderEstadoModo(){
   const el = $('#estadoModo'); if(!el) return;
   const sinSync = [].concat(estado.sesiones, estado.pendientes, estado.hitos).filter(x => x.sin_sync).length;
   const cola = colaOperaciones.length;
-  const t = !TIENE_APPS_SCRIPT ? '● Local' : (!sesionAutenticada() ? '● Sin sesión' : (cola ? '● ' + cola + ' cambio(s) pendientes' : (sinSync ? '● ' + sinSync + ' sin sincronizar' : '● Sincronizado')));
+  const conError = colaOperaciones.filter(op => op.estado === 'error' || op.estado === 'conflicto').length;
+  const t = !TIENE_APPS_SCRIPT ? '● Local' : (!sesionAutenticada() ? '● Sin sesión' :
+    (conError ? '● ' + conError + ' requiere(n) revisión' : cola ? '● ' + cola + ' cambio(s) pendientes' :
+      (sinSync ? '● ' + sinSync + ' sin sincronizar' : '● Sincronizado')));
   el.textContent = t;
+  el.title = cola ? 'Ver y administrar los cambios guardados en este dispositivo' : t;
+}
+function mostrarDetalleCola(){
+  const operaciones = colaOperaciones.slice().sort(compararOperacionesCola);
+  if(!operaciones.length){
+    abrirModal('<h2>Sin cambios pendientes</h2><p class="muted">No hay operaciones esperando sincronización.</p>');
+    return;
+  }
+  abrirModal('<h2>Sincronización pendiente</h2><p class="muted">' +
+    (navigator.onLine ? 'Los cambios se enviarán en orden al servidor.' : 'Sin conexión. Los cambios permanecen guardados en este dispositivo.') +
+    '</p><div class="vstack gap-2">' + operaciones.map((op, indice) => {
+      const actual = registroActualDeConflicto(op);
+      const snapshot = actual ? JSON.stringify(actual, null, 2).slice(0, 6000) : '';
+      const puedeReintentar = op.estado === 'error' ||
+        (op.estado === 'conflicto' && op.conflictTipo === 'revision' && op.accion !== 'guardar' &&
+          Number.isInteger(Number(op.revisionActual)));
+      return '<section class="tarjeta"><strong>' + esc(op.accion) + '</strong>' +
+        '<p class="muted">' + esc(op.local && op.local.tipo || 'Cambio') + ' · ' + esc(new Date(op.creado).toLocaleString('es-MX')) +
+        (op.estado === 'conflicto' ? ' · Conflicto: requiere revisión manual' : op.estado === 'error' ? ' · Requiere revisión o reintento' : ' · Pendiente') + '</p>' +
+        (op.error ? '<p class="aviso rojo">' + esc(op.error) + '</p>' : '') +
+        (op.estado === 'conflicto' ? '<p class="muted">Conflicto: ' + esc(op.conflictTipo || 'sin tipo') +
+          ' · Revisión actual del proyecto: ' + esc(op.revisionActual) + '</p>' +
+          (snapshot ? '<details><summary>Registro en el servidor</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto">' + esc(snapshot) + '</pre></details>' : '') +
+          (op.accion === 'guardar' ? '<p class="aviso">El envío completo no se reintentará: recarga y reconcilia antes de volver a guardar.</p>' : '') : '') +
+        (indice === 0 && puedeReintentar && navigator.onLine
+          ? '<button type="button" class="btn chico" data-cola-reintentar="' + esc(op.id) + '">' +
+            (op.estado === 'conflicto' ? 'Revisé el registro; reintentar' : 'Reintentar') + '</button> ' +
+            '<button type="button" class="btn chico peligro" data-cola-descartar="' + esc(op.id) + '">Descartar cambio local</button>'
+          : '') + '</section>';
+    }).join('') + '</div>');
+  $$('#modalContenido [data-cola-reintentar]').forEach(b => b.onclick = async () => {
+    const op = colaOperaciones.find(x => x.id === b.dataset.colaReintentar);
+    if(!op) return;
+    if(op.estado === 'conflicto' && !await prepararReintentoConflicto(op)){
+      avisar('Este conflicto no puede reintentarse con seguridad. Descarta el cambio o reconcilia los datos manualmente.', 'rojo');
+      return;
+    }
+    op.estado = 'pendiente';
+    delete op.error;
+    delete op.actual;
+    delete op.revisionActual;
+    delete op.conflictTipo;
+    delete op.reintentable;
+    try {
+      await guardarOperacionCola(op);
+      cerrarModal();
+      actualizarEstadoModo();
+      await reintentarColaCambios();
+    } catch(e){ avisar('No se pudo reintentar el cambio: ' + e.message, 'rojo'); }
+  });
+  $$('#modalContenido [data-cola-descartar]').forEach(b => b.onclick = async () => {
+    const op = colaOperaciones.find(x => x.id === b.dataset.colaDescartar);
+    if(!op || !navigator.onLine) return;
+    if(!await confirmarEliminacion('Descartar cambio pendiente', 'Se quitará esta operación local. El servidor conservará su versión actual.', 'Descartar cambio')) return;
+    try {
+      await quitarOperacionCola(op.id);
+      colaOperaciones = colaOperaciones.filter(x => x.id !== op.id);
+      await cargarDatos();
+      renderTodo();
+      mostrarDetalleCola();
+    } catch(e){ avisar('No se pudo descartar el cambio: ' + e.message, 'rojo'); }
+  });
 }
 
 /* ---------- Render: bitácoras ---------- */
@@ -2023,6 +2164,10 @@ function validarSesionEditable(s){
 }
 function guardarEdicionMasiva(){
   if(!exigirSesion()) return;
+  if(colaOperaciones.some(op => op.datos && op.datos.slug === proyectoSel && ACCIONES_CON_REVISION.has(op.accion))){
+    avisar('Sincroniza o revisa primero los cambios pendientes de este proyecto antes de usar la edición masiva.', 'rojo');
+    return;
+  }
   const cont = $('#lineaTiempo');
   const cambios = [];
   cont.querySelectorAll('tr[data-editar-id]').forEach(tr => {
@@ -2065,6 +2210,21 @@ function guardarEdicionMasiva(){
   edicionMasivaPausada = false;
   procesarEdicionMasiva();
 }
+function abrirRevisionEdicionMasiva(item, alConfirmar){
+  const actual = registroActualDeConflicto({
+    actual:item.conflictActual, local:{ tipo:'sesion', id:item.id }
+  });
+  abrirModal('<h2>Conflicto al editar sesión</h2><p>Compara la edición pendiente con el registro del servidor antes de continuar.</p>' +
+    '<p class="muted">Revisión actual: ' + esc(item.conflictRevision) + '</p>' +
+    '<h3>Registro en el servidor</h3><pre style="white-space:pre-wrap;max-height:220px;overflow:auto">' +
+    esc(actual ? JSON.stringify(actual, null, 2) : 'La sesión ya no existe.') + '</pre>' +
+    '<h3>Cambio local</h3><pre style="white-space:pre-wrap;max-height:220px;overflow:auto">' +
+    esc(JSON.stringify(item.nueva, null, 2)) + '</pre>' +
+    '<div class="fila"><button type="button" class="btn" id="confirmarRebaseMasivo">Revisé; aplicar mi edición</button>' +
+    '<button type="button" class="btn blanco" id="cancelarRebaseMasivo">Cancelar</button></div>');
+  $('#confirmarRebaseMasivo').onclick = () => { cerrarModal(); alConfirmar(); };
+  $('#cancelarRebaseMasivo').onclick = cerrarModal;
+}
 async function procesarEdicionMasiva(){
   if(edicionMasivaPausada) return;
   while(indiceEdicionMasiva < colaEdicionMasiva.length){
@@ -2072,7 +2232,10 @@ async function procesarEdicionMasiva(){
     const filaEstado = item.tr && item.tr.querySelector('[data-estado]');
     if(filaEstado){ filaEstado.textContent = 'Guardando…'; filaEstado.className = 'estado-edicion guardando'; item.tr.classList.remove('error-fila'); }
     try{
-      await llamar('editarSesion', { slug: proyectoSel, sesion: item.nueva });
+      const resultado = await llamar('editarSesion', {
+        slug: proyectoSel, revisionEsperada: revisionProyecto(proyectoSel), sesion: item.nueva
+      });
+      actualizarRevisionProyecto(proyectoSel, resultado.revision);
       if(filaEstado){ filaEstado.textContent = 'Guardado'; filaEstado.className = 'estado-edicion guardado'; }
       delete item.nueva.sin_sync;
       const indice = estado.sesiones.findIndex(s => s.id === item.id);
@@ -2080,6 +2243,12 @@ async function procesarEdicionMasiva(){
       guardar();
     }catch(e){
       item.nueva.sin_sync = true;
+      if(e.code === 'CONFLICT'){
+        item.conflictActual = e.actual || null;
+        item.conflictRevision = e.revisionActual;
+        item.conflictTipo = e.conflictTipo;
+        edicionMasivaPausada = true;
+      }
       const indice = estado.sesiones.findIndex(s => s.id === item.id);
       if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
       guardar();
@@ -2089,27 +2258,27 @@ async function procesarEdicionMasiva(){
         avisar('La sesión venció. Inicia sesión para reanudar el guardado masivo.', 'rojo');
         return;
       }
-      if(filaEstado){ filaEstado.textContent = 'Error — reintentar'; filaEstado.className = 'estado-edicion error'; item.tr.classList.add('error-fila'); }
+      if(filaEstado){ filaEstado.textContent = e.code === 'CONFLICT' ? 'Conflicto · revisar antes de reintentar' : 'Error — reintentar'; filaEstado.className = 'estado-edicion error'; item.tr.classList.add('error-fila'); }
       if(!item.tr.querySelector('[data-reintentar]')){
         const btn = document.createElement('button');
-        btn.type = 'button'; btn.className = 'btn blanco chico'; btn.dataset.reintentar = '1'; btn.textContent = 'Reintentar';
+        btn.type = 'button'; btn.className = 'btn blanco chico'; btn.dataset.reintentar = '1';
+        btn.textContent = e.code === 'CONFLICT' ? 'Revisar y reintentar' : 'Reintentar';
         btn.onclick = async () => {
           if(!sesionAutenticada()){ abrirLogin(); return; }
-          item.nueva.sin_sync = false;
-          try{
-            await llamar('editarSesion', { slug: proyectoSel, sesion: item.nueva });
-            delete item.nueva.sin_sync;
-            btn.remove(); filaEstado.textContent = 'Guardado'; filaEstado.className = 'estado-edicion guardado'; item.tr.classList.remove('error-fila');
-            const indice = estado.sesiones.findIndex(s => s.id === item.id);
-            if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
-            guardar();
-          }catch(e){
-            filaEstado.textContent = /Token/i.test(e.message || '') ? 'Pausado · inicia sesión' : 'Error — reintentar';
+          if(item.conflictTipo && item.conflictTipo !== 'revision'){
+            avisar('La sesión ya no puede actualizarse de forma segura. Recarga los datos y reconcilia el cambio.', 'rojo');
+            return;
           }
+          if(item.conflictTipo === 'revision'){
+            abrirRevisionEdicionMasiva(item, () => reintentarEdicionMasiva(item, filaEstado, btn, Number(item.conflictRevision)));
+            return;
+          }
+          await reintentarEdicionMasiva(item, filaEstado, btn, revisionProyecto(proyectoSel));
         };
         item.tr.lastElementChild.appendChild(document.createElement('br'));
         item.tr.lastElementChild.appendChild(btn);
       }
+      if(e.code === 'CONFLICT') return;
     }
     indiceEdicionMasiva++;
   }
@@ -2117,6 +2286,37 @@ async function procesarEdicionMasiva(){
   const fallidas = colaEdicionMasiva.length - guardadas;
   const resumen = $('#resumenEdicionMasiva');
   if(resumen) resumen.textContent = guardadas + ' guardada(s) · ' + fallidas + ' fallida(s) · sin cambios no enviadas.';
+}
+async function reintentarEdicionMasiva(item, filaEstado, btn, revisionEsperada){
+  item.nueva.sin_sync = false;
+  try{
+    const resultado = await llamar('editarSesion', {
+      slug: proyectoSel, revisionEsperada, sesion: item.nueva
+    });
+    actualizarRevisionProyecto(proyectoSel, resultado.revision);
+    delete item.nueva.sin_sync;
+    delete item.conflictActual;
+    delete item.conflictRevision;
+    delete item.conflictTipo;
+    btn.remove(); filaEstado.textContent = 'Guardado'; filaEstado.className = 'estado-edicion guardado'; item.tr.classList.remove('error-fila');
+    const indice = estado.sesiones.findIndex(s => s.id === item.id);
+    if(indice >= 0) estado.sesiones[indice] = JSON.parse(JSON.stringify(item.nueva));
+    guardar();
+    indiceEdicionMasiva = colaEdicionMasiva.indexOf(item) + 1;
+    edicionMasivaPausada = false;
+    await procesarEdicionMasiva();
+  }catch(e){
+    item.nueva.sin_sync = true;
+    if(e.code === 'CONFLICT'){
+      item.conflictActual = e.actual || null;
+      item.conflictRevision = e.revisionActual;
+      item.conflictTipo = e.conflictTipo;
+      edicionMasivaPausada = true;
+      btn.textContent = 'Revisar y reintentar';
+    }
+    filaEstado.textContent = e.code === 'CONFLICT' ? 'Conflicto · revisar antes de reintentar' :
+      /Token/i.test(e.message || '') ? 'Pausado · inicia sesión' : 'Error — reintentar';
+  }
 }
 function renderBitacoras(){
   const pr = estado.proyectos.find(p => p.slug === proyectoSel);
@@ -3469,6 +3669,7 @@ async function borrarLocal(){
 /* ---------- Inicio ---------- */
 /* M4: validar el token contra el backend antes de cargar los datos;
    si el backend lo rechaza, la sesión se cierra y solo queda lo local. */
+$('#estadoModo').addEventListener('click', mostrarDetalleCola);
 iniciarAplicacion();
 </script>
 </body>

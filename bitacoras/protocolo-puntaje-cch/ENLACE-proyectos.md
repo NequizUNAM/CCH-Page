@@ -6,7 +6,7 @@
 
 | Archivo | Para qué sirve |
 |---|---|
-| `../protocolo-puntaje-cch.json` | Catálogo de referencia: 158 actividades del JSON del usuario (el Cuadro oficial tiene 165; ver CORRECCIONES.md) |
+| `../docs/historico/protocolo-puntaje-cch-v1.json` | Catálogo de referencia: 158 actividades del JSON del usuario (el Cuadro oficial tiene 165; ver CORRECCIONES.md) |
 | `protocolo-puntaje-cch-CORRECCIONES.md` | Qué corrige el Cuadro oficial respecto al JSON |
 | `INDICE-plantillas-rubro.md` | Índice rubro → plantilla → destinatario → URLs |
 | `plantillas-rubro/rubro-I-apoyo-docencia.md` | Rubro I, 79 actividades |

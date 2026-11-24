@@ -231,6 +231,10 @@ const Api = {
     }
 
     if (auth === "admin" && !READ_ACTIONS.has(action)) Cache.invalidate(action, params);
+    if (auth === "student" && !READ_ACTIONS.has(action)) {
+      const student = Session.get("student") || {};
+      if (student.cuenta) Cache.clear(`s:${student.cuenta}`);
+    }
 
     if (result.status !== "success") {
       const error = new Error(result.message || "Ocurrió un error inesperado.");
@@ -259,6 +263,7 @@ const ApiQueue = {
   running: false,
   retryTimer: null,
   warned: new Set(),
+  refreshAfterDrain: false,
 
   init() {
     if (this.ready) return this.ready;
@@ -327,7 +332,7 @@ const ApiQueue = {
     const job = {
       id, action, params, auth,
       owner: auth === "student" ? student.cuenta : auth,
-      createdAt: Date.now(), attempts: 0, warned: false
+      createdAt: Date.now(), attempts: 0, warned: false, state: "pending"
     };
     await this.persist(job);
     this.jobs.push(job);
@@ -358,6 +363,7 @@ const ApiQueue = {
     try {
       while (this.jobs.length) {
         const job = this.jobs[0];
+        if (!navigator.onLine || job.state === "error" || job.state === "conflict") break;
         if (!this.hasCredentials(job)) break;
         try {
           const result = await Api._call(job.action, job.params, job.auth, job.id);
@@ -385,19 +391,25 @@ const ApiQueue = {
             this.retryTimer = setTimeout(() => this.kick(), delay);
             return;
           }
-          try { await this.remove(job); }
-          catch (storageError) { UI.toast("danger", `No se pudo retirar la solicitud fallida de la cola local: ${storageError.message}`); }
-          this.jobs.shift();
+          job.state = error.code === "CONFLICT" ? "conflict" : "error";
+          job.error = error.message;
+          try { await this.persist(job); }
+          catch (storageError) { UI.toast("danger", `No se pudo conservar la solicitud para revisión: ${storageError.message}`); }
           const waiter = this.waiters.get(job.id);
           if (waiter && waiter.reject) waiter.reject(error);
-          else if (error.code !== "AUTH") UI.toast("danger", `No se completó «${job.action}»: ${error.message}`);
+          else UI.toast("danger", `No se completó «${job.action}». Se conserva para revisión: ${error.message}`);
           this.waiters.delete(job.id);
           this.render();
+          break;
         }
       }
     } finally {
       this.running = false;
       this.render();
+      if (!this.jobs.length && this.refreshAfterDrain) {
+        this.refreshAfterDrain = false;
+        App.refreshCurrentData();
+      }
     }
   },
 
@@ -405,13 +417,14 @@ const ApiQueue = {
     const button = $("sync-status");
     if (!button) return;
     const count = this.jobs.length;
+    const needsReview = this.jobs.some(job => job.state === "error" || job.state === "conflict");
     button.classList.toggle("d-none", !count);
     button.replaceChildren(
-      h("span", { class: "spinner-border spinner-border-sm", role: "status", "aria-hidden": "true" }),
-      ` ${count} pendiente${count === 1 ? "" : "s"}`
+      h("i", { class: `bi ${!navigator.onLine ? "bi-wifi-off" : needsReview ? "bi-exclamation-triangle" : "bi-arrow-repeat"}`, "aria-hidden": "true" }),
+      ` ${!navigator.onLine ? "Sin conexión · " : needsReview ? "Revisar · " : ""}${count} pendiente${count === 1 ? "" : "s"}`
     );
     button.title = count ? "Ver solicitudes guardadas en la cola de sincronización" : "";
-    button.setAttribute("aria-label", `${count} solicitudes pendientes de sincronización`);
+    button.setAttribute("aria-label", `${count} solicitudes pendientes de sincronización${needsReview ? ", hay solicitudes que requieren revisión" : ""}`);
     if (count) this.checkAge();
   },
 
@@ -428,10 +441,42 @@ const ApiQueue = {
   },
 
   showDetails() {
-    const list = h("ul", { class: "mb-0" }, this.jobs.map(job => h("li", {}, `${job.action} · ${new Date(job.createdAt).toLocaleTimeString("es-MX")}`)));
+    const list = h("div", { class: "vstack gap-2" }, this.jobs.map(job => {
+      const state = job.state === "conflict" ? "Conflicto: requiere revisión manual."
+        : job.state === "error" ? "Error: requiere revisión o reintento manual."
+          : !navigator.onLine ? "Guardado en este dispositivo; se enviará al recuperar la conexión."
+            : "Esperando sincronización.";
+      const retry = h("button", {
+        class: "btn btn-sm btn-outline-primary", type: "button", text: "Reintentar",
+        onclick: async () => {
+          job.state = "pending";
+          delete job.error;
+          try { await this.persist(job); this.render(); this.kick(); }
+          catch (error) { UI.toast("danger", `No se pudo reintentar: ${error.message}`); }
+        }
+      });
+      const discard = h("button", {
+        class: "btn btn-sm btn-outline-danger", type: "button", text: "Descartar",
+        onclick: async () => {
+          if (!await UI.confirm(`¿Descartar «${job.action}»? Esta operación local no se enviará al servidor.`, { okText: "Descartar", danger: true })) return;
+          try {
+            await this.remove(job);
+            this.jobs = this.jobs.filter(item => item.id !== job.id);
+            this.waiters.delete(job.id);
+            this.render();
+            this.showDetails();
+          } catch (error) { UI.toast("danger", `No se pudo retirar la solicitud local: ${error.message}`); }
+        }
+      });
+      return h("div", { class: "border rounded p-2" },
+        h("div", { class: "fw-semibold", text: `${job.action} · ${new Date(job.createdAt).toLocaleString("es-MX")}` }),
+        h("div", { class: "small text-body-secondary", text: state }),
+        job.error ? h("div", { class: "small text-danger", text: job.error }) : null,
+        h("div", { class: "d-flex gap-2 mt-2" }, retry, discard));
+    }));
     UI.modal({
       title: [icon("arrow-repeat", "me-2"), "Cola de sincronización"],
-      body: h("div", {}, h("p", { class: "small text-body-secondary", text: "Los guardados y eliminaciones se procesan en orden. Las consultas continúan en paralelo." }), list)
+      body: h("div", {}, h("p", { class: "small text-body-secondary", text: "Los guardados se conservan en este dispositivo y se procesan en orden. Las operaciones con errores o conflictos permanecen aquí hasta revisarlas." }), list)
     });
   }
 };
@@ -932,14 +977,14 @@ const Cache = {
   TTL_MS: 12 * 60 * 60 * 1000,          // boot y grupos (solo lectura)
   TTL_PROFILE_MS: 15 * 60 * 1000,       // ficha del alumno
   on() { return Prefs.get("cache") !== false; },
-  /** null si está apagada, caducada o es de otra versión de la página. */
+  /** null si está apagada o es de otra versión; lo vencido se devuelve como obsoleto. */
   get(key) {
     if (!Cache.on()) return null;
     try {
       const x = JSON.parse(localStorage.getItem(Cache.PREFIX + key) || "null");
       if (!x || x.v !== CONFIG.VERSION) return null;
       const ttl = x.ttl || Cache.TTL_MS;
-      return Date.now() - x.t < ttl ? x : null;
+      return Object.assign({}, x, { stale: Date.now() - x.t >= ttl });
     } catch (e) { return null; }
   },
   set(key, data, ttlMs) {
@@ -947,7 +992,7 @@ const Cache = {
     const value = JSON.stringify({ t: Date.now(), v: CONFIG.VERSION, ttl: ttlMs || Cache.TTL_MS, d: data });
     try { localStorage.setItem(Cache.PREFIX + key, value); }
     catch (e) {
-      // Sin espacio: expulsa primero lo caducado y luego lo más viejo, una
+      // Sin espacio: expulsa primero lo incompatible y luego lo más viejo, una
       // entrada a la vez, en lugar de borrar toda la caché (antes un grupo
       // grande vaciaba la caché de todos los grupos).
       Cache.prune();
@@ -962,13 +1007,13 @@ const Cache = {
       Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX + prefix)).forEach(k => localStorage.removeItem(k));
     } catch (e) { /* nada */ }
   },
-  /** Borra solo las entradas caducadas o de otra versión. */
+  /** Conserva copias antiguas para lectura offline y elimina datos incompatibles. */
   prune() {
     try {
       Object.keys(localStorage).filter(k => k.startsWith(Cache.PREFIX)).forEach(k => {
         try {
           const x = JSON.parse(localStorage.getItem(k) || "null");
-          if (!x || x.v !== CONFIG.VERSION || Date.now() - x.t >= (x.ttl || Cache.TTL_MS)) localStorage.removeItem(k);
+          if (!x || x.v !== CONFIG.VERSION) localStorage.removeItem(k);
         } catch (e) { localStorage.removeItem(k); }
       });
     } catch (e) { /* nada */ }
@@ -1250,7 +1295,25 @@ const App = {
     });
     App.renderQr();
     ApiQueue.init();
-    window.addEventListener("online", () => ApiQueue.kick());
+    window.addEventListener("online", () => {
+      ApiQueue.refreshAfterDrain = true;
+      ApiQueue.kick();
+      App.refreshCurrentData();
+    });
+    window.addEventListener("offline", () => {
+      ApiQueue.render();
+      App.showOfflineNotice("Sin conexión. Se mostrarán los últimos datos guardados y las escrituras quedarán en cola.");
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (navigator.onLine) {
+        ApiQueue.refreshAfterDrain = true;
+        ApiQueue.kick();
+        App.refreshCurrentData();
+      } else {
+        ApiQueue.render();
+      }
+    });
     window.setInterval(() => ApiQueue.checkAge(), 15000);
 
     // Al cruzar el tamaño celular ↔ computadora se redibuja la pestaña del panel
@@ -1261,6 +1324,38 @@ const App = {
     window.addEventListener("beforeunload", e => {
       if (Admin.dirty && Admin.dirty.size) { e.preventDefault(); e.returnValue = ""; }
     });
+
+    // Interceptor inteligente de retroceso en Android (Gesto / Botón físico)
+    const onBackAction = () => {
+      const openModal = document.querySelector(".modal.show");
+      if (openModal) {
+        const closeBtn = openModal.querySelector(".btn-close, [data-bs-dismiss='modal']");
+        if (closeBtn) { closeBtn.click(); return; }
+        const inst = bootstrap.Modal.getInstance(openModal);
+        if (inst) { inst.hide(); return; }
+      }
+      if (Admin.dirty && Admin.dirty.size) {
+        if (!confirm("Tienes cambios sin guardar. ¿Deseas salir al menú principal?")) return;
+      }
+      window.location.href = "../index.html";
+    };
+
+    document.addEventListener("backbutton", e => {
+      e.preventDefault();
+      onBackAction();
+    }, false);
+
+    try {
+      history.pushState({ modulo: "asistencias" }, "");
+      window.addEventListener("popstate", () => {
+        const openModal = document.querySelector(".modal.show");
+        if (openModal) {
+          const closeBtn = openModal.querySelector(".btn-close, [data-bs-dismiss='modal']");
+          if (closeBtn) { closeBtn.click(); history.pushState({ modulo: "asistencias" }, ""); return; }
+        }
+        window.location.href = "../index.html";
+      });
+    } catch (e) {}
 
     App.route();
   },
@@ -1282,6 +1377,7 @@ const App = {
 
   show(view) {
     ["view-login", "view-student", "view-admin"].forEach(id => $(id).classList.toggle("d-none", id !== view));
+    if (view === "view-login") App.showOfflineNotice("");
     const logged = !!(Session.get("admin") || Session.get("student"));
     $("btn-logout").classList.toggle("d-none", !logged);
     $("btn-admin").querySelector("span").textContent = Session.get("admin") ? "Panel" : "Admin";
@@ -1294,6 +1390,29 @@ const App = {
     if (Session.get("student")) return Student.open();
     App.show("view-login");
     App.loadExamLinks();
+  },
+
+  showOfflineNotice(message, savedAt = null) {
+    const notice = $("offline-notice");
+    if (!notice) return;
+    if (!message) {
+      notice.textContent = "";
+      notice.classList.add("d-none");
+      return;
+    }
+    const updated = savedAt ? ` Última copia: ${new Date(savedAt).toLocaleString("es-MX")}.` : "";
+    notice.textContent = message + updated;
+    notice.classList.remove("d-none");
+  },
+
+  async refreshCurrentData() {
+    if (!navigator.onLine) return;
+    if (Session.get("admin")) {
+      if (Admin.boot) await Admin.loadGroup();
+      else await Admin.loadBoot();
+    } else if (Session.get("student")) {
+      await Student.load();
+    }
   },
 
   /** Inicio: solo se muestran los exámenes que tienen algún parcial abierto. */
@@ -1435,7 +1554,7 @@ const App = {
       sw("compact", "Tablas compactas"),
       sw("remember", "Recordar mi número de cuenta", "Útil en tu celular; no lo actives en computadoras compartidas."),
       sw("showHidden", "Admin: mostrar columnas «Oculto» del reporte", "Se ven en gris; los alumnos nunca las ven."),
-      sw("cache", "Admin: carga instantánea (guardar datos en este equipo)", "Abre el panel con lo último que viste y actualiza en segundo plano. Se borra al presionar Salir. Desactívalo en computadoras compartidas."),
+      sw("cache", "Guardar datos para consulta sin conexión", "Conserva datos administrativos y del alumno en este dispositivo. Se borran al cerrar sesión; desactívalo en equipos compartidos."),
       h("button", {
         class: "btn btn-sm btn-outline-danger", type: "button",
         onclick: () => { Prefs.reset(); App.applyTheme(); App.applyRows(); App.openPrefs(); UI.toast("info", "Preferencias restablecidas."); }
@@ -1494,13 +1613,39 @@ const Student = {
   },
 
   async load() {
-    UI.loading($("stu-content"), "Cargando tu información…");
-    try {
-      Student.data = await Api.call("studentData", {}, "student");
+    const student = Session.get("student") || {};
+    const cached = student.cuenta ? Cache.get(`s:${student.cuenta}`) : null;
+    if (cached) {
+      Student.data = cached.d;
       Student.courseIndex = Math.min(Student.courseIndex, Math.max(Student.data.courses.length - 1, 0));
       Student.render();
+      if (!navigator.onLine) {
+        App.showOfflineNotice("Sin conexión. Mostrando tus últimos datos guardados.", cached.t);
+        return;
+      }
+    } else if (!navigator.onLine) {
+      $("stu-content").replaceChildren(UI.empty("wifi-off", "No hay conexión ni datos guardados para esta cuenta. Conéctate una vez para habilitar la consulta sin conexión."));
+      App.showOfflineNotice("Sin conexión y sin una copia local de esta cuenta.");
+      return;
+    } else {
+      UI.loading($("stu-content"), "Cargando tu información…");
+    }
+    try {
+      const fresh = await Api.call("studentData", {}, "student");
+      if (student.cuenta) Cache.set(`s:${student.cuenta}`, fresh);
+      Student.data = fresh;
+      Student.courseIndex = Math.min(Student.courseIndex, Math.max(Student.data.courses.length - 1, 0));
+      Student.render();
+      App.showOfflineNotice("");
     } catch (error) {
-      if (error.code !== "AUTH") $("stu-content").replaceChildren(UI.empty("wifi-off", error.message));
+      if (error.code === "AUTH") return;
+      if (cached) {
+        Student.data = cached.d;
+        Student.render();
+        App.showOfflineNotice(`No se pudo actualizar. Mostrando los datos guardados. ${error.message}`, cached.t);
+      } else {
+        $("stu-content").replaceChildren(UI.empty("wifi-off", error.message));
+      }
     }
   },
 
@@ -1889,9 +2034,17 @@ const Admin = {
     } else {
       UI.loading($("adm-content"), "Cargando panel…");
     }
+    if (!navigator.onLine) {
+      App.showOfflineNotice(cached
+        ? "Sin conexión. Mostrando el panel administrativo guardado."
+        : "Sin conexión y sin una copia local del panel administrativo.", cached && cached.t);
+      if (!cached) $("adm-content").replaceChildren(UI.empty("wifi-off", "Conéctate una vez para guardar y consultar este panel sin conexión."));
+      return;
+    }
     try {
       const fresh = await Api.call("adminBootstrap", {}, "admin");
       Cache.set("boot", fresh);
+      App.showOfflineNotice("");
       const changed = !cached || JSON.stringify(cached.d) !== JSON.stringify(fresh);
       Admin.boot = fresh;
       if (changed) {
@@ -1900,7 +2053,10 @@ const Admin = {
       }
       if (!cached) await Admin.loadGroup();
     } catch (error) {
-      if (error.code !== "AUTH" && !cached) $("adm-content").replaceChildren(UI.empty("wifi-off", error.message));
+      if (error.code !== "AUTH") {
+        if (cached) App.showOfflineNotice(`No se pudo actualizar. Mostrando el panel guardado. ${error.message}`, cached.t);
+        else $("adm-content").replaceChildren(UI.empty("wifi-off", error.message));
+      }
     }
   },
 
@@ -1936,10 +2092,18 @@ const Admin = {
       UI.loading($("adm-content"));
       $("adm-toolbar").replaceChildren();
     }
+    if (!navigator.onLine) {
+      App.showOfflineNotice(cached
+        ? "Sin conexión. Mostrando los últimos datos guardados de este grupo."
+        : "Este grupo todavía no tiene una copia local. Conéctate para cargarlo.", cached && cached.t);
+      if (!cached) $("adm-content").replaceChildren(UI.empty("wifi-off", "No hay datos guardados de este grupo."));
+      return;
+    }
     try {
       const fresh = await Api.call("groupData", { idCurso: id }, "admin");
       if (token !== Admin._loadToken) return;          // el usuario ya cambió de grupo
       Cache.set("g:" + id, fresh);
+      App.showOfflineNotice("");
       const changed = !cached || JSON.stringify(cached.d) !== JSON.stringify(fresh);
       Admin.group = fresh;
       Admin.renderStats(false);
@@ -1948,7 +2112,10 @@ const Admin = {
       if (busy) UI.toast("info", "Hay datos más recientes; se mostrarán al recargar.");
       else Admin.renderTab();
     } catch (error) {
-      if (error.code !== "AUTH" && !cached) $("adm-content").replaceChildren(UI.empty("exclamation-octagon", error.message));
+      if (error.code !== "AUTH") {
+        if (cached) App.showOfflineNotice(`No se pudo actualizar este grupo. Mostrando la copia guardada. ${error.message}`, cached.t);
+        else $("adm-content").replaceChildren(UI.empty("exclamation-octagon", error.message));
+      }
     }
   },
 

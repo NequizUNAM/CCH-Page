@@ -1,5 +1,10 @@
 # CCH Proyectos — APK con Ionic y Capacitor
 
+> - **Versión actual:** `v1.2.0`
+> - **Identificador de entrega:** `CCH-MOB-002` (Build `2`)
+> - **ID de aplicación Android:** `mx.unam.cch.proyectos`
+> - **Fecha de corte:** Noviembre 2026
+
 Este proyecto convierte en una aplicación Android las dos páginas existentes:
 
 - `www/asistencias/`: Dashboard CCH, asistencia, calificaciones, equipos y exámenes.
@@ -16,11 +21,14 @@ apk/
 ├── README.md
 ├── package.json
 ├── ionic.config.json
-├── capacitor.config.ts
+├── capacitor.config.json
 ├── vite.config.ts
 └── www/
     ├── index.html
     ├── manifest.webmanifest
+    ├── icon-512.png
+    ├── icon-192.png
+    ├── favicon.png
     ├── asistencias/
     └── bitacoras/
 ```
@@ -186,3 +194,29 @@ Para compartir fotos o documentos:
 - IndexedDB/localStorage dentro de Android no se mezcla con el navegador de Windows.
 - Si cambias el identificador Android, podrás instalar una segunda aplicación separada.
 - El APK no reemplaza la publicación de las páginas web.
+
+## Modo offline actual
+
+- El lanzador y los archivos propios incluidos en `www/` se cargan desde el APK. Las hojas/iconos de Bootstrap servidos por CDN y las APIs de Apps Script necesitan conexión.
+- Asistencias conserva copias previas de datos y su cola de escrituras en IndexedDB; al reconectar reintenta las solicitudes. No todas las acciones se reflejan optimistamente en pantalla mientras están offline.
+- Bitácoras lee el estado local, proyecta los cambios de su outbox IndexedDB y los sincroniza al volver la conexión.
+- Los exámenes guardan respuestas locales y encolan resultados, pero iniciar sesión y cargar un examen nuevo requiere internet.
+- El backend de Bitácoras valida una revisión por documento `bitacora.json` bajo `LockService`. Los conflictos quedan en la cola y pueden inspeccionarse; el usuario puede rebasar manualmente operaciones por registro tras revisar la versión remota. Las escrituras completas requieren reconciliación y no se reintentan ciegamente.
+
+La versión actualizada de `bitacoras/Codigo.gs` debe copiarse y desplegarse como una nueva versión de Apps Script para habilitar este control en producción. La revisión de Bitácoras no se aplica al servicio independiente de Asistencias. Las páginas de la raíz y las copias de `apk/www/` son fuentes separadas; los cambios en una no se copian automáticamente a la otra.
+
+---
+
+## Historial de versiones del APK
+
+### `CCH-MOB-002` — Versión `1.2.0` (Build `2`) · Noviembre 2026
+* **Ajuste de SafeArea:** Desplazamiento dinámico superior para librar la barra de notificaciones y cámaras perforadas (notch) en todas las pantallas.
+* **Pase de lista táctil compacto:** Rediseño a una sola fila horizontal (Nombre + Iconos compactos de asistencia ✓ / ✗ / J) y número de cuenta inferior.
+* **Arraigo de sesión permanente:** Persistencia de login en `localStorage` con casilla *"Guardar sesión en este celular"*.
+* **Auditoría responsiva móvil:** Optimización de botones de Bitácoras, cuadrícula de 2 columnas para exportaciones, navegación de calendario y toolbar de Asistencias.
+* **Icono institucional CCH:** Creación de conjunto de iconos adaptativos en azul marino y dorado UNAM con las siglas CCH y el emblema institucional.
+* **Corrección de configuración:** Migración de `capacitor.config.ts` a `capacitor.config.json` para evitar incompatibilidades de transpilación TypeScript en tiempo de ejecución.
+
+### `CCH-MOB-001` — Versión `1.0.0` (Build `1`) · Noviembre 2026
+* Empaquetado inicial de Asistencias y Bitácoras dentro de un proyecto Capacitor/Android.
+* Pantalla lanzadora básica en `www/index.html`.

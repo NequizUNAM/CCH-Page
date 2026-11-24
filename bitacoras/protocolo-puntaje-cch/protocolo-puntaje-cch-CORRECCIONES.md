@@ -1,7 +1,7 @@
 # Correcciones al protocolo de puntaje CCH (JSON del usuario vs Cuadro del PDF)
 
 **Fecha:** 2026-11-18
-**Archivo original (SIN modificar):** `../protocolo-puntaje-cch.json` — JSON pegado por Nequiz el 2026-11-18 12:04, 158 actividades, SHA-256 `d2f04f019a667b89589d665e600c3795241345c9b315a9d45d45160e5e0e9366`.
+**Archivo original (SIN modificar):** `../docs/historico/protocolo-puntaje-cch-v1.json` — JSON pegado por Nequiz el 2026-11-18 12:04, 158 actividades, SHA-256 `d2f04f019a667b89589d665e600c3795241345c9b315a9d45d45160e5e0e9366`.
 **Fuente de corrección:** PDFs subidos por Nequiz el 2026-11-18 12:13 — Protocolo de Equivalencias 2020 (60 págs.) e Instructivo de Asignación de Horarios 2023 (22 págs.). Cuadro pp. 53-57 revisado visualmente página por página.
 **Regla:** el JSON original no se toca. Estas correcciones se aplican solo a las plantillas por rubro (`plantillas-rubro/`) y a la versión de trabajo de la página.
 

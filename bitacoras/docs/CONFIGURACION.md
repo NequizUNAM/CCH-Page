@@ -5,7 +5,7 @@
 
 Guía corta y concreta para dejar la v1 funcionando. Nequiz hace estos pasos él mismo, con su propia cuenta de Google y su propia cuenta de GitHub.
 
-Resumen del programa en [`README.md`](README.md). El checklist de decisiones (27 secciones) está en `../checklist-bitacora-web.md` y la guía de AppSheet en `../guia-configuracion-appsheet.md`.
+Resumen y estructura en el [README principal](../../README.md). El checklist de decisiones (27 secciones) está en [`checklist-bitacora-web.md`](checklist-bitacora-web.md) y la guía de AppSheet en [`guia-configuracion-appsheet.md`](guia-configuracion-appsheet.md).
 
 > **Placeholders:** en esta entrega no hay URLs ni contraseñas reales. Donde veas `TU_URL_APPS_SCRIPT_AQUI`, `TU_CONTRASENA_AQUI` o `TU_REPO_AQUI`, pon tu valor real. La tabla completa está al final de esta guía.
 
@@ -17,10 +17,10 @@ Resumen del programa en [`README.md`](README.md). El checklist de decisiones (27
 2. Crea una carpeta llamada **`Bitacoras`** en la raíz de tu Drive si todavía no existe.
 3. No crees `Proyectos/`, carpetas de proyectos ni una carpeta `Evidencias/` global a mano. Apps Script valida si ya existen y crea lo que falte.
 4. Sube a `Bitacoras/` estos archivos de esta entrega:
-   - `INDICE-bitacoras.json` → en `Bitacoras/` (plantilla vacía; la aplicación actualiza los proyectos automáticamente)
-   - `banco-peticiones.json` → en `Bitacoras/` (referencia; no lo edita la página)
-   - Las seis plantillas de `plantillas/` son heredadas y opcionales; no es necesario crear proyectos ni carpetas para ellas.
-   - `formato-por-defecto.json` es opcional; se aplica cuando se genera un informe sin formato propio.
+   - `../data/INDICE-bitacoras.json` → en `Bitacoras/` (plantilla vacía; la aplicación actualiza los proyectos automáticamente)
+   - `../integraciones/muse/banco-peticiones.json` → en `Bitacoras/` solo si Muse lo requiere (referencia; no lo edita la página)
+   - Las seis plantillas de `docs/historico/plantillas/` son heredadas y opcionales; no es necesario crear proyectos ni carpetas para ellas.
+   - `../data/formato-por-defecto.json` es opcional; consérvalo como referencia al configurar un informe sin formato propio.
 5. El índice puede iniciar sin proyectos. La página crea el registro del proyecto, su `bitacora.json`, ficha, plantilla, formato y `Evidencias/` al usar **Agregar proyecto**; no crees un `bitacoras.json` global.
 6. El libro **`Bitacoras`** se crea o reutiliza automáticamente en `Bitacoras/Proyectos/` al ejecutar la creación de estructura. Debe contener estas cinco hojas (la hoja `Firmas` ya no existe):
    - `Bitacoras`
@@ -29,7 +29,7 @@ Resumen del programa en [`README.md`](README.md). El checklist de decisiones (27
    - `Hitos`
    - `Puntaje`
    
-   Cada hoja lleva sus columnas según `../guia-configuracion-appsheet.md` (mismas hojas para la web y para AppSheet). No hace falta llenarlas: se llenan solas al usar la página. Si ya hay un libro llamado `Bitacoras` fuera de `Proyectos/`, Apps Script lo mueve allí y lo reutiliza; no crea otro.
+   Cada hoja lleva sus columnas según `guia-configuracion-appsheet.md` (mismas hojas para la web y para AppSheet). No hace falta llenarlas: se llenan solas al usar la página. Si ya hay un libro llamado `Bitacoras` fuera de `Proyectos/`, Apps Script lo mueve allí y lo reutiliza; no crea otro.
 7. No tienes que copiar IDs de Drive en Apps Script: la raíz `Bitacoras/` y `Proyectos/` se buscan por nombre. El programa guarda automáticamente el ID del libro en Script Properties y el de cada carpeta de proyecto en `INDICE-bitacoras.json`.
 
 > **Nota (M11):** las evidencias que se suben a Drive son **privadas del dueño** por defecto: sus enlaces `/view` solo los abre la cuenta propietaria. Los informes Word/PDF del botón Exportar se descargan en el navegador, no se suben automáticamente. Si guardas un informe por otra vía en `Informes/`, comparte esa carpeta manualmente; el programa no cambia permisos.
@@ -43,7 +43,7 @@ Resumen del programa en [`README.md`](README.md). El checklist de decisiones (27
 1. Abre [GitHub](https://github.com) con tu cuenta.
 2. Crea un repositorio nuevo. **Nombre a elegir; sugerencia: `bitacoras`**. Puedes ponerle el nombre que quieras; en esta guía se usa `TU_REPO_AQUI` como placeholder.
    - Visibilidad: público (necesario para GitHub Pages gratuito) o privado con Pages habilitado según tu plan.
-3. Sube **solo `index.html` y `protocolo-puntaje-cch-v2.json`** a la raíz del repo (o a la carpeta `docs/` si prefieres esa opción; elige una, no las dos). Auditoría v2, Paso 7g: el resto de la carpeta (checklist, análisis, auditorías, plantillas) es documentación interna y NO se publica.
+3. En este repositorio, GitHub Pages conserva la publicación desde la raíz y Bitácoras se sirve desde `bitacoras/`; deja ahí `index.html` y `protocolo-puntaje-cch-v2.json` para mantener sus URL actuales. Si instalas Bitácoras en un repositorio aparte, publica ambos archivos juntos desde la raíz (o juntos desde `docs/`).
 4. Activa GitHub Pages:
    - Ve a **Settings → Pages**.
    - En **Source**, elige la rama principal (`main`) y la carpeta donde subiste `index.html` (raíz `/` o `/docs`, según el paso anterior).
@@ -68,7 +68,7 @@ Resumen del programa en [`README.md`](README.md). El checklist de decisiones (27
 
 ## 4) Pegar la URL en UN solo lugar: `index.html`
 
-1. Abre `index.html` (el archivo de tu repo local, o edítalo en GitHub).
+1. Abre `bitacoras/index.html` (el archivo de este repositorio, o edítalo en GitHub).
 2. Busca el objeto `CONFIG` y pon la URL del paso 3 en **ese único lugar**:
    ```js
    const CONFIG = {
@@ -94,7 +94,7 @@ La página tiene login con contraseña aparte. La contraseña **nunca va en el H
 
 ## 6) AppSheet: conectar a las hojas de Drive
 
-1. Sigue **`../guia-configuracion-appsheet.md`** (checklist §26). Ahí están las hojas, las columnas y las vistas.
+1. Sigue [`guia-configuracion-appsheet.md`](guia-configuracion-appsheet.md) (checklist §26). Ahí están las hojas, las columnas y las vistas.
 2. Abre [AppSheet](https://www.appsheet.com) con la misma cuenta de Google.
 3. Crea una app nueva conectada al libro de hojas del paso 1 (las 5 hojas: `Bitacoras`, `Sesiones`, `Pendientes`, `Hitos`, `Puntaje`).
 4. AppSheet lee y escribe en las **mismas hojas** que usa la página web; no crees hojas duplicadas.
@@ -108,7 +108,7 @@ Con la página publicada y la URL de Apps Script puesta:
 2. Haz **login** con la contraseña del paso 5. Comprueba que sin la contraseña no entras a mantenimiento. (C5: la lectura de Drive también exige sesión; sin login la página solo muestra los datos locales.)
 3. En **Mantenimiento → Agregar proyecto**, crea un proyecto de prueba. Debe aparecer seleccionado y en el selector; comprueba en Drive `Bitacoras/Proyectos/<folio>/` y el libro `Bitacoras` dentro de `Proyectos/`.
 4. Crea una sesión en ese proyecto y recarga la página. Debe seguir visible; comprueba que su `bitacora.json`, la carpeta `Evidencias/` y las hojas se actualizaron.
-5. Haz la lista completa de pruebas del apartado **«Cómo probar la v1»** de `README.md` (acuerdo → pendiente, marcar hecho, calendario, exportar JSON/CSV, login bloqueado sin sesión y modo local sin URL).
+5. Haz las pruebas de creación, sincronización y conflicto descritas en [Validación de Bitácoras](../../README.md#validación-de-bitácoras), además de comprobar calendario y exportaciones.
 
 Si algo falla, anota en qué paso, con qué proyecto y qué mensaje apareció. Confirma que el nuevo `index.html` está publicado en GitHub Pages y que `Codigo.gs` está implementado como nueva versión; la URL `/exec` debe seguir pegada en `CONFIG.appsScriptUrl`.
 

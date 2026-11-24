@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#002663">
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>CCH Proyectos</title>
   <style>
@@ -22,8 +24,16 @@
     .texto{min-width:0}
     .texto strong{display:block;font-size:18px;margin-bottom:4px}
     .texto span{display:block;color:#64748b;font-size:14px;line-height:1.35}
-    .flecha{margin-left:auto;font-size:24px;color:#94a3b8}
+    .flecha{margin-left:auto;font-size:24px;color:#94a3b8;flex-shrink:0}
     footer{text-align:center;color:#64748b;font-size:12px;padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
+    @media (max-width:420px){
+      header{padding:calc(38px + env(safe-area-inset-top, 0px)) 16px 18px}
+      header h1{font-size:21px}
+      .proyecto{padding:14px;gap:12px;min-height:96px;border-radius:14px}
+      .icono{width:48px;height:48px;flex:0 0 48px;font-size:22px;border-radius:12px}
+      .texto strong{font-size:16px}
+      .texto span{font-size:13px}
+    }
   </style>
 </head>
 <body>
