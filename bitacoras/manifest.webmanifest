@@ -1,0 +1,25 @@
+{
+  "id": "./index.html",
+  "name": "Bitácoras CCH",
+  "short_name": "Bitácoras",
+  "description": "Gestiona sesiones, pendientes, hitos y puntaje CCH.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#002663",
+  "icons": [
+    {
+      "src": "../apk/www/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../apk/www/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

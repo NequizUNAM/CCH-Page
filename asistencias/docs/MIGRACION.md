@@ -141,7 +141,7 @@ En **Asistencia → Exportar**:
 
 La tabla de **Asistencia** concentra la lista y la captura. El botón **Capturar calificaciones** habilita la edición de componentes manuales y **Guardar** aplica los cambios. Ya no hay un botón visible **Descartar**; al salir con calificaciones pendientes se pide confirmación antes de perderlas. Guarda antes de exportar o importar. Los botones con icono **1** muestran la tabla completa; el icono **2** muestra solo ponderaciones y calificaciones. Si había quedado guardada la pestaña antigua **Captura**, se abre automáticamente la vista integrada.
 
-En la web HTML de escritorio, el icono de comentario muestra los comentarios del grupo al pasar el cursor. No se muestra popover en móvil ni en el APK. El botón **Leyenda** se retiró de la vista.
+En la web HTML de escritorio, al activar el icono de comentario se muestra por defecto solo el comentario más reciente. El popover es más amplio y se puede redimensionar con el mouse; los demás comentarios permanecen en la ficha del alumno. No se muestra popover en móvil ni en el APK. El botón **Leyenda** se retiró de la vista.
 
 El botón **Exportar** abre un modal con exportación a PSI, descarga/importación de plantilla Excel y el reporte completo del grupo. El libro `Reporte_grupo` conserva el orden de columnas y alumnos de `Reporte_`, incluye grupo, materia, ciclo y fecha de exportación, y excluye comentarios e indicadores calculados de la interfaz.
 
@@ -300,7 +300,7 @@ Si das de alta alumnos directamente en la hoja, escribe en la columna `Course` e
 
 **Asistencia — Exportar.** Un solo modal ofrece PSI, plantilla Excel, importación y el libro `Reporte_grupo` con la estructura completa de `Reporte_`, grupo, materia, ciclo y fecha; no añade comentarios ni indicadores de la interfaz.
 
-**Comentarios.** En HTML de escritorio, el icono de comentario abre un popover con los comentarios del grupo al pasar el cursor. No aplica en móvil ni APK.
+**Comentarios.** En HTML de escritorio, al activar el icono se abre un popover más amplio y redimensionable con el comentario más reciente del alumno. El historial completo sigue disponible en su ficha. No aplica en móvil ni APK.
 
 ## Novedades v7.1 — triaje y riesgo a la vista
 

@@ -519,11 +519,13 @@ const UI = {
   },
 
   /** Popover accesible (hover/foco/toque). content = HTML YA escapado. */
-  popover(el, title, contentHtml) {
+  popover(el, title, contentHtml, options = {}) {
     el.setAttribute("tabindex", "0");
     el.setAttribute("role", "button");
     el.dataset.pop = "1";
-    new bootstrap.Popover(el, { title, content: contentHtml, html: true, trigger: "hover focus", placement: "top", container: "body" });
+    new bootstrap.Popover(el, Object.assign({
+      title, content: contentHtml, html: true, trigger: "hover focus", placement: "top", container: "body"
+    }, options));
   }
 };
 
@@ -2101,9 +2103,12 @@ const Admin = {
       const badge = h("span", { class: "badge text-bg-warning", title: `${s.comments} comentario(s)` }, icon("chat-left-text"), ` ${s.comments}`);
       if (!ES_APK && !Mobile.is()) {
         const content = comments.length
-          ? comments.map((text, i) => `<div class="comment-item${i ? " mt-2" : ""}" style="white-space:pre-line">${Fmt.escape(text)}</div>`).join("")
+          ? `<div class="comment-item" style="white-space:pre-line">${Fmt.escape(comments[0])}</div>`
           : '<div class="small text-body-secondary">No hay comentarios para este grupo. Abre la ficha para ver los demás.</div>';
-        UI.popover(badge, `${s.comments} comentario(s)`, content);
+        UI.popover(badge, `${s.comments} comentario(s) · último comentario`, content, {
+          trigger: "focus",
+          customClass: "student-comments-popover"
+        });
       }
       wrap.append(badge);
     }

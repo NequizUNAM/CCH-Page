@@ -328,6 +328,15 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 .mini-card { border: 1px solid var(--line); border-radius: 12px; padding: .5rem .7rem; margin-bottom: .5rem; background: #f8fafc; }
 .comment-item { border-left: 4px solid var(--warn); padding: .45rem .8rem; margin-bottom: .5rem; background: var(--bs-body-bg); border-radius: 0 10px 10px 0; box-shadow: var(--shadow-sm); }
 .comment-item.web { border-left-color: var(--acc); }
+.student-comments-popover {
+  --bs-popover-max-width: min(44rem, 90vw);
+  width: min(30rem, 76vw);
+  min-width: min(22rem, 68vw);
+  min-height: 8rem;
+  max-height: 75vh;
+  resize: both;
+  overflow: auto;
+}
 
 /* ---------- 10. Vista del alumno ---------- */
 .overview-card { overflow: hidden; }

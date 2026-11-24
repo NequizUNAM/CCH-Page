@@ -1,0 +1,25 @@
+{
+  "id": "./index.html",
+  "name": "CCH Asistencias",
+  "short_name": "CCH",
+  "description": "Consulta asistencia, calificaciones, grupos y exámenes del CCH.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b1437",
+  "icons": [
+    {
+      "src": "./apk/www/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./apk/www/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
