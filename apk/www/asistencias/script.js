@@ -10,9 +10,8 @@
    ============================================================ */
 
 const CONFIG = {
-  // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
-  // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
-  API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
+  // Se configura en la primera visita y se guarda en el navegador; el QR comparte ?api=.
+  API_URL: "",
   VERSION: "7.1",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,
@@ -108,7 +107,9 @@ const ApiUrl = {
     const url = params.get("api");
     if (!url) return;
     if (ApiUrl.valid(url) && !CONFIG.API_URL) ApiUrl.set(url);
-    history.replaceState(null, "", location.pathname + location.hash);
+    params.delete("api");
+    const query = params.toString();
+    history.replaceState(null, "", location.pathname + (query ? `?${query}` : "") + location.hash);
   }
 };
 
@@ -1281,6 +1282,8 @@ const App = {
     $("btn-prefs").addEventListener("click", App.openPrefs);
     $("admin-login").addEventListener("submit", App.submitAdminLogin);
     $("student-login").addEventListener("submit", Student.login);
+    $("roll-back-courses").addEventListener("click", () => PaseLista.showCourses());
+    $("roll-refresh").addEventListener("click", () => PaseLista.refresh());
 
     if (Prefs.get("remember")) {
       $("login-cuenta").value = Prefs.get("cuenta") || "";
@@ -1376,7 +1379,7 @@ const App = {
   },
 
   show(view) {
-    ["view-login", "view-student", "view-admin"].forEach(id => $(id).classList.toggle("d-none", id !== view));
+    ["view-login", "view-student", "view-admin", "view-rollcall"].forEach(id => $(id).classList.toggle("d-none", id !== view));
     if (view === "view-login") App.showOfflineNotice("");
     const logged = !!(Session.get("admin") || Session.get("student"));
     $("btn-logout").classList.toggle("d-none", !logged);
@@ -1386,6 +1389,14 @@ const App = {
 
   route() {
     if (!ApiUrl.get()) return App.showSetup();
+    if (PaseLista.isRoute()) {
+      if (Session.get("admin")) return PaseLista.open();
+      document.body.classList.remove("rollcall-only");
+      App.show("view-login");
+      App.loadExamLinks();
+      return;
+    }
+    document.body.classList.remove("rollcall-only");
     if (Session.get("admin")) return Admin.open();
     if (Session.get("student")) return Student.open();
     App.show("view-login");
@@ -1407,6 +1418,7 @@ const App = {
 
   async refreshCurrentData() {
     if (!navigator.onLine) return;
+    if (PaseLista.isRoute()) return PaseLista.refreshSelectedGroup();
     if (Session.get("admin")) {
       if (Admin.boot) await Admin.loadGroup();
       else await Admin.loadBoot();
@@ -1463,7 +1475,7 @@ const App = {
   },
 
   openAdmin() {
-    if (Session.get("admin")) return Admin.open();
+    if (Session.get("admin")) return App.route();
     $("admin-login").reset();
     $("admin-error").classList.add("d-none");
     bootstrap.Modal.getOrCreateInstance($("modal-admin")).show();
@@ -1481,7 +1493,7 @@ const App = {
         Session.set("factory", !!result.factoryPassword);
       });
       bootstrap.Modal.getOrCreateInstance($("modal-admin")).hide();
-      Admin.open();
+      App.route();
     } catch (error) {
       errorBox.textContent = error.message;
       errorBox.classList.remove("d-none");
@@ -1503,7 +1515,7 @@ const App = {
     Cache.clear();
     Admin.reset();
     Student.data = null;
-    App.show("view-login");
+    App.route();
     UI.toast("info", "Sesión cerrada.");
   },
 
@@ -4192,6 +4204,333 @@ const Admin = {
     content.replaceChildren(h("div", { class: "row g-3" },
       h("div", { class: "col-12 col-xl-5 vstack gap-3" }, enrollCard, cycleCard, backupsCard, structureCard, serverCard),
       h("div", { class: "col-12 col-xl-7 vstack gap-3" }, examCard, backupCard, dangerCard, factoryCard)));
+  }
+};
+
+/* ============================================================
+   PASE DE LISTA SIMPLE (solo APK)
+   Usa la misma sesión, caché y cola IndexedDB del panel.
+   ============================================================ */
+const PaseLista = {
+  boot: null,
+  group: null,
+  groupId: "",
+  markVersions: new Map(),
+
+  isRoute() {
+    return new URLSearchParams(location.search).get("modo") === "pase-lista";
+  },
+
+  async open() {
+    if (!Session.get("admin")) {
+      document.body.classList.remove("rollcall-only");
+      App.show("view-login");
+      return;
+    }
+    document.body.classList.add("rollcall-only");
+    App.show("view-rollcall");
+    await ApiQueue.init();
+    if (ApiQueue.jobs.length) ApiQueue.refreshAfterDrain = true;
+    this.showCourses();
+    await this.loadCourses();
+  },
+
+  showCourses() {
+    this.group = null;
+    this.groupId = "";
+    $("roll-courses-panel").classList.remove("d-none");
+    $("roll-group-panel").classList.add("d-none");
+    App.show("view-rollcall");
+    this.renderCourses();
+  },
+
+  async loadCourses() {
+    const cached = Cache.get("boot");
+    if (cached && cached.d && Array.isArray(cached.d.groups)) {
+      this.boot = cached.d;
+      this.renderCourses();
+    } else {
+      $("roll-course-list").replaceChildren(UI.empty("hourglass-split", "Cargando cursos…"));
+    }
+    if (!navigator.onLine) {
+      App.showOfflineNotice(cached
+        ? "Sin conexión. Se muestran los cursos guardados en este dispositivo."
+        : "Sin conexión y sin cursos guardados. Conéctate una vez para cargar tus cursos.");
+      if (!cached) $("roll-course-list").replaceChildren(UI.empty("wifi-off", "No hay cursos disponibles sin conexión."));
+      return;
+    }
+    try {
+      const fresh = await Api.call("adminBootstrap", {}, "admin");
+      Cache.set("boot", fresh);
+      this.boot = fresh;
+      App.showOfflineNotice("");
+      this.renderCourses();
+    } catch (error) {
+      if (error.code !== "AUTH") {
+        if (cached) App.showOfflineNotice(`No se pudieron actualizar los cursos. Se muestran los guardados. ${error.message}`, cached.t);
+        else $("roll-course-list").replaceChildren(UI.empty("exclamation-octagon", error.message));
+      }
+    }
+  },
+
+  renderCourses() {
+    const groups = (this.boot && this.boot.groups) || [];
+    const active = groups.filter(group => group.active);
+    const shown = active.length ? active : groups;
+    if (!shown.length) {
+      $("roll-course-list").replaceChildren(UI.empty("journal-x", "No hay cursos disponibles."));
+      return;
+    }
+    $("roll-course-list").replaceChildren(...shown.map(group => h("button", {
+      class: "roll-course-card", type: "button", onclick: () => this.openGroup(group.id)
+    },
+    h("span", { class: "roll-course-main" },
+      this.courseIcon(group.label || group.id),
+      h("span", { class: "roll-course-name", text: group.label || group.id })),
+    icon("chevron-right", "text-body-secondary"))));
+  },
+
+  courseIcon(label) {
+    const subject = Fmt.normalize(label);
+    const kind = /matem|algebra|calculo|aritmet|geometr/.test(subject) ? "math"
+      : /quim|laboratorio/.test(subject) ? "chemistry"
+        : /fisic/.test(subject) ? "physics"
+          : /biolog|ecolog|ambient/.test(subject) ? "biology"
+            : /comput|inform|program|cibern|tecnol/.test(subject) ? "computer"
+              : /idioma|ingles|frances|lengua/.test(subject) ? "language"
+                : /historia|liter|filos|social/.test(subject) ? "humanities" : "general";
+    const glyphs = {
+      math: [
+        "M13 7h22a3 3 0 0 1 3 3v28H10V10a3 3 0 0 1 3-3Z",
+        "M15 12h18v7H15z",
+        "M16 25h4m-2-2v4M26 25h5M16 32h4M26 32h5"
+      ],
+      chemistry: [
+        "M19 7h10M21 7v12L11 36a3 3 0 0 0 3 5h20a3 3 0 0 0 3-5L27 19V7",
+        "M15 31h18"
+      ],
+      physics: [
+        "M9 24c0-6 7-11 15-11s15 5 15 11-7 11-15 11S9 30 9 24Z",
+        "M14 11c5-4 13-1 18 5s5 13 0 18-13 1-18-5-5-13 0-18Z",
+        "M34 11c-5-4-13-1-18 5s-5 13 0 18 13 1 18-5 5-13 0-18Z",
+        "M22 24a2 2 0 1 0 4 0a2 2 0 1 0-4 0Z"
+      ],
+      biology: [
+        "M38 9C20 9 10 17 10 29c0 6 4 10 10 10 12 0 18-10 18-30Z",
+        "M14 36c6-8 12-13 22-20",
+        "M22 28l-1-8M27 24l8 1"
+      ],
+      computer: [
+        "M10 10h28v21H10z",
+        "M17 38h14M24 31v7"
+      ],
+      language: [
+        "M10 12h28v19H23l-8 7v-7h-5z",
+        "M17 20h14M17 25h9"
+      ],
+      humanities: [
+        "M24 13c-5-4-10-4-15-2v25c5-2 10-2 15 2",
+        "M24 13c5-4 10-4 15-2v25c-5-2-10-2-15 2",
+        "M24 13v25"
+      ],
+      general: [
+        "M24 7 28.5 17l11 1-8.5 7.5 2.5 11L24 31l-9.5 5.5 2.5-11L8.5 18l11-1Z"
+      ]
+    };
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 48 48");
+    svg.setAttribute("class", "roll-course-svg");
+    svg.setAttribute("aria-hidden", "true");
+    glyphs[kind].forEach(d => {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "2.4");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+    });
+    return h("span", { class: `roll-course-icon roll-course-icon-${kind}` }, svg);
+  },
+
+  async openGroup(id) {
+    this.groupId = id;
+    $("roll-courses-panel").classList.add("d-none");
+    $("roll-group-panel").classList.remove("d-none");
+    $("roll-course-title").textContent = "";
+    $("roll-back-courses").disabled = false;
+    $("roll-roster").replaceChildren(UI.empty("hourglass-split", "Cargando alumnos…"));
+    App.show("view-rollcall");
+    await this.loadGroup(id);
+  },
+
+  hasPendingWrites(id) {
+    return ApiQueue.jobs.some(job => job.action === "saveRollCall" &&
+      job.params && job.params.idCurso === id);
+  },
+
+  async loadGroup(id) {
+    const cached = Cache.get("g:" + id);
+    if (cached && cached.d && cached.d.group) {
+      this.group = cached.d;
+      this.renderRoster();
+    }
+    if (!navigator.onLine) {
+      App.showOfflineNotice(cached
+        ? "Sin conexión. Se muestra la última lista guardada."
+        : "Este curso no tiene una lista guardada. Conéctate una vez para cargarla.");
+      if (!cached) $("roll-roster").replaceChildren(UI.empty("wifi-off", "No hay alumnos guardados para este curso."));
+      return;
+    }
+    if (this.hasPendingWrites(id)) return;
+    try {
+      const fresh = await Api.call("groupData", { idCurso: id }, "admin");
+      if (this.groupId !== id) return;
+      Cache.set("g:" + id, fresh);
+      this.group = fresh;
+      App.showOfflineNotice("");
+      this.renderRoster();
+    } catch (error) {
+      if (error.code !== "AUTH") {
+        if (cached) App.showOfflineNotice(`No se pudo actualizar la lista. Se muestra la copia guardada. ${error.message}`, cached.t);
+        else $("roll-roster").replaceChildren(UI.empty("exclamation-octagon", error.message));
+      }
+    }
+  },
+
+  async refresh() {
+    if (this.groupId) return this.refreshSelectedGroup();
+    return this.loadCourses();
+  },
+
+  async refreshSelectedGroup() {
+    if (!Session.get("admin")) return;
+    if (!this.groupId) return this.loadCourses();
+    if (!navigator.onLine || this.hasPendingWrites(this.groupId)) return;
+    await this.loadGroup(this.groupId);
+  },
+
+  today() {
+    const date = new Date();
+    const pad = value => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  },
+
+  statusIndex(group, date) {
+    return group.attendance && Array.isArray(group.attendance.dates)
+      ? group.attendance.dates.findIndex(item => item.key === date)
+      : -1;
+  },
+
+  studentStatus(student, group, date) {
+    const index = this.statusIndex(group, date);
+    const value = index < 0 ? "" : ((student.statuses || [])[index] || "");
+    const status = Fmt.normalize(value);
+    return status === "asistencia" || status === "retardo" ? "Asistencia"
+      : status === "falta" ? "Falta" : "";
+  },
+
+  renderRoster() {
+    const group = this.group;
+    if (!group || !group.group) return;
+    $("roll-course-title").textContent = group.group.label || group.group.name || "Curso";
+    if (!group.group.sheet) {
+      $("roll-roster").replaceChildren(UI.empty("calendar-x", "Este curso no tiene una hoja de asistencia configurada."));
+      return;
+    }
+    if (!group.students || !group.students.length) {
+      $("roll-roster").replaceChildren(UI.empty("people", "Este curso no tiene alumnos."));
+      return;
+    }
+    const date = this.today();
+    $("roll-roster").replaceChildren(...group.students.map(student => {
+      const account = String(student.cuenta || "");
+      const absences = Number(student.counts && student.counts.falta) || 0;
+      const current = this.studentStatus(student, group, date);
+      const button = (status, iconName, label, color) => h("button", {
+        class: `btn roll-mark-button ${current === status ? `btn-${color}` : `btn-outline-${color}`}`,
+        type: "button",
+        title: label,
+        "aria-label": `${label}: ${student.nombre || account}`,
+        "aria-pressed": String(current === status),
+        onclick: () => this.mark(account, status)
+      }, icon(iconName));
+      return h("article", { class: "roll-student-card" },
+        h("div", { class: "roll-student-info" },
+          h("div", { class: "roll-student-name", text: student.nombre || account }),
+          h("div", { class: "roll-student-details" },
+            h("span", { class: "roll-student-account", text: account }),
+            h("span", { class: "roll-student-absences", text: `${absences} falta${absences === 1 ? "" : "s"}` }))),
+        h("div", { class: "roll-mark-actions", role: "group", "aria-label": `Asistencia de ${student.nombre || account}` },
+          button("Asistencia", "check-lg", "Asistencia", "success"),
+          button("Falta", "x-lg", "Falta", "danger")));
+    }));
+  },
+
+  updateLocalStatus(account, date, status) {
+    const group = this.group;
+    if (!group) return;
+    if (!group.attendance) group.attendance = { sheetName: group.group.sheet, dates: [] };
+    const dates = group.attendance.dates || (group.attendance.dates = []);
+    let index = dates.findIndex(item => item.key === date);
+    if (index < 0) {
+      index = dates.findIndex(item => item.key > date);
+      if (index < 0) index = dates.length;
+      dates.splice(index, 0, {
+        key: date,
+        label: `${date.slice(8, 10)}/${date.slice(5, 7)}`,
+        visible: true
+      });
+      group.students.forEach(student => {
+        student.statuses = student.statuses || [];
+        student.statuses.splice(index, 0, "");
+      });
+    }
+    const student = group.students.find(item => String(item.cuenta) === String(account));
+    if (!student) return;
+    student.statuses = student.statuses || [];
+    student.statuses[index] = status;
+    const counts = { asistencia: 0, falta: 0, justificante: 0, nd: 0, otro: 0 };
+    student.statuses.forEach(value => {
+      const normalized = Fmt.normalize(value);
+      if (!normalized) return;
+      if (normalized === "asistencia" || normalized === "retardo") counts.asistencia++;
+      else if (normalized === "falta") counts.falta++;
+      else if (normalized === "justificante" || normalized === "justificada" || normalized === "justificado") counts.justificante++;
+      else if (normalized === "n/d") counts.nd++;
+      else counts.otro++;
+    });
+    student.counts = Object.assign({}, student.counts, counts);
+    Cache.set("g:" + this.groupId, group);
+  },
+
+  mark(account, status) {
+    const group = this.group;
+    const id = this.groupId;
+    const date = this.today();
+    const student = group && group.students.find(item => String(item.cuenta) === String(account));
+    if (!student || this.studentStatus(student, group, date) === status) return;
+
+    const key = `${id}|${date}|${account}`;
+    const previous = this.studentStatus(student, group, date);
+    const version = (this.markVersions.get(key) || 0) + 1;
+    this.markVersions.set(key, version);
+    this.updateLocalStatus(account, date, status);
+    this.renderRoster();
+
+    Api.call("saveRollCall", {
+      idCurso: id,
+      date,
+      marks: [{ cuenta: account, status }]
+    }, "admin").then(() => this.refreshSelectedGroup()).catch(error => {
+      if (error.code === "NETWORK" || error.code === "AUTH") return;
+      if (this.markVersions.get(key) === version && this.groupId === id) {
+        this.updateLocalStatus(account, date, previous);
+        this.renderRoster();
+      }
+      UI.toast("danger", error.message);
+    });
   }
 };
 

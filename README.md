@@ -33,9 +33,17 @@ La carpeta `apk/` no se sincroniza automáticamente con estas fuentes web. Para 
 - Cada proyecto tiene su `bitacora.json`; la carpeta de Drive contiene también evidencias y formato de exportación. La página puede crear proyectos desde **Mantenimiento** y mantiene sesiones, pendientes, hitos y puntajes separados por proyecto.
 - Las revisiones de concurrencia son por documento: las operaciones offline se guardan en IndexedDB, se procesan en orden y ante una revisión obsoleta quedan detenidas para comparación manual. No se debe reintentar un guardado completo sin reconciliarlo.
 - Las evidencias de Drive son privadas de forma predeterminada. Word/PDF se generan localmente; el programa no cambia permisos de Drive ni comparte informes.
-- El login web y los tokens se administran en Apps Script. No guardes contraseñas ni tokens reales en este repositorio. El token de Muse tiene una lista de acciones permitidas; las integraciones que escriben deben enviar la revisión obtenida al leer el proyecto.
+- El login web y los tokens se administran en Apps Script. La contraseña web se configura temporalmente con `WEB_PASS_SETUP`; `fijarPasswordWebDesdePropiedad()` la elimina y conserva solo `WEB_PASS_HASH` y `WEB_PASS_SALT` en Script Properties. No guardes contraseñas ni tokens reales en este repositorio. El token de Muse tiene una lista de acciones permitidas; las integraciones que escriben deben enviar la revisión obtenida al leer el proyecto.
 
 Para una instalación o actualización, sigue [la configuración de Bitácoras](bitacoras/docs/CONFIGURACION.md); para revisar las hojas y columnas de AppSheet, usa su [guía](bitacoras/docs/guia-configuracion-appsheet.md).
+
+### Configuración inicial de Apps Script
+
+Asistencias y Bitácoras usan **Web Apps de Apps Script distintos**; cada uno necesita su propia URL que termine en `/exec`.
+
+- **Asistencias (web y APK):** al abrir por primera vez solicita la URL, la prueba con `ping` y la guarda en `localStorage` como `cch.apiUrl`. Los exámenes leen esa misma configuración.
+- **Bitácoras (web y APK):** en el primer inicio solicita su URL, la prueba con `ping` y la guarda como `bitacoras.appsScriptUrl`. También ofrece continuar explícitamente en modo local, sin login ni sincronización con Drive.
+- La configuración se guarda por navegador/dispositivo. GitHub Pages y el APK no comparten almacenamiento; configura cada uno una vez. Cambiar de navegador o reinstalar el APK también requiere configurarlo de nuevo.
 
 ## Indicadores de carga y recargas
 
@@ -49,6 +57,8 @@ En el APK de Asistencias, las escrituras se procesan en orden FIFO, una a la vez
 
 Cada escritura de Asistencias lleva un identificador idempotente que Apps Script conserva temporalmente para reconocer reintentos. La cola de un alumno solo se reanuda con la misma cuenta. La sesión debe seguir activa para que la cola envíe solicitudes protegidas; por eso no se permite cerrar sesión mientras haya escrituras pendientes.
 
+El acceso **Pasar asistencia** del APK abre una vista exclusiva para el profesor: cursos activos con íconos SVG por materia, alumnos, cuenta, faltas y los dos controles de asistencia/falta. Reutiliza la sesión de administrador de Asistencias (no añade un segundo login); si no hay sesión activa, se usa el acceso habitual del módulo. Cada marca se guarda localmente en la misma cola IndexedDB y se sincroniza al recuperar conexión; para consultar cursos y alumnos sin conexión, primero deben haberse cargado una vez.
+
 ## Alcance offline verificado
 
 El soporte offline no significa que las páginas o los datos remotos estén disponibles sin una primera conexión. En Android los HTML, scripts e imágenes empacados están dentro del APK, pero Bootstrap y algunos iconos se solicitan a CDN y las APIs siguen en Apps Script.
@@ -57,7 +67,7 @@ El soporte offline no significa que las páginas o los datos remotos estén disp
 | --- | --- |
 | Lanzador del APK (`apk/www/index.html`) | Es una pantalla estática local; puede abrir los módulos empaquetados. |
 | Asistencias del APK (`apk/www/asistencias/`) | Muestra caché previa de alumno/panel y conserva escrituras en IndexedDB para reintento al reconectar. No todas las escrituras tienen proyección optimista completa: algunas pantallas pueden seguir esperando respuesta del servidor. |
-| Bitácoras del APK (`apk/www/bitacoras/`) | Abre datos locales y proyecta operaciones guardadas en la outbox de IndexedDB; las envía al recuperar conexión. Los errores quedan visibles para reintento o descarte. |
+| Bitácoras del APK (`apk/www/bitacoras/`) | Guarda el snapshot de los datos en `localStorage` y lo restaura al abrir, incluso offline, si la sesión quedó guardada en el dispositivo. Si ya hay snapshot, no relee todo el servidor en cada inicio; la actualización completa se hace con ↻ o al recuperar conexión. Las escrituras se proyectan localmente y la outbox de IndexedDB las envía al reconectar. Los errores quedan visibles para reintento o descarte. |
 | Exámenes (`examenes_*.html`) | Conservan respuestas del examen en el dispositivo y encolan el envío de resultados. El login, la descarga de preguntas y el inicio de un examen nuevo requieren conexión. |
 
 Las páginas web de la raíz (`index.html`, `script.js` y `bitacoras/index.html`) son fuentes separadas y no se actualizan automáticamente al editar `apk/www/`. La caché extendida de Asistencias corresponde al APK; Bitácoras tiene una cola independiente en las versiones web y APK, y ambas envían la revisión esperada. Las páginas de exámenes de raíz y APK ya incluyen almacenamiento local de respuestas y una cola IndexedDB de resultados.
@@ -108,5 +118,8 @@ Con el Web App desplegado y sesión activa, valida en este orden:
 3. En dos sesiones de navegador, modifica el mismo proyecto y guarda desde ambas. La segunda escritura obsoleta debe quedar en conflicto sin reemplazar los datos del servidor.
 4. Abre el indicador de sincronización, compara la versión remota con el cambio local y reintenta solo después de revisarlo. Las escrituras completas requieren reconciliación manual.
 5. Si pruebas modo offline, confirma que la cola de Bitácoras se conserva y se procesa en orden al reconectar.
+6. En el APK, abre Bitácoras con una copia guardada sin conexión; al volver a abrirla debe restaurar el snapshot. Usa ↻ para consultar actualizaciones.
+7. Confirma que «Exportar informe» no aparece en «Todos los proyectos», y que un PDF de proyecto individual incluye título y contenido. El PDF organiza los datos del proyecto, las secciones elegidas en el formato, las sesiones con acuerdos y evidencias, y el anexo fotográfico; los párrafos usan sangría de primera línea de 1.5 cm.
+8. En el APK, entra a **Pasar asistencia**, abre un curso y marca asistencia/falta; en modo avión las marcas deben aparecer en la cola y sincronizarse al recuperar conexión.
 
 La revisión es por documento completo, no por registro; cambios independientes dentro del mismo proyecto también pueden requerir revisión.

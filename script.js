@@ -10,9 +10,8 @@
    ============================================================ */
 
 const CONFIG = {
-  // URL del Web App de Apps Script (termina en /exec). Si la dejas vacía, la página
-  // la pide la primera vez y la guarda en ese navegador; el QR la comparte con ?api=
-  API_URL: "https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec",
+  // Se configura en la primera visita y se guarda en el navegador; el QR comparte ?api=.
+  API_URL: "",
   VERSION: "7.1",
   REQUEST_TIMEOUT_MS: 45000,
   SEARCH_DEBOUNCE_MS: 200,

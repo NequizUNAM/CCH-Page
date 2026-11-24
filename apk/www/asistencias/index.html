@@ -132,6 +132,29 @@
       </section>
     </section>
 
+    <!-- ============ PASE DE LISTA SIMPLE (APK) ============ -->
+    <section id="view-rollcall" class="view d-none" aria-label="Pase de lista">
+      <div id="roll-courses-panel" class="d-none">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+          <h1 class="h4 fw-bold mb-0">Mis cursos</h1>
+          <button id="roll-refresh" class="btn btn-outline-secondary" type="button" aria-label="Actualizar cursos" title="Actualizar">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div id="roll-course-list" class="roll-course-list" aria-live="polite"></div>
+      </div>
+
+      <div id="roll-group-panel" class="d-none">
+        <div class="d-flex align-items-start gap-2 mb-3">
+          <button id="roll-back-courses" class="btn btn-outline-secondary flex-shrink-0" type="button" aria-label="Volver a cursos">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+          </button>
+          <h1 id="roll-course-title" class="roll-course-title mb-0"></h1>
+        </div>
+        <div id="roll-roster" class="roll-roster" aria-live="polite"></div>
+      </div>
+    </section>
+
     <!-- ============ VISTA ALUMNO ============ -->
     <section id="view-student" class="view d-none">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">

@@ -7,7 +7,7 @@ Guía corta y concreta para dejar la v1 funcionando. Nequiz hace estos pasos él
 
 Resumen y estructura en el [README principal](../../README.md). El checklist de decisiones (27 secciones) está en [`checklist-bitacora-web.md`](checklist-bitacora-web.md) y la guía de AppSheet en [`guia-configuracion-appsheet.md`](guia-configuracion-appsheet.md).
 
-> **Placeholders:** en esta entrega no hay URLs ni contraseñas reales. Donde veas `TU_URL_APPS_SCRIPT_AQUI`, `TU_CONTRASENA_AQUI` o `TU_REPO_AQUI`, pon tu valor real. La tabla completa está al final de esta guía.
+> **Placeholders:** en esta entrega no hay URLs ni contraseñas reales. Donde veas `TU_URL_APPS_SCRIPT_AQUI` o `TU_REPO_AQUI`, pon tu valor real. La contraseña se configura temporalmente mediante Script Properties, como se explica en la sección 5.
 
 ---
 
@@ -82,14 +82,13 @@ Resumen y estructura en el [README principal](../../README.md). El checklist de 
 
 ## 5) Contraseña web: fijarla en Apps Script Properties (nunca en el HTML)
 
-La página tiene login con contraseña aparte. La contraseña **nunca va en el HTML**.
+La página tiene login con contraseña aparte. La contraseña **nunca va en el HTML, en Drive ni en el repositorio**.
 
-1. En el proyecto de Apps Script del paso 3, abre el editor y busca en `Codigo.gs` la función indicada para fijar la contraseña (la función que guarda el hash en Script Properties).
-2. Ejecuta **una sola vez** la función `fijarPasswordWebTemporal()` (D5): en el editor, en la lista de funciones, elige `fijarPasswordWebTemporal` (sin argumentos: el botón Ejecutar del editor no admite argumentos) y pulsa Ejecutar. Antes, pon tu contraseña en la línea `NUEVA_CONTRASENA = 'TU_CONTRASENA_AQUI'` dentro de esa función (mínimo 12 caracteres, auditoría v2).
-   - La función guarda solo el **hash con sal** en **Script Properties**; la contraseña en texto plano no queda guardada en ningún archivo.
-   - **Después de ejecutarla, BORRA la contraseña de esa función** (o borra toda la función `fijarPasswordWebTemporal`) para que no quede escrita en el código.
-3. Comprueba en **Project Settings → Script Properties** que quedó guardada la propiedad del hash (verás el nombre de la propiedad y un valor hash, no tu contraseña).
-4. **No escribas la contraseña en `index.html`, ni en Drive como texto, ni en el repo de GitHub.** Si la olvidas, vuelve a ejecutar la función del paso 2 con una contraseña nueva.
+1. En el proyecto de Apps Script del paso 3, abre **Project Settings → Script Properties** y añade temporalmente la propiedad `WEB_PASS_SETUP` con una contraseña de al menos 12 caracteres.
+2. En el editor de Apps Script, selecciona `fijarPasswordWebDesdePropiedad` y pulsa **Ejecutar**. Autoriza los permisos si se solicitan.
+3. La función elimina `WEB_PASS_SETUP` y guarda únicamente `WEB_PASS_HASH` y `WEB_PASS_SALT`. Comprueba en **Script Properties** que la temporal ya no esté y que las otras dos contengan el hash y la sal, no la contraseña.
+4. Implementa una nueva versión del Web App para publicar el `Codigo.gs` actualizado; conserva la misma URL `/exec`.
+5. Si olvidas o necesitas cambiar la contraseña, usa **Mantenimiento → Cambiar contraseña** estando autenticado. No escribas la contraseña en archivos del proyecto.
 5. El login y el mantenimiento (§24 y §25 del checklist) quedan bloqueados sin sesión: sin haber hecho login, la página no debe dejar entrar a mantenimiento.
 
 ## 6) AppSheet: conectar a las hojas de Drive
@@ -119,7 +118,7 @@ Si algo falla, anota en qué paso, con qué proyecto y qué mensaje apareció. C
 | Placeholder | Qué poner | Dónde va |
 |---|---|---|
 | `TU_URL_APPS_SCRIPT_AQUI` | La URL `/exec` del despliegue Web App de Apps Script (paso 3) | En `index.html`, en un solo lugar: `CONFIG.appsScriptUrl` |
-| `TU_CONTRASENA_AQUI` | Tu contraseña web, al ejecutar la función indicada en `Codigo.gs` | Solo como argumento de esa función; se guarda como hash en Script Properties. **Nunca en el HTML, ni en Drive como texto, ni en GitHub** |
+| `WEB_PASS_SETUP` | Contraseña temporal (mínimo 12 caracteres) para la configuración inicial | Script Properties; `fijarPasswordWebDesdePropiedad()` la elimina y guarda solo `WEB_PASS_HASH` y `WEB_PASS_SALT` |
 | `TU_REPO_AQUI` | El nombre de tu repositorio de GitHub (sugerencia: `bitacoras`) | En el nombre del repo y en la URL de GitHub Pages: `https://TU_USUARIO.github.io/TU_REPO_AQUI/` |
 
 ## Versión

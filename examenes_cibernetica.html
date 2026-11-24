@@ -241,7 +241,7 @@
         <button class="btn btn-outline-secondary" type="button" id="ver-clave" aria-label="Mostrar u ocultar"><i class="bi bi-eye"></i></button>
       </div>
       <div class="text-danger fw-bold small mb-2" id="clave-err" hidden></div>
-      <div class="alert alert-warning small py-2" id="clave-cfg" hidden><i class="bi bi-gear-fill me-1"></i>Falta configurar <code>CFG.ENDPOINT</code> con la URL de tu Apps Script.</div>
+      <div class="alert alert-warning small py-2" id="clave-cfg" hidden><i class="bi bi-gear-fill me-1"></i>Falta configurar el servidor. Abre <a href="./index.html">Asistencias</a> para guardar la URL /exec.</div>
       <button class="btn btn-lg w-100 text-white fw-bold" id="btn-entrar" style="background:linear-gradient(90deg,#4338ca,#7c3aed)" type="submit"><i class="bi bi-unlock-fill me-1"></i>Entrar</button>
       <div class="text-center text-muted small mt-3">La contraseña te la da tu profesor(a) en el salón. Cada examen tiene la suya.</div>
     </form>
@@ -392,8 +392,14 @@
    viven en tu hoja de Google (contraseñas de alumnos) y en el script de Apps Script (administrador).
    ========================================================================== */
 const TOTAL = () => (typeof EXAM !== 'undefined' && EXAM) ? EXAM.filter(q => !q.bonus).length : 0;   // la pregunta bonus no cuenta en el total
+const ENDPOINT_CCH = (() => {
+  try {
+    const url = localStorage.getItem('cch.apiUrl') || '';
+    return /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec$/.test(url) ? url : '';
+  } catch (e) { return ''; }
+})();
 const CFG = {
-  ENDPOINT: 'https://script.google.com/macros/s/AKfycbzRIZgmBVjWmPli3DObrzo-JZqyVhP3ePja0aRz_q4gdusi4S37Ad1aT4m4UZ2AsbAx/exec',   // URL de tu Apps Script (termina en /exec)
+  ENDPOINT: ENDPOINT_CCH,
   SYNC_MIN: [2, 4],                // rango (minutos) del envío del avance: cada equipo elige al azar su propio intervalo dentro del rango
   PROC_OBLIGATORIO: true,          // true: no se puede entregar (con el botón) si una pregunta contestada no tiene su procedimiento completo. No cambia la calificación.
   POLL_S: 30,                      // con más de SALIDAS_CIERRE salidas: cada cuántos segundos se pregunta si el profesor cerró el examen

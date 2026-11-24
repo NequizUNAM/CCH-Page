@@ -24,10 +24,9 @@
  *     SHA-256 CON SAL en Script Properties, claves WEB_PASS_HASH y
  *     WEB_PASS_SALT (M2, corregido 2026-11-18). La sal es aleatoria y se
  *     genera sola; sin ella el hash no se puede verificar ni reutilizar.
- *   - La primera vez se fija ejecutando fijarPasswordWebTemporal()
- *     desde el editor de Apps Script (ver pasos de despliegue al final).
- *     Esa función lleva el placeholder TU_CONTRASENA_AQUI y hay que
- *     BORRARLA (o su línea) después de usarla.
+ *   - Para fijarla, se añade temporalmente WEB_PASS_SETUP en Script
+ *     Properties y se ejecuta fijarPasswordWebDesdePropiedad(). La función
+ *     elimina la propiedad temporal después de guardar el hash y la sal.
  *   - Los proyectos activos se cargan desde INDICE-bitacoras.json.
  *   - El token de sesión es un string aleatorio (UUID) guardado en
  *     CacheService con expiración de 6 horas. Todas las acciones de
@@ -99,6 +98,7 @@ var CONFIG = {
 
   // Clave en Script Properties donde vive el hash SHA-256 de la contraseña web.
   PASS_HASH_KEY: 'WEB_PASS_HASH',
+  PASS_SETUP_KEY: 'WEB_PASS_SETUP',
 
   // M2: sal aleatoria (Script Properties, clave WEB_PASS_SALT) con la que
   // se calcula el hash: SHA-256(sal + ':' + contraseña). Se genera sola
@@ -395,7 +395,7 @@ function doPost(e) {
  * Si falla, registra el intento; tras INTENTOS_MAX (5) fallos seguidos,
  * bloquea el login BLOQUEO_MINUTOS (5) minutos.
  * Si aún no se ha fijado ninguna contraseña (sin hash guardado), devuelve
- * error indicando que hay que ejecutar fijarPasswordWeb() primero.
+ * error indicando que hay que ejecutar fijarPasswordWebDesdePropiedad().
  */
 function login_(password, cliente) {
   var cache = CacheService.getScriptCache();
@@ -427,7 +427,7 @@ function login_(password, cliente) {
     .getProperty(CONFIG.PASS_HASH_KEY);
   if (!hashGuardado) {
     return { ok: false, error: 'Aún no se ha fijado la contraseña web. ' +
-      'Ejecuta fijarPasswordWebTemporal() una vez desde el editor de Apps Script.' };
+      'Agrega WEB_PASS_SETUP en Script Properties y ejecuta fijarPasswordWebDesdePropiedad().' };
   }
 
   // 3) Comparar hashes con sal (nunca la contraseña en texto plano).
@@ -484,36 +484,37 @@ function verificarToken_(token) {
 }
 
 /**
- * Fija la contraseña web POR PRIMERA VEZ (o la restablece desde el editor).
- * Guarda solo el hash SHA-256 en Script Properties, nunca la contraseña.
- * USO: en el editor de Apps Script, ejecutar fijarPasswordWeb('TU_CONTRASENA_AQUI')
- * una sola vez y DESPUÉS BORRAR esa línea / cambiar el valor, para que la
- * contraseña no quede escrita en el código. También limpia los intentos
- * fallidos y cualquier bloqueo activo.
+ * Guarda el hash y la sal de la contraseña web, nunca la contraseña en texto
+ * plano. La configuración inicial se realiza con
+ * fijarPasswordWebDesdePropiedad(), no pasando secretos en el código.
  */
 function fijarPasswordWeb(nuevaPassword) {
   if (!nuevaPassword || nuevaPassword.length < 12) {
     throw new Error('La contraseña debe tener al menos 12 caracteres.');
   }
   // M2: se guarda el hash CON SAL, no el hash simple de antes.
-  PropertiesService.getScriptProperties()
-    .setProperty(CONFIG.PASS_HASH_KEY, hashConSal_(nuevaPassword));
-  return 'Contraseña web fijada (hash SHA-256 con sal guardado en Script Properties). ' +
-    'Borra ahora la línea con la contraseña del editor.';
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(CONFIG.PASS_HASH_KEY, hashConSal_(nuevaPassword));
+  props.setProperty('SESSION_EPOCH', String(new Date().getTime()));
+  return 'Contraseña web fijada (hash SHA-256 con sal guardado en Script Properties).';
 }
 
 /**
- * D5: fijarPasswordWebTemporal() — SIN argumentos, para ejecutarla desde
- * el editor de Apps Script (el botón Ejecutar no admite argumentos).
- * Pon tu contraseña en NUEVA_CONTRASENA abajo, ejecuta esta función UNA
- * vez desde la lista de funciones del editor, y BORRA la contraseña de
- * aquí inmediatamente después (o borra toda la función). La contraseña
- * queda guardada solo como hash con sal en Script Properties.
+ * Fija la contraseña inicial leyendo una propiedad temporal que se introduce
+ * desde Project Settings. Después de guardar el hash con sal, elimina el
+ * valor en texto plano para que no permanezca en Script Properties.
  */
-function fijarPasswordWebTemporal() {
-  var NUEVA_CONTRASENA = 'TU_CONTRASENA_AQUI'; // <-- pon tu contraseña aquí, ejecuta y BORRA
-  var resultado = fijarPasswordWeb(NUEVA_CONTRASENA);
-  return resultado + ' Recuerda borrar la contraseña de esta función ahora.';
+function fijarPasswordWebDesdePropiedad() {
+  var props = PropertiesService.getScriptProperties();
+  var nuevaPassword = props.getProperty(CONFIG.PASS_SETUP_KEY);
+  if (!nuevaPassword) {
+    throw new Error('Agrega primero la propiedad ' + CONFIG.PASS_SETUP_KEY +
+      ' en Project Settings → Script Properties.');
+  }
+  var resultado = fijarPasswordWeb(nuevaPassword);
+  props.deleteProperty(CONFIG.PASS_SETUP_KEY);
+  return resultado + ' La propiedad temporal ' + CONFIG.PASS_SETUP_KEY +
+    ' fue eliminada; WEB_PASS_HASH y WEB_PASS_SALT permanecen.';
 }
 
 /**
@@ -2326,19 +2327,13 @@ function eliminarFilaPorId_(nombre, id) {
  *    - Borrar el contenido de Code.gs y pegar este archivo completo.
  *    - Guardar (el nombre del proyecto puede ser "Bitacoras CCH").
  *
- * 2. Fijar la contraseña web LA PRIMERA VEZ (solo se guarda su hash con sal):
- *    - D5: en el editor, en la lista de funciones elegir
- *      fijarPasswordWebTemporal (SIN argumentos: el botón Ejecutar no
- *      admite argumentos) y ejecutarla una vez. Antes, pon tu contraseña
- *      en la línea NUEVA_CONTRASENA = 'TU_CONTRASENA_AQUI' dentro de
- *      esa función (mínimo 12 caracteres, auditoría v2).
- *    - DESPUÉS DE EJECUTARLA, BORRA la contraseña de esa función (o
- *      borra toda la función) para que no quede escrita en el código.
- *    - La contraseña queda guardada solo como hash SHA-256 CON SAL en
- *      Script Properties, claves WEB_PASS_HASH y WEB_PASS_SALT. Para
- *      cambiarla después, usar la acción cambiarPassword desde la
- *      página (pide la actual) o volver a ejecutar
- *      fijarPasswordWebTemporal() desde el editor.
+ * 2. Fijar la contraseña web:
+ *    - En Project Settings → Script Properties, añade WEB_PASS_SETUP con
+ *      una contraseña de al menos 12 caracteres.
+ *    - Ejecuta fijarPasswordWebDesdePropiedad() desde el editor. La función
+ *      elimina WEB_PASS_SETUP y conserva solo WEB_PASS_HASH y WEB_PASS_SALT.
+ *    - Para cambiarla después, usa Mantenimiento → Cambiar contraseña,
+ *      estando autenticado.
  *
  * 3. Crear la estructura en Drive (opcional, también se puede hacer
  *    desde la página con la acción crearEstructura, con token válido):

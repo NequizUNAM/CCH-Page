@@ -41,11 +41,11 @@ El código ya no trae nada tuyo: ni contraseña, ni URL, ni nombres de hojas.
 
 1. Crea una hoja de cálculo de Google en blanco → Extensiones → Apps Script.
 2. Pega `Codigo.gs` y `appsscript.json` → Implementar → Nueva implementación → **Aplicación web**, ejecutar como **Yo**, acceso **Cualquier usuario** → copia la URL que termina en `/exec`.
-3. Sube `index.html`, `estilo.css` y `script.js` a GitHub Pages y abre la página: te pide la **URL del Web App**. Pégala y presiona «Probar y guardar».
+3. Sube `index.html`, `estilo.css` y `script.js` a GitHub Pages y abre la página: si ese navegador aún no está configurado, te pide la **URL del Web App**. Pégala y presiona «Probar y guardar»; se valida con `ping` y se guarda en ese navegador.
 4. Entra a **Admin** con la contraseña de fábrica **123456789**. Se crean las hojas y un grupo **DEMO** con 12 alumnos (asistencia, Parcial 1 y un proyecto) para probar.
 5. Cambia la contraseña: Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → `CCH_ADMIN_PASSWORD`. Mientras no exista, el panel muestra un aviso amarillo.
 
-**URL para los alumnos:** el QR de la página de inicio ya lleva la URL del servidor (`?api=…`), así que el alumno no configura nada. Si prefieres dejarla fija para todos, pégala en `API_URL` al inicio de `script.js`.
+**URL para los alumnos:** el QR de la página de inicio ya lleva la URL del servidor (`?api=…`), así que el alumno no configura nada. Si prefieres dejarla fija para todos, pégala en `API_URL` al inicio de `script.js`. La copia incluida en el APK tiene almacenamiento separado y también debe configurarse una vez en cada dispositivo.
 
 ## Restaurar a fábrica (DEMO)
 

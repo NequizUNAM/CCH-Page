@@ -324,6 +324,53 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 
 /* ---------- 11. Celular ---------- */
 /* Pase de lista: tarjetas a todo el ancho + barra fija */
+.roll-course-list { display: grid; gap: .7rem; }
+.roll-course-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  width: 100%; min-height: 64px; padding: .85rem 1rem; text-align: left;
+  color: var(--ink); background: var(--bs-body-bg); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: var(--shadow-sm); transition: transform .15s, box-shadow .15s;
+}
+.roll-course-card:active { transform: scale(.99); }
+.roll-course-main { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+.roll-course-icon {
+  display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px;
+  border-radius: 14px; background: #f1f5f9;
+}
+.roll-course-svg { display: block; width: 29px; height: 29px; }
+.roll-course-icon-math { color: #2563eb; background: #eff6ff; }
+.roll-course-icon-chemistry { color: #0f766e; background: #f0fdfa; }
+.roll-course-icon-physics { color: #7c3aed; background: #f5f3ff; }
+.roll-course-icon-biology { color: #15803d; background: #f0fdf4; }
+.roll-course-icon-computer { color: #0891b2; background: #ecfeff; }
+.roll-course-icon-language { color: #be185d; background: #fdf2f8; }
+.roll-course-icon-humanities { color: #b45309; background: #fffbeb; }
+.roll-course-icon-general { color: var(--acc); background: var(--acc-soft); }
+.roll-course-name { min-width: 0; font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+.roll-course-title { min-width: 0; font-size: clamp(1.55rem, 6vw, 2.15rem); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+.roll-roster { display: flex; flex-direction: column; gap: .55rem; padding-bottom: 1rem; }
+.roll-student-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem;
+  min-width: 0; padding: .7rem .8rem; background: var(--bs-body-bg);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-sm);
+}
+.roll-student-info { min-width: 0; }
+.roll-student-name { font-size: 1rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.roll-student-details { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; margin-top: .2rem; }
+.roll-student-account, .roll-student-absences { color: var(--muted); font-size: .78rem; line-height: 1.2; }
+.roll-mark-actions { display: flex; flex-shrink: 0; gap: .45rem; }
+.roll-mark-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; padding: 0; border-radius: 12px; font-size: 1.15rem;
+}
+body.rollcall-only .navbar-brand,
+body.rollcall-only #btn-prefs,
+body.rollcall-only #btn-admin,
+body.rollcall-only #btn-logout,
+body.rollcall-only .app-footer { display: none !important; }
+body.rollcall-only main.container-xl,
+body.rollcall-only .app-nav .container-xl { max-width: 720px; }
+body.rollcall-only main.container-xl { padding-top: 1rem !important; }
 .roll-list { display: flex; flex-direction: column; gap: .5rem; padding-bottom: 5.5rem; }
 .roll-card { background: var(--bs-body-bg); border-radius: 14px; padding: .65rem .85rem; box-shadow: var(--shadow); border-left: 5px solid transparent; animation: rise .25s ease; }
 .roll-card.unmarked { border-left-color: var(--warn); }
@@ -369,6 +416,9 @@ td.has-same.has-prev { box-shadow: inset 3px 0 0 #38bdf8, inset 6px 0 0 #a78bfa;
 @media (max-width: 767.98px) {
   #view-admin .card-body { padding: .75rem; }
   .welcome-hero { padding: 1.2rem 1rem; }
+  .roll-student-card { gap: .5rem; padding: .65rem .7rem; }
+  .roll-mark-actions { gap: .35rem; }
+  .roll-mark-button { width: 44px; height: 44px; }
 }
 @media (max-width: 576px) {
   .table-cch .name-cell { max-width: 190px; }

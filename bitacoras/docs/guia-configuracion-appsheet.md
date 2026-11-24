@@ -3,7 +3,7 @@
 **Fecha:** 2026-11-18
 **Objetivo:** llenar los formularios de bitácoras desde AppSheet (móvil) y desde la página web, con las mismas hojas de Drive como fuente. El acceso por AppSheet se controla desde Apps Script / la cuenta de Google; el acceso por la web usa una contraseña aparte (§25 del checklist).
 
-**Regla de seguridad:** la contraseña web se guarda en Drive en un archivo de configuración, en forma protegida (hash), nunca en texto plano dentro del HTML publicado ni en AppSheet. Cambiar la contraseña web no cambia el acceso de AppSheet, y viceversa.
+**Regla de seguridad:** la contraseña web se valida en Apps Script. Su hash y sal se guardan en **Script Properties**; no se guarda en Drive ni en texto plano dentro del HTML publicado o AppSheet. Cambiar la contraseña web no cambia el acceso de AppSheet, y viceversa.
 
 ---
 
@@ -61,9 +61,9 @@ Crear una vista Form por cada acción, con los mismos campos que en la web:
 | Vía | Cómo se controla el acceso | Contraseña |
 |---|---|---|
 | **AppSheet** | Desde Apps Script y la cuenta de Google: en AppSheet, **Security > Require sign-in**, solo las cuentas autorizadas; y en el Apps Script Web App, lista de remitentes/cuentas autorizadas. Quien no está autorizado no abre la app ni escribe. | La de Google / AppSheet. No hay contraseña aparte dentro de AppSheet. |
-| **Página web** | Contraseña propia de la web, guardada en Drive en configuración (hash, no en el HTML). La valida el Apps Script Web App. | Contraseña web, distinta de la de Google. Cambiarla no afecta a AppSheet. |
+| **Página web** | Contraseña propia de la web, validada por el Apps Script Web App; su hash y sal están en Script Properties. | Contraseña web, distinta de la de Google. Cambiarla no afecta a AppSheet. |
 
-- Nunca pongas la contraseña web en el HTML publicado, ni en una hoja que AppSheet muestre, ni en texto plano en Drive.
+- Nunca pongas la contraseña web en el HTML publicado, una hoja que AppSheet muestre, ni en texto plano en Drive o el repositorio.
 - Para cambiar la contraseña web: Mantenimiento → Cambio de contraseña, con la contraseña actual.
 
 ## 7. Sincronización web ↔ AppSheet
