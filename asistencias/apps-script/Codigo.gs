@@ -103,18 +103,20 @@ const DRIVE_FOLDERS = [
 
 /**
  * Tipos de componente de evaluación
- *   manual      lo capturas tú (parciales, sellos, Teams, tareas…)
+ *   manual      lo capturas tú (parciales, Teams, tareas…)
+ *   participaciones  captura libre con máximo automático por grupo
+ *   puntos_adicionales  captura manual extra fuera de la ponderación base
  *   asistencia  se calcula: Asistencias / (Asistencias + Faltas) × 10
  *   proyectos   se calcula: promedio de los proyectos ligados a este componente
  */
-const COMPONENT_TYPES = ["manual", "asistencia", "proyectos", "examen"];   // examen = Examenes.gs (Fuente = "Resultados …|parcial")
+const COMPONENT_TYPES = ["manual", "asistencia", "proyectos", "examen", "participaciones", "puntos_adicionales"];   // examen = Examenes.gs (Fuente = "Resultados …|parcial")
 
 /** Plantilla por defecto al configurar un grupo nuevo (editable en la web). */
 const DEFAULT_COMPONENTS = [
   { Nombre: "Parcial 1", Tipo: "manual",    Ponderacion: 25, Maximo: 10 },
   { Nombre: "Parcial 2", Tipo: "manual",    Ponderacion: 25, Maximo: 10 },
   { Nombre: "Parcial 3", Tipo: "manual",    Ponderacion: 25, Maximo: 10 },
-  { Nombre: "Sellos",    Tipo: "manual",    Ponderacion: 10, Maximo: 15 },
+  { Nombre: "Sellos",    Tipo: "participaciones", Ponderacion: 10, Maximo: 10 },
   { Nombre: "Proyectos", Tipo: "proyectos", Ponderacion: 15, Maximo: 10 }
 ];
 
@@ -2314,8 +2316,8 @@ function syncRollCallLog_(idCurso, dateKey, marks, tz) {
 // Cada grupo (ID_Curso) tiene sus propios componentes con ponderación:
 //   W_Componentes: ID | ID_Curso | Nombre | Tipo | Ponderacion | Maximo | Orden
 // Las calificaciones capturadas a mano viven en W_Calificaciones
-// (una fila por alumno × componente). "Maximo" es la escala de captura
-// (10 para un examen, 15 para sellos, 100 para Teams…); se convierte a 10.
+// (una fila por alumno × componente). "Maximo" es la escala de captura;
+// Sellos usa como máximo dinámico el mayor valor capturado en su grupo.
 //
 // Calificación final (sobre lo evaluado):
 //   Σ(calif10 × ponderación) / Σ(ponderación de los componentes con calificación)
@@ -2436,6 +2438,31 @@ function isExtraCreditComponentName_(name) {
   return ["punto adicional", "puntos adicionales"].includes(normalizeKey_(name).replace(/\s+/g, " "));
 }
 
+function isExtraCreditComponent_(comp) {
+  return !!comp && (comp.tipo === "puntos_adicionales" || isExtraCreditComponentName_(comp.nombre));
+}
+
+function isParticipationComponent_(comp) {
+  return !!comp && (comp.tipo === "participaciones" ||
+    (comp.tipo === "manual" && /sello|particip/.test(normalizeKey_(comp.nombre))));
+}
+
+function isGradeInputComponent_(comp) {
+  return !!comp && ["manual", "participaciones", "puntos_adicionales"].includes(comp.tipo);
+}
+
+function applyDynamicSealMaximums_(components, grades) {
+  components.forEach(comp => {
+    if (!isParticipationComponent_(comp)) return;
+    let maximum = 0;
+    Object.values(grades).forEach(studentGrades => {
+      maximum = Math.max(maximum, Number(studentGrades[comp.id]) || 0);
+    });
+    comp.maximo = maximum > 0 ? maximum : 10;
+  });
+  return components;
+}
+
 function saveComponents_(params) {
   const idCurso = cleanText_(params.idCurso);
   requireGroup_(idCurso);
@@ -2449,7 +2476,8 @@ function saveComponents_(params) {
     const nombre = cleanText_(c.nombre).slice(0, 60);
     const tipo = cleanText_(c.tipo);
     const ponderacion = toNumberOrNull_(c.ponderacion);
-    const maximo = tipo === "manual" ? toNumberOrNull_(c.maximo) : 10;
+    const component = { nombre, tipo };
+    const maximo = tipo === "manual" && !isParticipationComponent_(component) ? toNumberOrNull_(c.maximo) : 10;
 
     if (!nombre) throw new Error(`El componente ${i + 1} no tiene nombre.`);
     if (seen.has(normalizeKey_(nombre))) throw new Error(`Nombre repetido: "${nombre}".`);
@@ -2457,10 +2485,10 @@ function saveComponents_(params) {
     if (!COMPONENT_TYPES.includes(tipo)) throw new Error(`Tipo inválido en "${nombre}".`);
     if (ponderacion === null || ponderacion < 0 || ponderacion > 100) throw new Error(`Ponderación inválida en "${nombre}" (0 a 100).`);
     if (!maximo || maximo <= 0 || maximo > 1000) throw new Error(`Máximo inválido en "${nombre}".`);
-    if (isExtraCreditComponentName_(nombre)) {
+    if (isExtraCreditComponent_(component)) {
       extraCreditCount++;
       if (extraCreditCount > 1) throw new Error("Solo se permite un rubro «Puntos Adicionales».");
-      if (tipo !== "manual" || maximo !== 10) throw new Error("«Puntos Adicionales» debe ser manual y capturarse de 0 a 10.");
+      if (!isGradeInputComponent_(component) || maximo !== 10) throw new Error("«Puntos Adicionales» debe capturarse de 0 a 10.");
     }
     const fuente = tipo === "examen" ? cleanText_(c.fuente) : "";
     if (tipo === "examen" && !examSources_().some(x => x.id === fuente)) throw new Error(`Elige el examen y parcial de "${nombre}".`);
@@ -2478,6 +2506,8 @@ function saveComponents_(params) {
   });
 
   const before = componentsFor_(idCurso);
+  const participationCount = newRows.filter(r => isParticipationComponent_({ tipo: r.Tipo, nombre: r.Nombre })).length;
+  if (participationCount > 1) throw new Error("Solo se permite una columna de «Participaciones/Sellos» por grupo.");
   const others = Db.read(WEB.COMPONENTS).rows.filter(r => cleanText_(r.ID_Curso) !== idCurso);
   Db.writeAll(WEB.COMPONENTS, others.concat(newRows));
 
@@ -2486,9 +2516,9 @@ function saveComponents_(params) {
   try { notes = pairComponentColumns_(idCurso, before); } catch (e) { notes = [`(No se pudo ajustar el reporte: ${e.message})`]; }
 
   const total = newRows
-    .filter(r => !isExtraCreditComponentName_(r.Nombre))
+    .filter(r => !isExtraCreditComponent_({ tipo: r.Tipo, nombre: r.Nombre }))
     .reduce((sum, r) => sum + r.Ponderacion, 0);
-  const extra = newRows.find(r => isExtraCreditComponentName_(r.Nombre));
+  const extra = newRows.find(r => isExtraCreditComponent_({ tipo: r.Tipo, nombre: r.Nombre }));
   return {
     components: componentsFor_(idCurso),
     message: (Math.abs(total - 100) < 0.001
@@ -2502,9 +2532,9 @@ function saveComponents_(params) {
 // ---------- Calificaciones capturadas ----------
 
 /** cuenta → idComponente → valor (escala del componente). */
-function gradesFor_(idCurso) {
+function gradesFor_(idCurso, rows) {
   const map = {};
-  Db.read(WEB.GRADES).rows.forEach(r => {
+  (rows || Db.read(WEB.GRADES).rows).forEach(r => {
     if (cleanText_(r.ID_Curso) !== idCurso) return;
     const cuenta = limpiarCuenta_(r.Cuenta);
     const value = toNumberOrNull_(r.Valor);
@@ -2542,7 +2572,7 @@ function saveGrades_(params) {
     const cuenta = limpiarCuenta_(entry.cuenta);
     const comp = components[cleanText_(entry.componentId)];
     if (!cuenta || !comp) return errors.push(`Registro inválido (${entry.cuenta}).`);
-    if (comp.tipo !== "manual" && comp.tipo !== "examen") return errors.push(`"${comp.nombre}" se calcula solo; no se captura.`);
+    if (!isGradeInputComponent_(comp) && comp.tipo !== "examen") return errors.push(`"${comp.nombre}" se calcula solo; no se captura.`);
 
     const key = keyOf(cuenta, comp.id);
     const raw = cleanText_(entry.valor);
@@ -2553,8 +2583,11 @@ function saveGrades_(params) {
     }
 
     const value = toNumberOrNull_(raw);
-    if (value === null || value < 0 || value > comp.maximo) {
-      return errors.push(`${cuenta} · ${comp.nombre}: "${raw}" fuera de 0–${comp.maximo}.`);
+    const dynamicSeal = isParticipationComponent_(comp);
+    if (value === null || value < 0 || (!dynamicSeal && value > comp.maximo)) {
+      return errors.push(dynamicSeal
+        ? `${cuenta} · ${comp.nombre}: "${raw}" debe ser un valor igual o mayor que 0.`
+        : `${cuenta} · ${comp.nombre}: "${raw}" fuera de 0–${comp.maximo}.`);
     }
 
     if (index[key]) {
@@ -2613,8 +2646,8 @@ function rosterFor_(idCurso, attendance) {
  */
 function computeCourse_(idCurso, onlyCuenta) {
   const group = requireGroup_(idCurso);
-  const components = componentsFor_(idCurso);
   const grades = gradesFor_(idCurso);
+  const components = applyDynamicSealMaximums_(componentsFor_(idCurso), grades);
   const attendance = reportAttendance_(group.sheet);
   const projects = projectGradesFor_(idCurso);
   const bonus = appliedBonusFor_(idCurso);
@@ -2623,7 +2656,7 @@ function computeCourse_(idCurso, onlyCuenta) {
   if (onlyCuenta) roster = roster.filter(s => s.cuenta === onlyCuenta);
 
   const totalWeight = components
-    .filter(c => !isExtraCreditComponentName_(c.nombre))
+    .filter(c => !isExtraCreditComponent_(c))
     .reduce((sum, c) => sum + c.ponderacion, 0);
 
   const students = roster.map(student => {
@@ -2635,7 +2668,7 @@ function computeCourse_(idCurso, onlyCuenta) {
     components.forEach(comp => {
       let base = null;
 
-      if (comp.tipo === "manual") {
+      if (isGradeInputComponent_(comp)) {
         const value = grades[student.cuenta] && grades[student.cuenta][comp.id];
         base = value === undefined ? null : value;
       } else if (comp.tipo === "examen") {
@@ -2666,7 +2699,7 @@ function computeCourse_(idCurso, onlyCuenta) {
       const score10 = raw === null ? null : raw / comp.maximo * 10;
 
       if (score10 !== null && comp.ponderacion > 0) {
-        if (isExtraCreditComponentName_(comp.nombre)) extraCredit += score10 * comp.ponderacion / 100;
+        if (isExtraCreditComponent_(comp)) extraCredit += score10 * comp.ponderacion / 100;
         else {
           weighted += score10 * comp.ponderacion;
           evaluatedWeight += comp.ponderacion;
@@ -3110,9 +3143,10 @@ function listEvidence_(params) {
   const groups = groupsMap_();
 
   const componentsByCourse = {};
+  const gradeRows = Db.read(WEB.GRADES).rows;
   Object.keys(groups).forEach(id => {
-    componentsByCourse[id] = componentsFor_(id)
-      .filter(c => c.tipo === "manual" || c.tipo === "examen")
+    componentsByCourse[id] = applyDynamicSealMaximums_(componentsFor_(id), gradesFor_(id, gradeRows))
+      .filter(c => isGradeInputComponent_(c) || c.tipo === "examen")
       .map(c => ({ id: c.id, nombre: c.nombre, maximo: c.maximo }));
   });
 
@@ -3143,8 +3177,9 @@ function reviewEvidence_(params) {
   row.Nota = cleanText_(params.nota).slice(0, 500);
 
   if (estado === "Aplicada") {
-    const comp = componentsFor_(evidence.idCurso).find(c => c.id === cleanText_(params.componentId));
-    if (!comp || comp.tipo !== "manual") throw new Error("Elige el examen/componente (manual) al que se suman los puntos.");
+    const comp = applyDynamicSealMaximums_(componentsFor_(evidence.idCurso), gradesFor_(evidence.idCurso))
+      .find(c => c.id === cleanText_(params.componentId));
+    if (!comp || !isGradeInputComponent_(comp)) throw new Error("Elige el componente al que se suman los puntos.");
     const puntos = toNumberOrNull_(params.puntos);
     if (puntos === null || puntos <= 0 || puntos > comp.maximo) throw new Error(`Los puntos deben ser mayores que 0 y hasta ${comp.maximo}.`);
     row.Puntos = puntos;

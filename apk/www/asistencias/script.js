@@ -178,7 +178,21 @@ const Fmt = {
 };
 
 function isExtraCreditComponent(c) {
-  return !!c && ["punto adicional", "puntos adicionales"].includes(Fmt.normalize(c.nombre).replace(/\s+/g, " "));
+  return !!c && (c.tipo === "puntos_adicionales" || ["punto adicional", "puntos adicionales"].includes(Fmt.normalize(c.nombre).replace(/\s+/g, " ")));
+}
+
+function isParticipationComponent(c) {
+  return !!c && (c.tipo === "participaciones" || (c.tipo === "manual" && /sello|particip/.test(Fmt.normalize(c.nombre))));
+}
+
+function isGradeInputComponent(c) {
+  return !!c && (["manual", "participaciones", "puntos_adicionales"].includes(c.tipo) || isExtraCreditComponent(c) || isParticipationComponent(c));
+}
+
+function componentRubricType(c) {
+  if (c && c.tipo === "manual" && isParticipationComponent(c)) return "participaciones";
+  if (c && c.tipo === "manual" && isExtraCreditComponent(c)) return "puntos_adicionales";
+  return c ? c.tipo : "manual";
 }
 
 function debounce(fn, wait) {
@@ -1772,7 +1786,7 @@ const Student = {
     const typeHint = { asistencia: "según tu asistencia", proyectos: "según tu equipo", examen: "examen en línea" };
     const rows = comps.map(comp => {
       const item = course.items[comp.id] || { score10: null, bonus: 0 };
-      const rawText = comp.tipo === "manual" && comp.maximo !== 10 && item.raw !== null ? `${Fmt.num(item.raw)} / ${comp.maximo}` : "";
+      const rawText = isGradeInputComponent(comp) && comp.maximo !== 10 && item.raw !== null ? `${Fmt.num(item.raw)} / ${comp.maximo}` : "";
       return h("tr", {},
         h("td", { class: "text-start" }, h("div", { class: "fw-semibold", text: comp.nombre }),
           typeHint[comp.tipo] ? h("div", { class: "small text-body-secondary", text: typeHint[comp.tipo] }) : null,
@@ -2358,8 +2372,8 @@ const Admin = {
     const standaloneComponents = g.components.filter(c => !linkedComponents.has(c.id));
 
     // Parciales para el filtro «Sin calificar parcial» (si no hay, cualquier manual).
-    const parciales = g.components.filter(c => (c.tipo === "manual" || c.tipo === "examen") && /parcial/i.test(c.nombre));
-    const fuentesNota = parciales.length ? parciales : g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
+    const parciales = g.components.filter(c => (isGradeInputComponent(c) || c.tipo === "examen") && /parcial/i.test(c.nombre));
+    const fuentesNota = parciales.length ? parciales : g.components.filter(c => isGradeInputComponent(c) || c.tipo === "examen");
     const sinNota = s => fuentesNota.length && fuentesNota.some(cp => !s.items[cp.id] || s.items[cp.id].score10 === null || s.items[cp.id].score10 === undefined);
     const matchFilter = s => {
       const f = Admin._attFilter || "all";
@@ -2387,7 +2401,7 @@ const Admin = {
     };
     const gradeCell = (s, comp) => {
       const item = s.items[comp.id] || {};
-      if (Admin.captureMode && comp.tipo === "manual") {
+      if (Admin.captureMode && isGradeInputComponent(comp)) {
         const key = `${s.cuenta}|${comp.id}`;
         const original = item.base === null || item.base === undefined ? "" : String(item.base);
         const value = Admin.dirty.has(key) ? Admin.dirty.get(key) : original;
@@ -2401,9 +2415,9 @@ const Admin = {
         input.addEventListener("input", () => {
           const raw = input.value.trim().replace(",", ".");
           const n = Number(raw);
-          const invalid = raw !== "" && (!isFinite(n) || n < 0 || n > comp.maximo);
+          const invalid = raw !== "" && (!isFinite(n) || n < 0 || (!isParticipationComponent(comp) && n > comp.maximo));
           input.classList.toggle("is-invalid", invalid);
-          input.title = invalid ? `Debe estar entre 0 y ${comp.maximo}` : "";
+          input.title = invalid ? (isParticipationComponent(comp) ? "Debe ser un valor igual o mayor que 0." : `Debe estar entre 0 y ${comp.maximo}`) : "";
           if (raw === original) Admin.dirty.delete(key); else Admin.dirty.set(key, raw);
           input.classList.toggle("dirty", Admin.dirty.has(key));
           refreshCapture();
@@ -2415,7 +2429,7 @@ const Admin = {
         input.addEventListener("focus", () => input.select());
         return h("td", {}, h("div", { class: "d-flex align-items-center justify-content-center gap-1" }, input, Parts.bonusTag(item, comp)));
       }
-      if (comp.tipo === "manual") {
+      if (isGradeInputComponent(comp)) {
         return h("td", {}, h("div", { class: "d-flex align-items-center justify-content-center gap-1" },
           h("span", { text: item.base === null || item.base === undefined ? "" : Fmt.num(item.base) }),
           Parts.bonusTag(item, comp)));
@@ -2646,11 +2660,11 @@ const Admin = {
 
   psiModal() {
     const g = Admin.group;
-    const manual = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
+    const manual = g.components.filter(c => isGradeInputComponent(c) || c.tipo === "examen");
     const auto = manual.find(c => /tarea|teams|activ|sello|ejercicio/i.test(c.nombre));
     const opts = { tareas: auto ? auto.id : "none", extra: false, dejoN: 3, components: g.components };
     // Parciales disponibles como fuente de la calificación a exportar.
-    const parciales = g.components.filter(c => (c.tipo === "manual" || c.tipo === "examen") && /parcial/i.test(c.nombre));
+    const parciales = g.components.filter(c => (isGradeInputComponent(c) || c.tipo === "examen") && /parcial/i.test(c.nombre));
     const fuentes = parciales.length ? parciales : manual;
     const conNota = c => g.students.some(st => st.items[c.id] && st.items[c.id].score10 !== null && st.items[c.id].score10 !== undefined);
     opts.fuente = (fuentes.find(conNota) || fuentes[0] || {}).id || "";
@@ -3088,7 +3102,7 @@ const Admin = {
   /** Excel con Cuenta, Nombre y una columna por componente manual (vacíos en amarillo). */
   gradesTemplate() {
     const g = Admin.group;
-    const comps = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
+    const comps = g.components.filter(c => isGradeInputComponent(c) || c.tipo === "examen");
     if (!comps.length) return UI.toast("warning", "Este grupo no tiene componentes manuales.");
     const header = ["Cuenta", "Nombre"].concat(comps.map(c => c.nombre)).map(v => ({ v, s: "head" }));
     const rows = g.students.map(st => [Number(st.cuenta), st.nombre].concat(comps.map(c => {
@@ -3120,7 +3134,7 @@ const Admin = {
     const header = (sheet.rows[0] || []).map(v => String(v ?? ""));
     const iCuenta = header.findIndex(v => key(v) === "cuenta" || key(v).includes("cuenta"));
     if (iCuenta === -1) return UI.toast("danger", `La hoja «${sheet.name}» no tiene la columna Cuenta.`);
-    const comps = g.components.filter(c => c.tipo === "manual" || c.tipo === "examen");
+    const comps = g.components.filter(c => isGradeInputComponent(c) || c.tipo === "examen");
     const map = [], unknown = [];
     header.forEach((v, i) => {
       if (i === iCuenta || !v || key(v) === "nombre") return;
@@ -3188,11 +3202,18 @@ const Admin = {
   /* ---------------- Pestaña: Ponderaciones ---------------- */
   tabWeights(content, opts = {}) {
     const g = Admin.group;
-    const fresh = () => g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, ponderacion: c.ponderacion, maximo: c.maximo, fuente: c.fuente || "" }));
+    const fresh = () => g.components.map(c => ({ id: c.id, nombre: c.nombre, tipo: componentRubricType(c), ponderacion: c.ponderacion, maximo: c.maximo, fuente: c.fuente || "" }));
     // En la pestaña el borrador sobrevive al cambiar de pestaña; en el modal siempre parte de lo guardado
     if (!opts.modal && !Admin.compDraft) Admin.compDraft = fresh();
     const draft = opts.modal ? fresh() : Admin.compDraft;
-    const types = { manual: "Manual (capturo yo)", asistencia: "Asistencia (automática)", proyectos: "Proyectos en equipo (automática)", examen: "Examen en línea (automática)" };
+    const types = {
+      manual: "Manual (capturo yo)",
+      participaciones: "Participaciones/Sellos (máximo automático)",
+      puntos_adicionales: "Puntos Adicionales (escala 0–10; extra)",
+      asistencia: "Asistencia (automática)",
+      proyectos: "Proyectos en equipo (automática)",
+      examen: "Examen en línea (automática)"
+    };
     const exams = g.examSources || [];
 
     const list = h("div", { class: "vstack gap-2" });
@@ -3201,6 +3222,7 @@ const Admin = {
 
     const updateSum = () => {
       const extraComponents = draft.filter(isExtraCreditComponent);
+      const participationComponents = draft.filter(isParticipationComponent);
       const sum = draft.filter(c => !isExtraCreditComponent(c)).reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
       const extraWeight = extraComponents.reduce((s, c) => s + (Number(c.ponderacion) || 0), 0);
       sumText.textContent = `${Fmt.num(sum)}%`;
@@ -3208,8 +3230,9 @@ const Admin = {
       const exact = Math.abs(sum - 100) < 0.001;
       const errors = [];
       if (!exact) errors.push(`Debe sumar 100 % (${sum > 100 ? "sobran" : "faltan"} ${Fmt.num(Math.abs(100 - sum))} %)`);
+      if (participationComponents.length > 1) errors.push("Solo se permite una columna de «Participaciones/Sellos» por grupo.");
       if (extraComponents.length > 1) errors.push("Solo se permite un rubro «Puntos Adicionales».");
-      if (extraComponents.some(c => c.tipo !== "manual" || Number(c.maximo) !== 10)) errors.push("«Puntos Adicionales» debe ser manual y capturarse de 0 a 10.");
+      if (extraComponents.some(c => componentRubricType(c) !== "puntos_adicionales" || Number(c.maximo) !== 10)) errors.push("«Puntos Adicionales» debe seleccionarse en Tipo y capturarse de 0 a 10.");
       const notes = extraWeight > 0 ? [`+${Fmt.num(extraWeight)}% extra (no cuenta en el 100 % base).`] : [];
       const ids = new Set(draft.map(c => c.id).filter(Boolean));
       const gone = (g.columns || []).filter(l => l.tipo === "componente" && !ids.has(l.ref)).map(l => l.columna);
@@ -3232,17 +3255,13 @@ const Admin = {
 
     const draw = () => {
       list.replaceChildren(...draft.map((c, i) => {
-        // Solo porcentaje. Sellos es el único con máximo propio (ej. 40 sellos = su 100 %).
+        // Sellos normaliza sus valores usando el máximo capturado en la columna.
         const isExtra = isExtraCreditComponent(c);
-        const isSello = c.tipo === "manual" && /sello/.test(Fmt.normalize(c.nombre));
+        const isSello = isParticipationComponent(c);
         const scaleNote = isExtra ? h("div", { class: "small text-body-secondary mt-1" },
-          "Captura desde Asistencia → Capturar calificaciones, de 0 a 10. Cada 10 % extra puede sumar hasta 1 punto al promedio (tope 10). ",
-          c.tipo !== "manual" ? "Selecciona el tipo Manual." : Number(c.maximo) !== 10
-            ? h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Usar escala de 0 a 10")
-            : null)
-        : isSello ? h("div", { class: "input-group input-group-sm mt-1", style: { maxWidth: "260px" } },
-          h("span", { class: "input-group-text", text: "Máximo de sellos" }),
-          h("input", { class: "form-control", type: "number", min: "1", step: "1", value: c.maximo, "aria-label": "Máximo de sellos", oninput: e => { c.maximo = e.target.value; } }))
+          "Captura de 0 a 10; su ponderación se suma aparte del 100 % base. Selecciona «Puntos Adicionales» en Tipo.")
+        : isSello ? h("div", { class: "small text-body-secondary mt-1" },
+          `Máximo actual: ${Fmt.num(c.maximo)} (mayor valor capturado; si aún no hay valores positivos, usa 10). Los valores se normalizan a 0–10 antes de aplicar la ponderación; no hay tope fijo de captura.`)
         : c.tipo === "examen" ? h("select", { class: "form-select form-select-sm mt-1", "aria-label": "Examen y parcial", onchange: e => { c.fuente = e.target.value; } },
           h("option", { value: "", text: exams.length ? "— Elige examen y parcial —" : "No hay hojas «Resultados …» (ejecuta crearTablasExamenes)" }),
           exams.map(x => h("option", { value: x.id, selected: c.fuente === x.id, text: x.label })))
@@ -3250,10 +3269,10 @@ const Admin = {
           `En Asistencia → Capturar calificaciones se escribe de 0 a ${c.maximo}. `,
           h("button", { type: "button", class: "btn btn-link btn-sm p-0 align-baseline", onclick: () => { c.maximo = 10; draw(); } }, "Capturar de 0 a 10")) : null;
         return h("div", { class: `card card-soft comp-row ${opts.focusId && c.id === opts.focusId ? "comp-focus" : ""}`, dataset: { compRow: c.id || "" } }, h("div", { class: "card-body p-2" }, h("div", { class: "row g-2 align-items-center" },
-          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Sellos, Puntos Adicionales)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const wasSello = /sello/.test(Fmt.normalize(c.nombre)); const wasExtra = isExtraCreditComponent(c); c.nombre = e.target.value; if (wasSello !== /sello/.test(Fmt.normalize(c.nombre)) || wasExtra !== isExtraCreditComponent(c)) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } else updateSum(); } }), scaleNote),
+          h("div", { class: "col-12 col-md-5" }, h("input", { class: "form-control form-control-sm", value: c.nombre, placeholder: "Nombre (ej. Parcial 1, Proyecto de lectura)", "aria-label": "Nombre", maxlength: "60", oninput: e => { const wasSello = isParticipationComponent(c); const wasExtra = isExtraCreditComponent(c); c.nombre = e.target.value; if (c.tipo === "manual" && isParticipationComponent(c)) c.tipo = "participaciones"; if (c.tipo === "manual" && isExtraCreditComponent(c)) c.tipo = "puntos_adicionales"; if (wasSello !== isParticipationComponent(c) || wasExtra !== isExtraCreditComponent(c)) { draw(); list.querySelectorAll("input[aria-label='Nombre']")[i].focus(); } else updateSum(); } }), scaleNote),
           h("div", { class: "col-12 col-md-3" }, h("select", {
             class: "form-select form-select-sm", "aria-label": "Tipo",
-            onchange: e => { c.tipo = e.target.value; if (c.tipo !== "manual") c.maximo = 10; if (c.tipo !== "examen") c.fuente = ""; draw(); }
+            onchange: e => { c.tipo = e.target.value; c.maximo = 10; if (c.tipo !== "examen") c.fuente = ""; draw(); }
           }, Object.entries(types).map(([v, t]) => h("option", { value: v, selected: c.tipo === v, text: t })))),
           h("div", { class: "col-6 col-md-2" }, h("div", { class: "input-group input-group-sm" },
             h("input", { class: "form-control", type: "number", min: "0", max: "100", step: "any", value: c.ponderacion, "aria-label": "Ponderación", oninput: e => { c.ponderacion = e.target.value; updateSum(); } }),
@@ -3304,15 +3323,18 @@ const Admin = {
           h("h2", { class: "h6 mb-0" }, `Forma de evaluación · ${g.group.label}`),
           h("span", { class: "small" }, "Suma: ", sumText, sumHint)),
         h("div", { class: "progress weight-bar mb-2", role: "progressbar", "aria-label": "Suma de ponderaciones" }, sumBar),
-        h("p", { class: "small text-body-secondary mb-0" },
+        h("details", { class: "small text-body-secondary mb-0" },
+          h("summary", { class: "fw-semibold", text: "Ver detalle de la evaluación" }),
+          h("p", { class: "mt-2 mb-0" },
           "Cada componente vale el % que le pongas y entre todos deben sumar 100 % (= 10). Ej.: Parcial 1 al 40 % con 8 aporta 3.2. ",
-          "El único rubro extra permitido es «Puntos Adicionales»: debe ser manual, de 0 a 10, y su % se suma aparte del 100 % base (10 % extra con 10 añade 1 punto; máximo final 10). ",
-          "«Manual» = lo capturas tú desde Asistencia → Capturar calificaciones, de 0 a 10; solo Sellos lleva su máximo (ej. 40 sellos). ",
+          "«Puntos Adicionales» se selecciona en Tipo, se captura de 0 a 10 y su % se suma aparte del 100 % base (10 % con 10 añade 1 punto; máximo final 10). ",
+          "«Participaciones/Sellos» se selecciona en Tipo, permite una columna por grupo y toma automáticamente como máximo el mayor valor capturado; cada valor se normaliza a 10 antes de aplicar su ponderación. ",
+          "«Manual» = lo capturas tú desde Asistencia → Capturar calificaciones, de 0 a 10. ",
           "«Asistencia» = asistencias ÷ (asistencias + faltas) × 10; el justificante no cuenta en contra. ",
           "«Proyectos» = promedio de los proyectos ligados a ese componente. ",
           "«Examen en línea» = la calificación que el alumno sacó en el examen (Cibernética o Estadística) de ese parcial, por número de cuenta. ",
           "«Calificación entera» suma lo obtenido y quita los decimales (no redondea). ",
-          "Cada componente tiene su columna en el reporte: si quitas uno se borra su columna, y si agregas uno se crea.")
+          "Cada componente tiene su columna en el reporte: si quitas uno se borra su columna, y si agregas uno se crea."))
       )),
       list,
       pairNote,

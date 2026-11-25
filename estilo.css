@@ -48,6 +48,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  font-size: 1.05rem;
   min-height: 100vh;
 }
 .mono { font-family: 'Courier New', ui-monospace, monospace; }

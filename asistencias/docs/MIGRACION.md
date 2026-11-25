@@ -121,7 +121,7 @@ En la web, pestaña **Asistencia → botón «Columnas»**:
 | Proyecto_Final (Estadística) | Componente Proyectos |
 | Ejercicio Clase (CYC) | Proyecto «Proyecto (AppSheet)», el que se migró |
 | Calificación, SIAE | **Calificación entera** |
-| Puntos Adicionales | Sin enlace por defecto; si agregas el componente «Puntos Adicionales», se enlaza a ese rubro |
+| Puntos Adicionales | Sin enlace por defecto; si agregas un componente de tipo «Puntos Adicionales» (con cualquier nombre), se enlaza a ese rubro |
 
 **Calificación entera:** los porcentajes suman 10 (100 % = 10). Se suma lo obtenido en cada componente y **se quitan los decimales, sin redondear**: 7.96 → 7. Si ya tenías Calificación o SIAE enlazadas a «Promedio actual», se cambian solas a entera al entrar como admin. En la vista **2 · Ponderaciones** de Asistencia verás la columna **Entera** junto a Final y Estricta.
 
@@ -195,9 +195,9 @@ En Asistencia solo aparecen los grupos **activos**; los demás se activan en la 
 
 ## Ponderaciones: solo porcentaje
 
-Los componentes base deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. Se permite un único componente manual llamado **Puntos Adicionales** (o «Punto adicional»), con escala de 0 a 10; su ponderación se agrega aparte del 100 % y no se normaliza junto con los demás rubros. Cada 10 % adicional con calificación 10 aporta 1 punto al resultado; la calificación final no supera 10.
+Los componentes base deben sumar **100 %** (= 10). Si no suman 100, el botón Guardar se bloquea y te dice cuánto sobra o falta. En el menú **Tipo** selecciona el rubro especial: solo se permite una columna **Participaciones/Sellos** por grupo, y un único **Puntos Adicionales**. Este último se captura de 0 a 10; su ponderación se agrega aparte del 100 % base y no se normaliza con los demás rubros. Cada 10 % adicional con calificación 10 aporta 1 punto al resultado; la calificación final no supera 10.
 
-Todo se captura de 0 a 10. Si un componente viejo se capturaba en otra escala (Sellos de 0 a 15), aparece una nota y el enlace «Capturar de 0 a 10» para cambiarlo.
+Los componentes manuales se capturan de 0 a 10, excepto **Participaciones/Sellos**: se captura sin máximo fijo y el sistema toma como máximo el mayor valor de esa columna en el grupo. Cada valor se convierte proporcionalmente a escala 0–10 y luego se aplica la ponderación configurada. Si cambia el mayor valor, se recalculan proporcionalmente las calificaciones de Participaciones/Sellos del grupo. La selección de rubro es por Tipo y funciona aunque se le dé otro nombre.
 
 ## Plantilla por defecto (Ponderaciones)
 
