@@ -2035,7 +2035,7 @@ const Admin = {
     frame.onload = () => {
       try {
         const w = frame.contentWindow, d = frame.contentDocument;
-        w.eval(`ADMIN = ${JSON.stringify(Session.get("admin"))};`);
+        w.eval(`ADMIN = ${JSON.stringify(Session.get("admin"))}; if (typeof CFG !== 'undefined') CFG.ENDPOINT = ${JSON.stringify(ApiUrl.get())};`);
         const tag = d.createElement("script");
         tag.src = `./${script}?v=${encodeURIComponent(CONFIG.VERSION || "")}`;
         tag.onload = () => { w.eval("openAdmin()"); frame.dataset.ready = "1"; $("exam-loading").classList.add("d-none"); };

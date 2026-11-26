@@ -14,7 +14,7 @@
     input, textarea { -webkit-user-select:text; user-select:text; }
     .screen { min-height:100vh; }
     /* ===== Pantallas de acceso ===== */
-    .gate { background:radial-gradient(1200px 600px at 10% -10%, #1e3a8a 0%, transparent 60%), radial-gradient(900px 500px at 100% 110%, #6d28d9 0%, transparent 55%), linear-gradient(160deg,#050b24,#0b1437 55%,#111c4a); display:flex; align-items:center; justify-content:center; padding:1.2rem; position:relative; overflow:hidden; }
+    .gate { background:radial-gradient(1200px 600px at 10% -10%, #1e3a8a 0%, transparent 60%), radial-gradient(900px 500px at 100% 110%, #6d28d9 0%, transparent 55%), linear-gradient(160deg,#050b24,#0b1437 55%,#111c4a); display:flex; align-items:center; justify-content:center; padding:calc(1.2rem + env(safe-area-inset-top, 0px)) 1.2rem 1.2rem; position:relative; overflow:hidden; }
     .gate::before { content:"01001010 11010 0110 1011 00101 1110 0101 10011 0100 1101 0010 1010 0110 1001 1100"; position:absolute; inset:0; font:700 1.1rem/2 'Courier New',monospace; color:rgba(34,211,238,.07); word-break:break-all; padding:1rem; pointer-events:none; letter-spacing:.3em; }
     .gate-card { position:relative; background:#fff; border-radius:22px; box-shadow:0 25px 60px rgba(0,0,0,.45); width:100%; max-width:480px; overflow:hidden; animation:rise .5s ease; }
     .gate-card.wide { max-width:760px; }
@@ -119,6 +119,12 @@
     .hbar { width:100%; background:linear-gradient(180deg,#16a34a,#0891b2); border-radius:8px 8px 0 0; min-height:2px; transition:height .5s; } .hbar.bad { background:linear-gradient(180deg,#f97316,#dc2626); }
     .hv { font-size:.75rem; font-weight:800; color:#334155; } .hl { font-size:.75rem; color:#64748b; margin-top:.2rem; }
     .admin-tabs .nav-link { border-radius:12px; background:#fff; color:#334155; font-weight:700; box-shadow:0 2px 8px rgba(15,23,42,.08); margin-right:.4rem; margin-bottom:.4rem; } .admin-tabs .nav-link.active { background:linear-gradient(90deg,#4338ca,#7c3aed); color:#fff; }
+    .modo-panel .exam-bar { padding-top:0 !important; }
+    @media (max-width:767.98px) {
+      .admin-tabs { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; scrollbar-width:none; }
+      .admin-tabs .nav-link { white-space:nowrap; font-size:.84rem; padding:.4rem .75rem; margin-bottom:0; }
+      .modo-panel main.container { padding:12px !important; }
+    }
     .btn-chip { border:2px solid var(--c,#4338ca); color:var(--c,#4338ca); background:#fff; font-weight:800; font-size:.86rem; padding:.28rem .9rem; border-radius:999px; transition:all .2s; } .btn-chip.on { background:var(--c,#4338ca); color:#fff; box-shadow:0 4px 12px rgba(0,0,0,.2); }
     .ad-tbl th { white-space:nowrap; font-size:.8rem; color:#475569; } .ad-tbl td { font-size:.88rem; }
     @media print { body { display:none !important; } }
@@ -222,6 +228,7 @@
     <div class="gate-body text-center">
       <p class="mb-2">Para presentar el examen entra desde el <b>navegador de una computadora o laptop</b> (Chrome, Edge, Firefox o Safari) con teclado y mouse o trackpad.</p>
       <p class="small text-muted mb-3">Si ya habías empezado, tus respuestas están guardadas: entra con tu mismo número de cuenta y nombre desde la computadora y continúas donde ibas.</p>
+      <a href="./index.html" class="btn btn-outline-secondary btn-sm w-100 mb-2"><i class="bi bi-chevron-left me-1"></i>Volver a Asistencias</a>
       <button class="btn btn-link btn-sm text-muted" type="button" id="btn-prof-movil"><i class="bi bi-person-badge me-1"></i>Acceso del profesor(a)</button>
     </div>
   </div>
@@ -243,6 +250,7 @@
       <div class="text-danger fw-bold small mb-2" id="clave-err" hidden></div>
       <div class="alert alert-warning small py-2" id="clave-cfg" hidden><i class="bi bi-gear-fill me-1"></i>Falta configurar el servidor. Abre <a href="./index.html">Asistencias</a> para guardar la URL /exec.</div>
       <button class="btn btn-lg w-100 text-white fw-bold" id="btn-entrar" style="background:linear-gradient(90deg,#4338ca,#7c3aed)" type="submit"><i class="bi bi-unlock-fill me-1"></i>Entrar</button>
+      <a href="./index.html" class="btn btn-outline-secondary btn-sm w-100 mt-2"><i class="bi bi-chevron-left me-1"></i>Volver a Asistencias</a>
       <div class="text-center text-muted small mt-3">La contraseña te la da tu profesor(a) en el salón. Cada examen tiene la suya.</div>
     </form>
   </div>
@@ -394,7 +402,9 @@
 const TOTAL = () => (typeof EXAM !== 'undefined' && EXAM) ? EXAM.filter(q => !q.bonus).length : 0;   // la pregunta bonus no cuenta en el total
 const ENDPOINT_CCH = (() => {
   try {
-    const url = localStorage.getItem('cch.apiUrl') || '';
+    const q = new URLSearchParams(location.search).get('api') || '';
+    const p = (window.parent !== window && window.parent.ApiUrl && typeof window.parent.ApiUrl.get === 'function') ? window.parent.ApiUrl.get() : '';
+    const url = (q || p || localStorage.getItem('cch.apiUrl') || '').trim();
     return /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec$/.test(url) ? url : '';
   } catch (e) { return ''; }
 })();
@@ -2564,6 +2574,25 @@ $('#btn-prof-movil').onclick = () => show('clave');
   else show('clave');
   flushQueue();
 })();
+if (!PANEL_MODE) {
+  const onBackExam = () => {
+    const openModal = document.querySelector('.modal.show');
+    if (openModal) {
+      const btn = openModal.querySelector('.btn-close, [data-bs-dismiss="modal"]');
+      if (btn) { btn.click(); return true; }
+    }
+    if (examActive && S && !S.fin) return false;
+    window.location.href = './index.html';
+    return true;
+  };
+  document.addEventListener('backbutton', e => { e.preventDefault(); onBackExam(); }, false);
+  try {
+    history.pushState({ modulo: 'examen-cib' }, '');
+    window.addEventListener('popstate', () => {
+      if (!onBackExam()) history.pushState({ modulo: 'examen-cib' }, '');
+    });
+  } catch (e) {}
+}
 </script>
 </body>
 </html>
