@@ -2045,7 +2045,7 @@ const Admin = {
         $("exam-loading").replaceChildren(UI.empty("exclamation-triangle", `No se pudo abrir el panel del examen (${error.message}). Las páginas del examen deben estar en el mismo sitio que el Dashboard.`));
       }
     };
-    frame.src = `./${page}?panel=1`;
+    frame.src = `./examenes/${page}?panel=1`;
   },
 
   async open() {

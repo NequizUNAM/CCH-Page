@@ -1855,8 +1855,8 @@ const Admin = {
    * Contraseñas y Vista previa.
    */
   loadExamPanel(id) {
-    const page = id === "cib" ? "examenes_cibernetica.html" : "examenes_estadistica.html";
-    const script = id === "cib" ? "panel_examen_cibernetica.js" : "panel_examen_estadistica.js";
+    const page = id === "cib" ? "examenes/examenes_cibernetica.html" : "examenes/examenes_estadistica.html";
+    const script = id === "cib" ? "examenes/panel_examen_cibernetica.js" : "examenes/panel_examen_estadistica.js";
     const frame = $("exam-frame");
     if (frame.dataset.exam === id && frame.dataset.ready === "1") return;
     frame.dataset.exam = id;
