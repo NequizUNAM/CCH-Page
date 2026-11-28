@@ -1,0 +1,610 @@
+{
+  "schemaVersion": 1,
+  "materia": "est",
+  "parciales": {
+    "1": {
+      "BANK1": {
+        "tc": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "¿Qué es la <b>media aritmética</b> de un conjunto de datos?",
+              "ok": "La suma de todos los datos dividida entre el número de datos",
+              "bad": [
+                "El dato que más se repite",
+                "El dato que queda en el centro al ordenar los datos",
+                "La diferencia entre el dato mayor y el dato menor"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "La <b>moda</b> de un conjunto de datos es…",
+              "ok": "el dato que aparece con mayor frecuencia",
+              "bad": [
+                "el promedio de todos los datos",
+                "el dato central de los datos ordenados",
+                "el dato de mayor valor"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Antes de calcular la <b>mediana</b> de datos sin agrupar, lo primero que se debe hacer es…",
+              "ok": "ordenar los datos de menor a mayor",
+              "bad": [
+                "sumar todos los datos",
+                "contar cuántas veces se repite cada dato",
+                "restar el dato menor al dato mayor"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Si hay un número <b>par</b> de datos ordenados, la mediana es…",
+              "ok": "el promedio de los dos datos centrales",
+              "bad": [
+                "el dato que más se repite",
+                "el primero de los dos datos centrales",
+                "la suma de los dos datos centrales"
+              ]
+            },
+            {
+              "bl": "Analizar",
+              "q": "Un conjunto de datos tiene un valor extremadamente grande (un dato atípico). ¿Cuál medida de tendencia central cambia más por ese valor?",
+              "ok": "La media aritmética",
+              "bad": [
+                "La mediana",
+                "La moda",
+                "Ninguna: las tres cambian igual"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Un conjunto de datos en el que <b>dos valores empatan</b> con la mayor frecuencia se llama…",
+              "ok": "bimodal",
+              "bad": [
+                "unimodal",
+                "amodal",
+                "simétrico"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Comprender",
+              "q": "Con los datos ya ordenados, la <b>mediana</b> es el valor que…",
+              "ok": "deja la mitad de los datos por debajo y la otra mitad por encima",
+              "bad": [
+                "aparece más veces",
+                "resulta de sumar todos los datos y dividir entre n",
+                "se encuentra entre el dato menor y el dato mayor, sin importar el orden"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "Si <i>n</i> es <b>impar</b>, la posición de la mediana en los datos ordenados es…",
+              "ok": "(n + 1) / 2",
+              "bad": [
+                "n / 2",
+                "n + 1",
+                "n − 1"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "En el conjunto {3, 5, 5, 8, 9}, ¿qué significa que el 5 aparezca dos veces?",
+              "ok": "Que el 5 es la moda del conjunto",
+              "bad": [
+                "Que el 5 es la media del conjunto",
+                "Que el 5 es la mediana porque se repite",
+                "Que el conjunto no tiene moda"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "¿Cuál es la <b>única</b> medida de tendencia central que puede calcularse con datos cualitativos (por ejemplo, el color favorito)?",
+              "ok": "La moda",
+              "bad": [
+                "La media",
+                "La mediana",
+                "Las tres por igual"
+              ]
+            },
+            {
+              "bl": "Analizar",
+              "q": "A cada dato de un conjunto se le suma 10 unidades. Entonces la media…",
+              "ok": "aumenta 10 unidades",
+              "bad": [
+                "no cambia",
+                "se multiplica por 10",
+                "aumenta 10 veces el número de datos"
+              ]
+            },
+            {
+              "bl": "Evaluar",
+              "q": "En una empresa el director gana mucho más que todos los demás. Para describir el sueldo «típico» conviene más…",
+              "ok": "la mediana, porque no la afectan los valores extremos",
+              "bad": [
+                "la media, porque usa todos los datos y los extremos no importan",
+                "la moda, porque siempre es el sueldo más alto",
+                "el dato mayor, porque representa a la empresa"
+              ]
+            }
+          ]
+        },
+        "fr": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "La <b>frecuencia relativa</b> de una clase se obtiene…",
+              "ok": "dividiendo su frecuencia absoluta entre el total de datos (n)",
+              "bad": [
+                "sumando su frecuencia absoluta con la de la clase anterior",
+                "restando el dato menor al dato mayor",
+                "multiplicando su frecuencia por la amplitud"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La <b>frecuencia acumulada</b> de una clase indica…",
+              "ok": "cuántos datos hay en esa clase y en todas las anteriores",
+              "bad": [
+                "cuántas veces se repite el dato más frecuente",
+                "la proporción de datos de esa clase respecto del total",
+                "el punto medio de la clase"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La suma de <b>todas</b> las frecuencias relativas de una tabla es…",
+              "ok": "1 (es decir, 100 %)",
+              "bad": [
+                "n, el total de datos",
+                "la amplitud de clase",
+                "0"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "La <b>regla de Sturges</b> sirve para…",
+              "ok": "estimar el número de clases a partir del número de datos",
+              "bad": [
+                "calcular la media de datos agrupados",
+                "hallar la moda en una tabla de frecuencias",
+                "medir la dispersión de los datos"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Recordar",
+              "q": "La <b>marca de clase</b> es…",
+              "ok": "el punto medio del intervalo: (límite inferior + límite superior) / 2",
+              "bad": [
+                "la frecuencia de la clase",
+                "la diferencia entre sus límites",
+                "el número de datos menores que la clase"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La <b>amplitud</b> de las clases se calcula como…",
+              "ok": "el rango dividido entre el número de clases (redondeado hacia arriba)",
+              "bad": [
+                "el número de clases dividido entre el rango",
+                "la suma del dato mayor y el dato menor",
+                "n dividido entre el número de clases"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La <b>última</b> frecuencia acumulada de una tabla es igual a…",
+              "ok": "n, el total de datos",
+              "bad": [
+                "1",
+                "la amplitud de clase",
+                "la frecuencia de la clase modal"
+              ]
+            },
+            {
+              "bl": "Aplicar",
+              "q": "Una clase tiene frecuencia 15 y el total es <i>n</i> = 60 datos. Su frecuencia relativa es…",
+              "ok": "0.25 (25 %)",
+              "bad": [
+                "0.15",
+                "4",
+                "0.40"
+              ]
+            }
+          ]
+        },
+        "di": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "La <b>desviación media</b> es…",
+              "ok": "el promedio de los valores absolutos de las desviaciones respecto de la media",
+              "bad": [
+                "el promedio de las desviaciones sin valor absoluto",
+                "la raíz cuadrada de la varianza",
+                "la diferencia entre el dato mayor y el menor"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "¿Por qué las desviaciones se elevan al cuadrado al calcular la <b>varianza</b>?",
+              "ok": "Porque las desviaciones positivas y negativas se cancelan al sumarlas (su suma es 0)",
+              "bad": [
+                "Para que el resultado quede en las mismas unidades que los datos",
+                "Para que la varianza siempre sea igual a la media",
+                "Porque la media no puede usarse con datos decimales"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La <b>desviación estándar</b> se obtiene…",
+              "ok": "sacando la raíz cuadrada de la varianza",
+              "bad": [
+                "elevando al cuadrado la desviación media",
+                "dividiendo la media entre la varianza",
+                "restando la mediana a la media"
+              ]
+            },
+            {
+              "bl": "Analizar",
+              "q": "Dos grupos tienen la misma media. El grupo 1 tiene σ = 2 y el grupo 2 tiene σ = 9. Se concluye que…",
+              "ok": "los datos del grupo 2 están más dispersos alrededor de la media",
+              "bad": [
+                "los datos del grupo 1 están más dispersos alrededor de la media",
+                "ambos grupos tienen la misma dispersión porque la media es igual",
+                "el grupo 2 tiene una media mayor"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Recordar",
+              "q": "La <b>varianza poblacional</b> se calcula dividiendo la suma de las desviaciones al cuadrado entre…",
+              "ok": "N, el tamaño de la población",
+              "bad": [
+                "N − 1",
+                "N + 1",
+                "la media"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Si <b>todos</b> los datos de un conjunto son iguales, la desviación estándar vale…",
+              "ok": "0",
+              "bad": [
+                "1",
+                "la media",
+                "el valor de los datos"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "En la <b>varianza muestral</b> se divide entre <i>n</i> − 1 (y no entre <i>n</i>) porque…",
+              "ok": "dividir entre n tiende a subestimar la dispersión de la población y n − 1 corrige ese sesgo",
+              "bad": [
+                "así la varianza resulta siempre un número entero",
+                "la muestra siempre tiene un dato menos",
+                "así coincide con la desviación media"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Si los datos se miden en centímetros, la <b>varianza</b> se expresa en…",
+              "ok": "centímetros al cuadrado (cm²)",
+              "bad": [
+                "centímetros (cm)",
+                "ninguna unidad",
+                "centímetros cúbicos (cm³)"
+              ]
+            }
+          ]
+        }
+      },
+      "SECS1": [
+        {
+          "id": "tc",
+          "t": "Datos ordenados, media, mediana y moda · teoría",
+          "d": "Elige la respuesta correcta.",
+          "ic": "bi-sort-numeric-down",
+          "c": "#0d9488"
+        },
+        {
+          "id": "tcc",
+          "t": "Datos ordenados, media, mediana y moda · cálculo",
+          "d": "Respuesta abierta: escribe solo el número, sin espacios. En la última pregunta elige la opción.",
+          "ic": "bi-calculator-fill",
+          "c": "#2563eb"
+        },
+        {
+          "id": "fr",
+          "t": "Distribución de frecuencias: Sturges, amplitud, acumulada y relativa",
+          "d": "Elige la respuesta correcta o escribe solo el número, sin espacios.",
+          "ic": "bi-table",
+          "c": "#d97706"
+        },
+        {
+          "id": "gr",
+          "t": "Histogramas y polígonos de frecuencias",
+          "d": "Las gráficas están dibujadas con vectores. Elige la opción correcta o escribe el número que se pide.",
+          "ic": "bi-bar-chart-fill",
+          "c": "#be185d"
+        },
+        {
+          "id": "di",
+          "t": "Desviación media, varianza y desviación estándar",
+          "d": "Elige la respuesta correcta o escribe solo el número, sin espacios.",
+          "ic": "bi-arrows-expand",
+          "c": "#7c3aed"
+        }
+      ]
+    },
+    "2": {
+      "BANK2": {
+        "pe": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "El <b>coeficiente de correlación de Pearson</b> (<i>r</i>) solo puede tomar valores…",
+              "ok": "entre −1 y 1",
+              "bad": [
+                "entre 0 y 1",
+                "entre 0 y 100",
+                "cualquier número real"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Un valor <i>r</i> = −0.85 indica una correlación…",
+              "ok": "negativa y fuerte: cuando x aumenta, y tiende a disminuir",
+              "bad": [
+                "positiva y fuerte: cuando x aumenta, y tiende a aumentar",
+                "negativa y débil",
+                "nula: no existe relación lineal"
+              ]
+            },
+            {
+              "bl": "Evaluar",
+              "q": "Se encontró <i>r</i> = 0.92 entre las ventas de helados y el número de personas que se ahogan en verano. ¿Qué conclusión es correcta?",
+              "ok": "Hay una correlación positiva fuerte, pero eso no prueba que una variable cause la otra",
+              "bad": [
+                "Comer helado causa que las personas se ahoguen",
+                "Los ahogamientos hacen que se vendan más helados",
+                "No hay relación alguna porque las variables no tienen sentido juntas"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Si <i>r</i> = 0, entonces…",
+              "ok": "no hay relación lineal entre las variables",
+              "bad": [
+                "las dos variables son iguales",
+                "hay una relación lineal perfecta",
+                "las dos variables son opuestas"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Recordar",
+              "q": "Si todos los puntos de un diagrama de dispersión están exactamente sobre una recta <b>creciente</b>, el coeficiente <i>r</i> vale…",
+              "ok": "1",
+              "bad": [
+                "0",
+                "−1",
+                "0.5"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "El <b>signo</b> de <i>r</i> indica…",
+              "ok": "el sentido de la relación (positivo: las variables suben juntas; negativo: una sube y la otra baja)",
+              "bad": [
+                "la fuerza de la relación",
+                "si una variable causa la otra",
+                "cuántos datos se usaron"
+              ]
+            },
+            {
+              "bl": "Analizar",
+              "q": "Entre <i>r</i> = 0.35 y <i>r</i> = −0.80, ¿cuál muestra la relación lineal <b>más fuerte</b>?",
+              "ok": "<i>r</i> = −0.80, porque su valor absoluto es mayor",
+              "bad": [
+                "<i>r</i> = 0.35, porque es positivo",
+                "Las dos son igual de fuertes",
+                "<i>r</i> = 0.35, porque está más cerca de 0"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "Un <b>diagrama de dispersión</b> sirve para…",
+              "ok": "visualizar la relación entre dos variables cuantitativas medidas en los mismos individuos",
+              "bad": [
+                "calcular la media de una sola variable",
+                "mostrar la frecuencia de cada clase",
+                "comparar las proporciones de una variable cualitativa"
+              ]
+            }
+          ]
+        },
+        "cu": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "Los cuartiles Q₁, Q₂ y Q₃ dividen un conjunto de datos ordenados en…",
+              "ok": "cuatro partes con la misma cantidad de datos",
+              "bad": [
+                "tres partes iguales",
+                "dos mitades",
+                "diez partes iguales"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "El segundo cuartil Q₂ coincide con…",
+              "ok": "la mediana",
+              "bad": [
+                "la media",
+                "la moda",
+                "el rango"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "El 75 % de los datos es menor o igual que…",
+              "ok": "Q₃",
+              "bad": [
+                "Q₁",
+                "Q₂",
+                "el rango intercuartílico"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Recordar",
+              "q": "El <b>rango intercuartílico</b> (RIC) se calcula como…",
+              "ok": "Q₃ − Q₁",
+              "bad": [
+                "Q₃ + Q₁",
+                "Q₂ − Q₁",
+                "dato mayor − dato menor"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "El <b>percentil 25</b> equivale a…",
+              "ok": "Q₁",
+              "bad": [
+                "Q₂",
+                "Q₃",
+                "la mediana"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Según el criterio de Tukey, un dato es <b>atípico</b> si queda fuera del intervalo…",
+              "ok": "[Q₁ − 1.5·RIC , Q₃ + 1.5·RIC]",
+              "bad": [
+                "[Q₁ , Q₃]",
+                "[media − RIC , media + RIC]",
+                "[Q₁ − RIC , Q₃ + RIC]"
+              ]
+            }
+          ]
+        },
+        "pr": {
+          "A": [
+            {
+              "bl": "Recordar",
+              "q": "El <b>espacio muestral</b> Ω de un experimento es…",
+              "ok": "el conjunto de todos los resultados posibles",
+              "bad": [
+                "el resultado que más se repite",
+                "el número de veces que se repite el experimento",
+                "el conjunto de los resultados favorables"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Dos eventos son <b>mutuamente excluyentes</b> cuando…",
+              "ok": "no pueden ocurrir al mismo tiempo: P(A ∩ B) = 0",
+              "bad": [
+                "uno siempre ocurre cuando ocurre el otro",
+                "P(A ∩ B) = P(A)·P(B)",
+                "sus probabilidades suman 1"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La probabilidad de cualquier evento A cumple…",
+              "ok": "0 ≤ P(A) ≤ 1",
+              "bad": [
+                "P(A) > 1",
+                "−1 ≤ P(A) ≤ 1",
+                "P(A) ≥ 1"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "El <b>complemento</b> de un evento A (A′)…",
+              "ok": "ocurre cuando A no ocurre, y P(A′) = 1 − P(A)",
+              "bad": [
+                "ocurre junto con A, y P(A′) = P(A)",
+                "tiene siempre probabilidad 0.5",
+                "es el evento que ocurre más veces"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "bl": "Recordar",
+              "q": "La <b>probabilidad clásica</b> de un evento A (con resultados equiprobables) es…",
+              "ok": "casos favorables entre casos posibles",
+              "bad": [
+                "casos posibles entre casos favorables",
+                "casos favorables menos casos posibles",
+                "casos favorables por casos posibles"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "Dos eventos son <b>independientes</b> cuando…",
+              "ok": "la ocurrencia de uno no cambia la probabilidad del otro: P(A ∩ B) = P(A)·P(B)",
+              "bad": [
+                "no pueden ocurrir al mismo tiempo",
+                "P(A ∩ B) = 0",
+                "P(A) + P(B) = 1"
+              ]
+            },
+            {
+              "bl": "Recordar",
+              "q": "La <b>regla de la suma</b> para dos eventos cualesquiera es…",
+              "ok": "P(A ∪ B) = P(A) + P(B) − P(A ∩ B)",
+              "bad": [
+                "P(A ∪ B) = P(A)·P(B)",
+                "P(A ∪ B) = P(A) + P(B) + P(A ∩ B)",
+                "P(A ∪ B) = P(A) − P(B)"
+              ]
+            },
+            {
+              "bl": "Comprender",
+              "q": "La <b>probabilidad condicional</b> P(A | B) se lee y se calcula como…",
+              "ok": "la probabilidad de A dado que ocurrió B: P(A ∩ B) / P(B)",
+              "bad": [
+                "la probabilidad de B dado que ocurrió A: P(A ∩ B) / P(A)",
+                "la probabilidad de A o B: P(A) + P(B)",
+                "la probabilidad de A y B sin importar el orden: P(A)·P(B)"
+              ]
+            }
+          ]
+        }
+      },
+      "SECS2": [
+        {
+          "id": "pe",
+          "t": "Coeficiente de correlación de Pearson",
+          "d": "Elige la respuesta correcta o escribe solo el número, sin espacios (usa punto decimal y el signo − si hace falta).",
+          "ic": "bi-graph-up-arrow",
+          "c": "#0d9488"
+        },
+        {
+          "id": "cu",
+          "t": "Cuartiles y diagrama de caja",
+          "d": "Elige la respuesta correcta o escribe solo el número, sin espacios.",
+          "ic": "bi-distribute-vertical",
+          "c": "#2563eb"
+        },
+        {
+          "id": "pr",
+          "t": "Probabilidad",
+          "d": "Elige la respuesta correcta o escribe solo el número decimal, sin espacios y sin el signo %.",
+          "ic": "bi-dice-5-fill",
+          "c": "#d97706"
+        }
+      ]
+    }
+  }
+}

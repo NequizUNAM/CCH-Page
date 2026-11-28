@@ -29,14 +29,14 @@ const Examenes = (function () {
   const BLOQUEO_GLOBAL_S = 300;
 
   const MATERIAS = {                                    // una entrada por materia: nombres de sus hojas
-    cib: { nombre: 'Cibernética 1', res: 'Resultados Cibernética', cfg: 'Config Cibernética', questions: 'Ediciones Cibernética', viejoRes: 'Resultados', viejoCfg: 'Config', c1: 'parcial1', c2: 'parcial2' },
-    est: { nombre: 'Estadística', res: 'Resultados Estadística', cfg: 'Config Estadística', questions: 'Ediciones Estadística', c1: 'estadistica1', c2: 'estadistica2' }   // contraseñas iniciales (cámbialas desde el panel)
+    cib: { nombre: 'Cibernética 1', res: 'Resultados Cibernética', cfg: 'Config Cibernética', viejoRes: 'Resultados', viejoCfg: 'Config', c1: 'parcial1', c2: 'parcial2' },
+    est: { nombre: 'Estadística', res: 'Resultados Estadística', cfg: 'Config Estadística', c1: 'estadistica1', c2: 'estadistica2' }   // contraseñas iniciales (cámbialas desde el panel)
   };
   const mat_ = d => (d && MATERIAS[d.materia]) ? d.materia : 'cib';
   const COLS = ['Inicio (fecha y hora)', 'Entrega (fecha y hora)', 'Parcial', 'Nombre', 'Número de cuenta', 'Grupo', 'Tipo de examen', 'Estado',
                 'Aciertos', 'Total', 'Calificación (0-10)', 'Tiempo usado', 'Segundos', 'Salidas de pestaña', 'Motivo de entrega',
                 'Detalle (1=bien, 0=mal)', 'Respuestas', 'Semilla', 'Sesión (no borrar)', 'Procedimiento', 'Ediciones de preguntas'];
-  const C = { INICIO: 0, ENTREGA: 1, PARCIAL: 2, NOMBRE: 3, CUENTA: 4, GRUPO: 5, TIPO: 6, ESTADO: 7, ACIERTOS: 8, TOTAL: 9, NOTA: 10, TIEMPO: 11, SEG: 12, SALIDAS: 13, MOTIVO: 14, DETALLE: 15, RESP: 16, SEMILLA: 17, SESION: 18, PROC: 19, QEDIT: 20 };
+  const C = { INICIO: 0, ENTREGA: 1, PARCIAL: 2, NOMBRE: 3, CUENTA: 4, GRUPO: 5, TIPO: 6, ESTADO: 7, ACIERTOS: 8, TOTAL: 9, NOTA: 10, TIEMPO: 11, SEG: 12, SALIDAS: 13, MOTIVO: 14, DETALLE: 15, RESP: 16, SEMILLA: 17, SESION: 18, PROC: 19 };
   /* Config de cada materia (hoja «Config …»), claves nuevas: preguntas1/2 = preguntas habilitadas · cierreon1/2 = SI/NO · cierre1/2 = fecha y hora de cierre (ISO) */
   const nPreg_ = (cfg, p) => { const n = parseInt(cfg['preguntas' + p], 10); return n >= 1 && n <= MAX_PREGUNTAS ? n : MAX_PREGUNTAS; };
   const cierre_ = (cfg, p) => { if (cfg['cierreon' + p] !== 'SI') return ''; const d = new Date(cfg['cierre' + p]); return isNaN(d) ? '' : d.toISOString(); };
@@ -48,7 +48,7 @@ const Examenes = (function () {
    */
   const LOCK_WAIT_MS = 10000;                       // espera máxima por el candado (antes 25 s)
   const CFG_CACHE_S = 20;                           // segundos que se guarda la configuración en caché (cambios del panel se ven al instante)
-  const ESCRITURA = { start: 1, submit: 1, admin_setclave: 1, admin_abierto: 1, admin_liberar: 1, admin_reloj: 1, admin_cerrar: 1, admin_cfgexamen: 1, admin_savequestion: 1 };
+  const ESCRITURA = { start: 1, submit: 1, admin_setclave: 1, admin_abierto: 1, admin_liberar: 1, admin_reloj: 1, admin_cerrar: 1, admin_cfgexamen: 1 };
   const ocupado_ = err => /lock|candado|too many|demasiad|tiempo de espera/i.test(String(err));
   function handle(e) {
     let d = {};
@@ -59,12 +59,10 @@ const Examenes = (function () {
       if (lock && !lock.tryLock(LOCK_WAIT_MS)) return out({ ok: false, code: 'ocupado', msg: 'Servidor ocupado' });
       switch (d.action) {
         case 'login': return out(login_(d, m));
-        case 'question_bank': return out(adminOnly_(d, m, questionBank_));
         case 'start': return out(start_(d, m));
         case 'progress': return out(progress_(d, m));
         case 'submit': return out(submit_(d, m));
         case 'admin_data':    return out(adminOnly_(d, m, adminData_));
-        case 'admin_qedits':  return out(adminOnly_(d, m, adminQuestionEdits_));
         case 'admin_cfg':     return out(adminOnly_(d, m, adminCfg_));
         case 'admin_setclave': return out(adminOnly_(d, m, setClave_));
         case 'admin_abierto': return out(adminOnly_(d, m, setAbierto_));
@@ -72,7 +70,6 @@ const Examenes = (function () {
         case 'admin_reloj':   return out(adminOnly_(d, m, setReloj_));
         case 'admin_cerrar':  return out(adminOnly_(d, m, cerrar_));
         case 'admin_cfgexamen': return out(adminOnly_(d, m, cfgExamen_));
-        case 'admin_savequestion': return out(adminOnly_(d, m, saveQuestion_));
         default:              return out({ ok: false, code: 'accion', msg: 'Acción desconocida' });
       }
     } catch (err) {
@@ -118,41 +115,6 @@ const Examenes = (function () {
     for (let i = 1; i < vals.length; i++) if (vals[i][0] === k) { sh.getRange(i + 1, 2).setNumberFormat('@').setValue(String(v)); return; }
     sh.appendRow([k, String(v)]);
   }
-  function questionSheet_(m, create) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sh = ss.getSheetByName(MATERIAS[m].questions);
-    if (!sh && create) {
-      sh = ss.insertSheet(MATERIAS[m].questions);
-      sh.getRange(1, 1, 1, 4).setValues([['Clave', 'Parcial', 'Edición (JSON)', 'Actualizado']]).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
-      sh.setFrozenRows(1);
-      sh.setColumnWidth(1, 150); sh.setColumnWidth(2, 80); sh.setColumnWidth(3, 600); sh.setColumnWidth(4, 170);
-    }
-    return sh;
-  }
-  function questionEdits_(m, parcial) {
-    const sh = questionSheet_(m, false), result = {};
-    if (!sh || sh.getLastRow() < 2) return result;
-    sh.getRange(2, 1, sh.getLastRow() - 1, 3).getDisplayValues().forEach(row => {
-      if (Number(row[1]) !== Number(parcial) || !/^[a-f0-9]{16}$/i.test(row[0])) return;
-      try { result[row[0]] = JSON.parse(row[2]); }
-      catch (error) { console.error(`Edición de pregunta inválida (${row[0]}): ${error.message}`); }
-    });
-    return result;
-  }
-  function selectedQuestionEdits_(m, parcial, keys) {
-    const edits = questionEdits_(m, parcial), selected = {};
-    (Array.isArray(keys) ? keys : []).slice(0, MAX_PREGUNTAS * 4).forEach(key => {
-      if (typeof key === 'string' && edits[key]) selected[key] = edits[key];
-    });
-    return selected;
-  }
-  function parseQuestionSnapshot_(value) {
-    try {
-      const parsed = JSON.parse(String(value || '{}'));
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-    } catch (error) { return {}; }
-  }
-
   /* ---------------------------------- Resultados ---------------------------------- */
   function resSheet_(m) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -201,10 +163,8 @@ const Examenes = (function () {
     for (const p of [1, 2]) {
       if (cfg['clave' + p] === clave) {
         if (cfg['abierto' + p] !== 'SI') return { ok: false, code: 'cerrado' };
-        const bank = questionBank_( { parcial: p }, m );
-        if (!bank.ok) return bank;
         CacheService.getScriptCache().remove('fl_' + dev);
-        return { ok: true, role: 'alumno', parcial: p, materia: m, reloj: cfg.reloj === 'SI', preguntas: nPreg_(cfg, p), cierre: cierre_(cfg, p), questionBank: bank.bank, bankRevision: bank.bankRevision, t: Date.now() };
+        return { ok: true, role: 'alumno', parcial: p, materia: m, reloj: cfg.reloj === 'SI', preguntas: nPreg_(cfg, p), cierre: cierre_(cfg, p), t: Date.now() };
       }
     }
     for (const p of [1, 2]) {
@@ -219,14 +179,6 @@ const Examenes = (function () {
     const f = cacheGet_('fl_' + dev);
     return { ok: false, code: 'incorrecta', restan: f ? MAX_FALLOS - f.n : MAX_FALLOS };
   }
-  function questionBank_(d, m) {
-    const parcial = Number(d.parcial);
-    if (!(parcial === 1 || parcial === 2)) return { ok: false, code: 'datos', msg: 'Parcial inválido.' };
-    if (typeof BancosPreguntas === 'undefined') return { ok: false, code: 'preguntas', msg: 'Falta agregar BancosPreguntas.gs al proyecto.' };
-    const snapshot = BancosPreguntas.readPartialFromSheets(m, parcial);
-    return { ok: true, bank: snapshot.bank, bankRevision: snapshot.revision };
-  }
-
   /* ---------------------------------- Alumno ---------------------------------- */
   const norm_ = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   function start_(d, m) {
@@ -240,21 +192,17 @@ const Examenes = (function () {
       if (norm_(v[C.NOMBRE]) !== norm_(d.nombre)) return { ok: false, code: 'enCurso' };         // en curso: solo continúa quien escribe el mismo nombre
       sh.getRange(found, C.SESION + 1).setValue(sid);                                           // la sesión pasa a este dispositivo
       let pr = {}; try { pr = JSON.parse(v[C.RESP] || '{}'); } catch (e) { }
-      const savedEdits = String(v[C.QEDIT] || '');
-      const questionEdits = savedEdits ? parseQuestionSnapshot_(savedEdits) : {};
-      if (!savedEdits) sh.getRange(found, C.QEDIT + 1).setValue(JSON.stringify(questionEdits));
-      return { ok: true, reloj: cfg.reloj === 'SI', cerrar: String(v[C.MOTIVO]) === 'CERRAR', total: Number(v[C.TOTAL]) || 0, cierre: cierre_(cfg, parcial), t: Date.now(), resumed: true, sid: sid, tipo: v[C.TIPO], seed: Number(v[C.SEMILLA]), inicio: iso_(v[C.INICIO]), nombre: v[C.NOMBRE], grupo: String(v[C.GRUPO]), progreso: pr, salidas: Number(v[C.SALIDAS]) || 0, questionEdits: questionEdits };
+      return { ok: true, reloj: cfg.reloj === 'SI', cerrar: String(v[C.MOTIVO]) === 'CERRAR', total: Number(v[C.TOTAL]) || 0, cierre: cierre_(cfg, parcial), t: Date.now(), resumed: true, sid: sid, tipo: v[C.TIPO], seed: Number(v[C.SEMILLA]), inicio: iso_(v[C.INICIO]), nombre: v[C.NOMBRE], grupo: String(v[C.GRUPO]), progreso: pr, salidas: Number(v[C.SALIDAS]) || 0 };
     }
     const cz = cierre_(cfg, parcial); if (cz && Date.now() > Date.parse(cz)) return { ok: false, code: 'cierre' };          // pasó la fecha de cierre: ya no se admiten alumnos nuevos
     const ahora = new Date(), tot = Math.min(nPreg_(cfg, parcial), Math.max(1, Math.min(MAX_PREGUNTAS, Number(d.disp) || MAX_PREGUNTAS)));   // preguntas de este alumno (fijas desde que inicia)
-    const questionEdits = selectedQuestionEdits_(m, parcial, d.questionKeys);
     const row = new Array(COLS.length).fill('');
-    row[C.INICIO] = ahora; row[C.TOTAL] = tot; row[C.QEDIT] = JSON.stringify(questionEdits);          // el inicio lo marca el servidor, no el equipo del alumno
+    row[C.INICIO] = ahora; row[C.TOTAL] = tot;                                      // el inicio lo marca el servidor, no el equipo del alumno
     row[C.PARCIAL] = parcial; row[C.NOMBRE] = String(d.nombre || ''); row[C.CUENTA] = cuenta;
     row[C.GRUPO] = String(d.grupo || ''); row[C.TIPO] = String(d.tipo || ''); row[C.ESTADO] = 'En curso'; row[C.SEMILLA] = d.seed || ''; row[C.SESION] = sid;
     sh.appendRow(row);
     const r = sh.getLastRow(); sh.getRange(r, C.CUENTA + 1).setNumberFormat('@').setValue(cuenta);
-    return { ok: true, sid: sid, inicio: ahora.toISOString(), reloj: cfg.reloj === 'SI', preguntas: tot, cierre: cz, t: Date.now(), questionEdits: questionEdits };
+    return { ok: true, sid: sid, inicio: ahora.toISOString(), reloj: cfg.reloj === 'SI', preguntas: tot, cierre: cz, t: Date.now() };
   }
   function progress_(d, m) {                       // guarda el avance del alumno en la hoja (cada ~minuto) para poder continuar desde otro dispositivo
     const parcial = Number(d.parcial), cuenta = String(d.cuenta || '').trim();
@@ -269,15 +217,14 @@ const Examenes = (function () {
   function submit_(d, m) {
     const parcial = Number(d.parcial), cuenta = String(d.cuenta || '').trim();
     if (!(parcial === 1 || parcial === 2) || !/^\d{9}$/.test(cuenta)) return { ok: false, code: 'datos', msg: 'Datos inválidos' };
-    const sh = resSheet_(m); let r = findRow_(sh, parcial, cuenta), questionSnapshot = '{}';
+    const sh = resSheet_(m); let r = findRow_(sh, parcial, cuenta);
     if (r) {
       const v = sh.getRange(r, 1, 1, COLS.length).getValues()[0];
       if (v[C.ESTADO] === 'Entregado') return { ok: false, code: 'duplicado' };                                  // ya respondido
       if (d.sid && v[C.SESION] && String(v[C.SESION]) !== String(d.sid)) return { ok: false, code: 'sesion' };    // el examen continuó en otro dispositivo
-      questionSnapshot = String(v[C.QEDIT] || '{}');
     }
     const vals = [new Date(d.inicio || new Date()), new Date(d.fecha || new Date()), parcial, String(d.nombre || ''), cuenta, String(d.grupo || ''), String(d.tipo || ''), 'Entregado',
-                  d.aciertos, d.total, d.calificacion, String(d.tiempo || ''), d.tiempoSeg, d.salidas, String(d.motivo || ''), String(d.detalle || ''), String(d.respuestas || ''), d.seed || '', String(d.sid || ''), String(d.procedimiento || '').slice(0, 45000), questionSnapshot];
+                  d.aciertos, d.total, d.calificacion, String(d.tiempo || ''), d.tiempoSeg, d.salidas, String(d.motivo || ''), String(d.detalle || ''), String(d.respuestas || ''), d.seed || '', String(d.sid || ''), String(d.procedimiento || '').slice(0, 45000), ''];
     if (!r) { sh.appendRow(vals); r = sh.getLastRow(); } else sh.getRange(r, 1, 1, COLS.length).setValues([vals]);
     sh.getRange(r, C.CUENTA + 1).setNumberFormat('@').setValue(cuenta);
     sh.getRange(r, C.TIEMPO + 1).setNumberFormat('@').setValue(String(d.tiempo || ''));   // «Tiempo usado» como texto hh:mm:ss (si no, Sheets lo convierte en hora)
@@ -303,19 +250,11 @@ const Examenes = (function () {
     }));
     return { ok: true, rows: rows };
   }
-  function adminQuestionEdits_(d, m) {
-    const parcial = Number(d.parcial), cuenta = String(d.cuenta || '').trim();
-    if (!(parcial === 1 || parcial === 2) || !/^\d{9}$/.test(cuenta)) return { ok: false, code: 'datos', msg: 'Datos inválidos.' };
-    const sh = resSheet_(m), row = findRow_(sh, parcial, cuenta);
-    if (!row) return { ok: false, code: 'sinregistro', msg: 'No se encontró el examen.' };
-    return { ok: true, questionEdits: String(sh.getRange(row, C.QEDIT + 1).getValue() || '{}') };
-  }
   function adminCfg_(d, m) {
     const c = getCfg_(m), cfg = {};
     [1, 2].forEach(p => { cfg['clave' + p] = c['clave' + p] || ''; cfg['abierto' + p] = c['abierto' + p] || 'SI'; cfg['cambios' + p] = Number(c['cambios' + p] || 0); });
     cfg.reloj = c.reloj === 'SI' ? 'SI' : 'NO';
     [1, 2].forEach(p => { cfg['preguntas' + p] = nPreg_(c, p); cfg['cierreon' + p] = c['cierreon' + p] === 'SI' ? 'SI' : 'NO'; cfg['cierre' + p] = c['cierre' + p] || ''; });
-    cfg.questionEdits = { 1: questionEdits_(m, 1), 2: questionEdits_(m, 2) };
     return { ok: true, cfg: cfg };
   }
   function setClave_(d, m) {
@@ -354,48 +293,6 @@ const Examenes = (function () {
     setCfg_(m, 'preguntas' + p, n); setCfg_(m, 'cierreon' + p, on ? 'SI' : 'NO'); setCfg_(m, 'cierre' + p, on ? f.toISOString() : '');
     return { ok: true };
   }
-  function saveQuestion_(d, m) {
-    const parcial = Number(d.parcial), key = String(d.key || '').trim().toLowerCase();
-    if (!(parcial === 1 || parcial === 2)) return { ok: false, msg: 'Parcial inválido.' };
-    if (!/^[a-f0-9]{16}$/.test(key)) return { ok: false, msg: 'La pregunta seleccionada no es válida.' };
-    const sh = questionSheet_(m, d.reset !== true);
-    if (d.reset === true) {
-      if (!sh || sh.getLastRow() < 2) return { ok: true, deleted: true };
-      const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getDisplayValues();
-      for (let i = rows.length - 1; i >= 0; i--) {
-        if (rows[i][0] === key && Number(rows[i][1]) === parcial) sh.deleteRow(i + 2);
-      }
-      return { ok: true, deleted: true };
-    }
-
-    const sources = Array.isArray(d.sources) ? d.sources.map(String) : [];
-    const correctSource = String(d.correctSource || '');
-    const prompt = d.prompt === null || d.prompt === undefined ? null : String(d.prompt);
-    const edits = Array.isArray(d.options) ? d.options : [];
-    if (sources.length < 2 || sources.length > 8 || sources.some(source => source.length > 20000)) return { ok: false, msg: 'La pregunta debe tener entre 2 y 8 opciones válidas.' };
-    if (!sources.includes(correctSource)) return { ok: false, msg: 'Selecciona una de las opciones como respuesta correcta.' };
-    if (prompt !== null && prompt.length > 1200) return { ok: false, msg: 'El enunciado no puede exceder 1,200 caracteres.' };
-    if (edits.length > sources.length || edits.some(item => !item || !sources.includes(String(item.source)) || typeof item.text !== 'string' || item.text.length > 500)) {
-      return { ok: false, msg: 'Revisa las opciones; cada una debe tener como máximo 500 caracteres.' };
-    }
-    const uniqueSources = new Set(sources);
-    if (uniqueSources.size !== sources.length) return { ok: false, msg: 'La pregunta tiene opciones repetidas y no se puede editar de forma segura.' };
-    const edit = { prompt: prompt, sources: sources, options: edits.map(item => ({ source: String(item.source), text: item.text })), correctSource: correctSource };
-    const serialized = JSON.stringify(edit);
-    if (serialized.length > 45000) return { ok: false, msg: 'La edición es demasiado grande para guardarse.' };
-    const sheet = sh || questionSheet_(m, true), last = sheet.getLastRow();
-    if (last >= 2) {
-      const rows = sheet.getRange(2, 1, last - 1, 2).getDisplayValues();
-      for (let i = 0; i < rows.length; i++) {
-        if (rows[i][0] === key && Number(rows[i][1]) === parcial) {
-          sheet.getRange(i + 2, 3, 1, 2).setNumberFormat('@').setValues([[serialized, new Date().toISOString()]]);
-          return { ok: true, edit: edit };
-        }
-      }
-    }
-    sheet.appendRow([key, parcial, serialized, new Date().toISOString()]);
-    return { ok: true, edit: edit };
-  }
   function setReloj_(d, m) { setCfg_(m, 'reloj', d.valor === 'SI' ? 'SI' : 'NO'); return { ok: true }; }
   function liberar_(d, m) {
     const sh = resSheet_(m), r = findRow_(sh, d.parcial, d.cuenta);
@@ -403,7 +300,7 @@ const Examenes = (function () {
     sh.deleteRow(r); return { ok: true };
   }
 
-  const ACTIONS = ['login', 'question_bank', 'start', 'progress', 'submit', 'admin_data', 'admin_qedits', 'admin_cfg', 'admin_setclave', 'admin_abierto', 'admin_liberar', 'admin_reloj', 'admin_cerrar', 'admin_cfgexamen', 'admin_savequestion'];
+  const ACTIONS = ['login', 'start', 'progress', 'submit', 'admin_data', 'admin_cfg', 'admin_setclave', 'admin_abierto', 'admin_liberar', 'admin_reloj', 'admin_cerrar', 'admin_cfgexamen'];
   /* ---- Para el panel de Asistencias (no cambian el examen) ---- */
   // Estado de cada materia sin crear hojas: ¿existe su Config y qué parciales admiten alumnos?
   function estado() {

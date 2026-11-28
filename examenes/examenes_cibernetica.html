@@ -387,7 +387,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const EXAM_DATA_READY = Promise.resolve();
+let QUESTION_BANK_DATA = null, QUESTION_BANK_REVISIONS = {};
+const EXAM_DATA_READY = fetch('./banco_cibernetica.json')
+  .then(response => {
+    if (!response.ok) throw new Error('No se pudo cargar banco_cibernetica.json.');
+    return response.json();
+  })
+  .then(initializeQuestionBankData);
 /* ==========================================================================
    CONFIGURACIÓN (lo único que debes editar aquí)
    Las contraseñas del examen y la del administrador YA NO están en esta página:
@@ -1774,33 +1780,11 @@ function pickQs(qs, k, rnd) {
   return qs.filter((q, i) => keep.has(i));
 }
 /* n = preguntas habilitadas (sin contar el bonus). Las mismas n preguntas salen siempre para la misma semilla. */
-const buildExam = (parcial, tipo, seed, n, edits = QUESTION_EDITS) => {
+const buildExam = (parcial, tipo, seed, n) => {
   const all = EXAMS[parcial].build(tipo, seed), base = all.filter(q => !q.bonus), bonus = all.filter(q => q.bonus);
   const qs = pickQs(base, effN(n, base.length), mulberry32((seed ^ 0x5DEECE66) >>> 0)).concat(bonus);
-  qs.forEach((q, i) => q.id = i + 1); return prepareQuestionEdits(qs, edits);
+  qs.forEach((q, i) => q.id = i + 1); return qs;
 };
-function questionEditKey(q) {
-  const source = JSON.stringify([q.sec, q.html, q.opts.map(String).sort()]);
-  const hash = seed => { let value = seed; for (let i = 0; i < source.length; i++) { value ^= source.charCodeAt(i); value = Math.imul(value, 16777619); } return (value >>> 0).toString(16).padStart(8, '0'); };
-  return hash(2166136261) + hash(2654435761);
-}
-const escapeQuestionText = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])).replace(/\r?\n/g, '<br>');
-function prepareQuestionEdits(questions, edits = {}) {
-  questions.forEach(q => {
-    if (q.kind !== 'mc') return;
-    const sources = q.opts.map(String), key = questionEditKey({ sec: q.sec, html: q.html, opts: sources });
-    q.editKey = key; q.editSources = sources; q.editOriginalHtml = q.html; q.editOverride = edits[key] || null;
-    const edit = q.editOverride;
-    if (!edit) return;
-    if (typeof edit.prompt === 'string') q.html = escapeQuestionText(edit.prompt);
-    const optionEdits = new Map((edit.options || []).map(item => [String(item.source), item.text]));
-    q.opts = sources.map(source => optionEdits.has(source) ? escapeQuestionText(optionEdits.get(source)) : source);
-    const correct = sources.indexOf(String(edit.correctSource));
-    if (correct >= 0) q.correct = correct;
-  });
-  return questions;
-}
-const questionEditKeys = (parcial, tipo, seed, n) => buildExam(parcial, tipo, seed, n, {}).filter(q => q.kind === 'mc').map(q => q.editKey);
 function gradeQ(q, v) {
   if (v === undefined || v === null || v === '') return false;
   if (q.kind === 'mc') return +v === q.correct;
@@ -1841,7 +1825,7 @@ const BANK_CACHE_PREFIX = `eq_${CFG.MATERIA}_bank`;
 let ACTIVE_BANK_REVISION = '', ACTIVE_BANK_PARTIAL = 0;
 const questionBankCacheKey = (partial, revision) => `${BANK_CACHE_PREFIX}_${partial}_${revision}`;
 function applyQuestionBank(partial, bank) {
-  if (!bank || typeof bank !== 'object' || Array.isArray(bank)) throw new Error('El servidor devolvió un banco de preguntas inválido.');
+  if (!bank || typeof bank !== 'object' || Array.isArray(bank)) throw new Error('El archivo local contiene un banco de preguntas inválido.');
   if (CFG.MATERIA === 'cib') {
     if (+partial === 1) {
       BANK = bank.BANK || {}; BANK2 = bank.BANK2 || {};
@@ -1858,7 +1842,7 @@ function applyQuestionBank(partial, bank) {
   }
 }
 function persistQuestionBank(partial, bank, revision) {
-  if (!/^[a-f0-9]{64}$/i.test(String(revision || ''))) throw new Error('El servidor no devolvió una versión válida del banco.');
+  if (!/^[a-f0-9]{64}$/i.test(String(revision || ''))) throw new Error('No se pudo verificar la versión local del banco.');
   applyQuestionBank(partial, bank);
   try { localStorage.setItem(questionBankCacheKey(partial, revision), JSON.stringify(bank)); }
   catch (error) { throw new Error('No se pudo guardar el banco de preguntas en este navegador. Libera espacio y vuelve a entrar.'); }
@@ -1879,35 +1863,52 @@ function restoreQuestionBank(partial, revision) {
     return false;
   }
 }
-async function loadQuestionBank(partial) {
-  const response = await api('question_bank', { parcial: partial, token: ADMIN });
-  if (!response || !response.ok) throw new Error(response && response.msg ? response.msg : 'No se pudieron cargar las preguntas desde Sheets.');
-  return persistQuestionBank(partial, response.bank, response.bankRevision);
+async function questionBankRevision(bank) {
+  if (!crypto.subtle || typeof TextEncoder === 'undefined') throw new Error('Este navegador no permite verificar la versión del banco local.');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(bank)));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+async function initializeQuestionBankData(data) {
+  if (!data || data.schemaVersion !== 1 || data.materia !== 'cib' || !data.parciales) throw new Error('El archivo del banco de Cibernética no tiene el formato esperado.');
+  QUESTION_BANK_DATA = data;
+  for (const partial of [1, 2]) {
+    const bank = data.parciales[String(partial)];
+    const required = partial === 1 ? ['BANK', 'BANK2', 'NAMES', 'PAIRS', 'RANGE', 'SUMBITS', 'SECS1', 'SECS2'] : ['BANKJ', 'SECS_J'];
+    if (!bank || required.some(key => !Object.prototype.hasOwnProperty.call(bank, key))) throw new Error(`Faltan datos del parcial ${partial} en el banco local.`);
+    QUESTION_BANK_REVISIONS[partial] = await questionBankRevision(bank);
+    applyQuestionBank(partial, bank);
+  }
+  EXAMS[1].secs = [...SECS1, ...SECS2, ...SECS_NEW];
+  EXAMS[2].secs = SECS_J;
+}
+function loadQuestionBank(partial) {
+  const bank = QUESTION_BANK_DATA && QUESTION_BANK_DATA.parciales[String(partial)];
+  const revision = QUESTION_BANK_REVISIONS[partial];
+  if (!bank || !revision) throw new Error(`No está disponible el banco local del parcial ${partial}.`);
+  return persistQuestionBank(partial, bank, revision);
 }
 async function ensureQuestionBankForState(state) {
   if (!state) throw new Error('No hay un intento para restaurar.');
   if (state.bankRevision) {
     if (restoreQuestionBank(state.parcial, state.bankRevision)) return;
-    throw new Error('Falta la copia local de las preguntas de este intento. No se reemplazará por una versión distinta.');
+    if (state.bankRevision !== QUESTION_BANK_REVISIONS[state.parcial]) throw new Error('Falta la copia local de las preguntas de este intento. No se reemplazará por una versión distinta.');
   }
-  if (+ACTIVE_BANK_PARTIAL !== +state.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a iniciar sesión para cargar las preguntas de este examen.');
-  state.bankRevision = ACTIVE_BANK_REVISION;
+  state.bankRevision = loadQuestionBank(state.parcial);
   save();
 }
 async function ensureQuestionBankForLogin(session) {
   if (session.bankRevision) {
     if (restoreQuestionBank(session.parcial, session.bankRevision)) return;
-    throw new Error('Falta la copia local de las preguntas cargadas al iniciar sesión. Vuelve a ingresar para descargarlas otra vez.');
+    if (session.bankRevision !== QUESTION_BANK_REVISIONS[session.parcial]) throw new Error('Falta la copia local de las preguntas cargadas al iniciar sesión. Vuelve a ingresar para cargarlas otra vez.');
   }
-  if (+ACTIVE_BANK_PARTIAL !== +session.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a ingresar la contraseña del examen para cargar las preguntas.');
-  session.bankRevision = ACTIVE_BANK_REVISION;
+  session.bankRevision = loadQuestionBank(session.parcial);
   SS.set('eq_sess', JSON.stringify(session));
 }
 const MSG = {
   incorrecta: 'Contraseña incorrecta.',
   cambio: 'La contraseña ha cambiado. Solicita la nueva a tu profesor(a).',
   cerrado: 'El examen está cerrado por ahora. Consulta a tu profesor(a).',
-  preguntas: 'No se pudo cargar el banco de preguntas desde Google Sheets.',
+  preguntas: 'No se pudo cargar el banco local de preguntas.',
   red: 'No hay conexión con el servidor. Revisa tu internet e inténtalo otra vez.',
   config: 'El examen aún no está conectado a la hoja de Google (falta configurar el ENDPOINT).',
   auth: 'Tu sesión de administrador expiró. Vuelve a entrar.',
@@ -1934,7 +1935,6 @@ const limiteMs = () => (S.cierre || S.start + CFG.DURACION_MIN * 60000) - CFG.PE
 let CLK = false;       // ¿el administrador activó el cronómetro visible? (por defecto NO)
 const applyClock = () => { const t = $('#timer'); if (t) t.classList.toggle('d-none', !CLK); };
 let S = null, EXAM = [], timerId = null, away = false, examActive = false, ADMIN = null;
-var QUESTION_EDITS = {};
 try { const l = (LS.get(LAST) || '').split(':'); S = l.length === 2 ? loadLocal(l[0], l[1]) : JSON.parse(LS.get(KEY) || 'null'); } catch (e) { S = null; }
 const save = () => { if (S) { LS.set(skey(S.parcial, S.cuenta), JSON.stringify(S)); LS.set(LAST, S.parcial + ':' + S.cuenta); } };
 const clearState = () => { if (S) LS.del(skey(S.parcial, S.cuenta)); S = null; LS.del(LAST); LS.del(KEY); };
@@ -2088,10 +2088,11 @@ $('#form-clave').addEventListener('submit', async e => {
   if (r.ok && r.role === 'admin') { $('#clave').value = ''; showAlert('El panel está en el Dashboard', 'Los resultados, métricas, contraseñas y la configuración de este examen se manejan en el <b>Dashboard de Asistencias</b>: entra como administrador y elige <b>Examen</b> en la barra superior.', 'bi-speedometer2', '#4338ca'); return; }
   if (r.ok && r.role === 'alumno' && bloqueaMovil()) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Entrar'; return; }
   if (r.ok && r.role === 'alumno') {
-    try { persistQuestionBank(r.parcial, r.questionBank, r.bankRevision); }
+    let bankRevision;
+    try { bankRevision = loadQuestionBank(r.parcial); }
     catch (error) { err.textContent = error.message; err.hidden = false; return; }
     CLK = !!r.reloj; PREGN = r.preguntas; PREGC = r.cierre || '';
-    SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '', bankRevision: r.bankRevision }));
+    SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '', bankRevision }));
     await afterLogin(r.parcial, true); return;
   }
   err.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${MSG[r.code] || r.msg || 'No se pudo entrar.'}${r.code === 'incorrecta' && r.restan !== undefined ? ` <b>Te ${r.restan === 1 ? 'queda 1 intento' : 'quedan ' + r.restan + ' intentos'}.</b>` : ''}`; err.hidden = false;
@@ -2155,7 +2156,7 @@ $('#form-datos').addEventListener('submit', async e => {
   if (!$('#d-ok').checked) { err.textContent = 'Marca la casilla para confirmar que leíste las reglas.'; err.hidden = false; return; }
   const btn = $('#btn-comenzar'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando…';
   const r = $('#d-ok') && randBytes(), tipo = 'ABC'[r[1] % 3], seed = r[0] >>> 0, inicio = new Date().toISOString();
-  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), questionKeys: questionEditKeys(PARCIAL, tipo, seed, PREGN), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
+  const res = await api('start', { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, inicio, disp: availOf(PARCIAL), dev: DEV }); if (res && res.ok) CLK = !!res.reloj;
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-play-circle-fill me-1"></i>Comenzar examen';
   if (!res.ok) {
     if (res.code === 'duplicado') showAlert('Examen ya respondido', `El examen del <b>${EXAMS[PARCIAL].titulo}</b> ya fue respondido anteriormente con el número de cuenta <b>${esc(cuenta)}</b>. No es posible presentarlo de nuevo.<br><small class="text-muted">Si crees que es un error, habla con tu profesor(a).</small>`);
@@ -2170,12 +2171,12 @@ $('#form-datos').addEventListener('submit', async e => {
     if (mismo && loc.bankRevision && !restoreQuestionBank(PARCIAL, loc.bankRevision)) {
       showAlert('Falta la copia local de las preguntas', 'No se reemplazará la versión de este intento por otra distinta. Contacta a tu profesor(a) antes de continuar.', 'bi-cloud-download', '#d97706'); return;
     }
-    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: mismo && loc.bankRevision ? loc.bankRevision : ACTIVE_BANK_REVISION };
+    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, bankRevision: mismo && loc.bankRevision ? loc.bankRevision : ACTIVE_BANK_REVISION };
     try { await ensureQuestionBankForState(S); }
     catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); return; }
     save(); startExam(true); if (res.cerrar) { toast('Tu profesor(a) cerró tu examen: tus respuestas se enviaron.', 'bi-lock-fill', 5000); finish('admin'); } return;
   }
-  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: ACTIVE_BANK_REVISION };
+  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, bankRevision: ACTIVE_BANK_REVISION };
   save(); startExam(false);
 });
 
@@ -2245,7 +2246,6 @@ function questionsHTML(exam, secs, opt = {}) {
 
 /* ===== 3. Examen ===== */
 function startExam(resume) {
-  QUESTION_EDITS = S.questionEdits || {};
   EXAM = buildExam(S.parcial, S.tipo, S.seed, S.n);
   $('#bar-titulo').textContent = `Cibernética 1 · ${EXAMS[S.parcial].titulo}`;
   $('#bar-alumno').textContent = `${S.nombre} · ${S.cuenta} · Gpo. ${S.grupo}`;

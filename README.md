@@ -2,7 +2,7 @@
 
 Dashboard dedicado a reportes y listas CCH.
 
-En los paneles de Cibernética y Estadística, la pestaña **Editar preguntas** permite cambiar enunciados, opciones y la respuesta correcta de reactivos de opción múltiple. Los cambios se guardan por materia y parcial, recalculan la calificación en los intentos nuevos y no modifican exámenes que ya están en curso. Después de actualizar Apps Script, publica una nueva versión de la implementación para habilitar estas funciones.
+Los bancos de preguntas de Cibernética y Estadística viven en `examenes/banco_cibernetica.json` y `examenes/banco_estadistica.json`; las copias del APK están en `apk/www/asistencias/examenes/`. El panel de cada examen ofrece **Exportar JSON** para descargar el banco completo. Edita el JSON en el código y publica los archivos web/APK actualizados. Al iniciar sesión, cada alumno guarda una copia versionada del banco en el almacenamiento local; Apps Script conserva solo autenticación, configuración, progreso y resultados, sin leer ni modificar preguntas.
 
 ## Organización del repositorio
 
@@ -93,7 +93,7 @@ El soporte offline no significa que las páginas o los datos remotos estén disp
 | Lanzador del APK (`apk/www/index.html`) | Es una pantalla estática local; puede abrir los módulos empaquetados. |
 | Asistencias del APK (`apk/www/asistencias/`) | Muestra caché previa de alumno/panel y conserva escrituras en IndexedDB para reintento al reconectar. No todas las escrituras tienen proyección optimista completa: algunas pantallas pueden seguir esperando respuesta del servidor. |
 | Bitácoras del APK (`apk/www/bitacoras/`) | Guarda el snapshot de los datos en `localStorage` y lo restaura al abrir, incluso offline, si la sesión quedó guardada en el dispositivo. Si ya hay snapshot, no relee todo el servidor en cada inicio; la actualización completa se hace con ↻ o al recuperar conexión. Las escrituras se proyectan localmente y la outbox de IndexedDB las envía al reconectar. Los errores quedan visibles para reintento o descarte. |
-| Exámenes (`examenes_*.html`) | Conservan respuestas del examen en el dispositivo y encolan el envío de resultados. El login, la descarga de preguntas y el inicio de un examen nuevo requieren conexión. |
+| Exámenes (`examenes_*.html`) | Conservan respuestas y una copia versionada del banco JSON en el dispositivo, y encolan el envío de resultados. El login y el inicio de un examen nuevo requieren conexión con Apps Script; los bancos JSON se sirven como archivos estáticos locales/cacheables. |
 
 Las páginas web de la raíz (`index.html`, `script.js` y `bitacoras/index.html`) son fuentes separadas y no se actualizan automáticamente al editar `apk/www/`. La caché extendida de Asistencias corresponde al APK; Bitácoras tiene una cola independiente en las versiones web y APK, y ambas envían la revisión esperada. Las páginas de exámenes de raíz y APK ya incluyen almacenamiento local de respuestas y una cola IndexedDB de resultados.
 

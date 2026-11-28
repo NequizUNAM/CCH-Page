@@ -40,7 +40,7 @@ apk/
 3. Android SDK Platform 35 o superior.
 4. Android SDK Build-Tools.
 5. Android SDK Command-line Tools.
-6. Java 21 si Android Studio lo requiere; usa el JDK incluido por Android Studio.
+6. JDK 21. Gradle 8.11.1 no es compatible con el JDK 25 que incluyen algunas versiones de Android Studio.
 7. Un dispositivo Android o un emulador configurado.
 
 Durante la instalación de Android Studio activa al menos:
@@ -135,6 +135,10 @@ npm run android:debug
 Desde esta carpeta:
 
 ```powershell
+# Sustituye esta ruta por la carpeta donde instalaste el JDK 21.
+$env:JAVA_HOME = "C:\ruta\al\jdk-21"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+
 npm run android:apk
 ```
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = "cch-pwa-shell-v3";
+const CACHE_NAME = "cch-pwa-shell-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const APP_SHELL = [
   "./script.js",
   "./examenes/examenes_cibernetica.html",
   "./examenes/examenes_estadistica.html",
+  "./examenes/banco_cibernetica.json",
+  "./examenes/banco_estadistica.json",
   "./examenes/panel_examen_cibernetica.js",
   "./examenes/panel_examen_estadistica.js",
   "./bitacoras/index.html",
