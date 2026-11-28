@@ -1,4 +1,4 @@
-const CACHE_NAME = "cch-pwa-shell-v1";
+const CACHE_NAME = "cch-pwa-shell-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -15,7 +15,7 @@ const APP_SHELL = [
   "./apk/www/icon-192.png",
   "./apk/www/icon-512.png"
 ];
-const CACHEABLE_FILE = /\.(?:html|css|js|webmanifest|png|svg|ico|woff2?)$/i;
+const CACHEABLE_FILE = /\.(?:html|css|js|json|webmanifest|png|svg|ico|woff2?)$/i;
 
 self.addEventListener("install", event => {
   event.waitUntil(

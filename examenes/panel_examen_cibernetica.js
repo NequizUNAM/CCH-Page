@@ -14,7 +14,14 @@ document.body.insertAdjacentHTML('beforeend', '<div id="scr-admin" class="screen
    ========================================================================== */
 const AD = { tab: 'resumen', par: '0', rows: [], cfg: null, q: '', pvP: 1, pvT: 'A', pvSeed: 20250101, qeP: 1, qeT: 'A', qeSeed: 20250101, qeKey: '', questionSnapshots: {}, questionSnapshotErrors: {}, questionSnapshotLoading: '' };
 const ADTABS = [['resumen', 'bi-bar-chart-line-fill', 'Resumen'], ['met', 'bi-clipboard-data-fill', 'Métricas'], ['res', 'bi-table', 'Resultados'], ['alu', 'bi-person-lines-fill', 'Por alumno'], ['clv', 'bi-key-fill', 'Contraseñas'], ['prev', 'bi-eye-fill', 'Vista previa'], ['questions', 'bi-pencil-square', 'Editar preguntas']];
-async function openAdmin() { show('admin'); await loadAdmin(); }
+async function openAdmin() {
+  await EXAM_DATA_READY;
+  show('admin');
+  $('#ad-body').innerHTML = '<div class="nav-card text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando bancos desde Sheets…</div>';
+  try { await loadQuestionBank(1); await loadQuestionBank(2); }
+  catch (error) { $('#ad-body').innerHTML = `<div class="alert alert-danger">${esc(error.message)}</div>`; return; }
+  await loadAdmin();
+}
 /* El panel se actualiza como máximo cada minuto (también con F5): mientras, se muestran los últimos datos guardados en este equipo. */
 const AD_WAIT = 60000, ADK = 'eq_adm_' + (CFG.MATERIA || 'cib');
 const adCache = { get() { try { return JSON.parse(LS.get(ADK) || 'null'); } catch (e) { return null; } }, set(o) { LS.set(ADK, JSON.stringify(o)); } };

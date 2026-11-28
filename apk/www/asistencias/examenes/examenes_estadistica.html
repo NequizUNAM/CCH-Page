@@ -123,6 +123,7 @@
     .fr > span:first-child { border-bottom:2px solid currentColor; padding:0 .3rem .05rem; } .fr > span:last-child { padding:.05rem .3rem 0; }
     .opt .fr { font-size:1.15rem; }
 
+  .grade-wait{max-width:520px;margin:0 auto;padding:1.4rem 1.2rem;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(145deg,#eff6ff,#fff);color:#1e3a8a}.grade-wait .spinner-border{width:2.4rem;height:2.4rem}.grade-wait-step{min-height:1.5em;font-weight:700;color:#1d4ed8}.grade-wait-track{height:8px;overflow:hidden;border-radius:999px;background:#dbeafe}.grade-wait-track i{display:block;width:35%;height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#06b6d4);animation:gradeWaitMove 1.4s ease-in-out infinite alternate}@keyframes gradeWaitMove{to{transform:translateX(185%)}}@media(prefers-reduced-motion:reduce){.grade-wait-track i{animation:none;width:100%}}
   .send-alert{display:flex;gap:.7rem;align-items:flex-start;text-align:left;background:#fee2e2;border:2px solid #dc2626;color:#991b1b;border-radius:14px;padding:.8rem 1rem;margin-bottom:.7rem;font-size:.95rem;animation:sendPulse 1.6s ease-in-out infinite}.send-alert i{font-size:1.6rem;color:#dc2626}
 @keyframes sendPulse{50%{box-shadow:0 0 0 6px rgba(220,38,38,.18)}}@media (prefers-reduced-motion:reduce){.send-alert{animation:none}}
 .mbar{height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden}.mbar i{display:block;height:100%;border-radius:999px;transition:width .6s}.mdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
@@ -532,11 +533,13 @@ const fig = h => `<div class="fig">${h}</div>`;
                 Sturges · desviación media, varianza y desviación estándar
    ========================================================================== */
 let SECS1 = [], SECS2 = [], BANK1 = {}, BANK2 = {};
-const EXAM_DATA_READY = fetch('./estadistica.json').then(r => r.json()).then(d => {
+const EXAM_DATA_READY = fetch('./estadistica.json').then(r => {
+  if (!r.ok) throw new Error('No se pudo cargar la configuración de Estadística.');
+  return r.json();
+}).then(async d => {
   SECS1 = (d.secciones && d.secciones.parcial1) || [];
   SECS2 = (d.secciones && d.secciones.parcial2) || [];
-  BANK1 = (d.bancos && d.bancos.parcial1) || {};
-  BANK2 = (d.bancos && d.bancos.parcial2) || {};
+
 }).catch(e => { console.error('Error cargando estadistica.json:', e); });
 
 /* ---- generadores de datos ---- */
@@ -883,6 +886,72 @@ api = async function (action, data = {}) {
   if (isBusy(r)) r.code = 'ocupado';
   return r;
 };
+const BANK_CACHE_PREFIX = `eq_${CFG.MATERIA}_bank`;
+let ACTIVE_BANK_REVISION = '', ACTIVE_BANK_PARTIAL = 0;
+const questionBankCacheKey = (partial, revision) => `${BANK_CACHE_PREFIX}_${partial}_${revision}`;
+function applyQuestionBank(partial, bank) {
+  if (!bank || typeof bank !== 'object' || Array.isArray(bank)) throw new Error('El servidor devolvió un banco de preguntas inválido.');
+  if (CFG.MATERIA === 'cib') {
+    if (+partial === 1) {
+      BANK = bank.BANK || {}; BANK2 = bank.BANK2 || {};
+      NAMES = bank.NAMES || {}; PAIRS = bank.PAIRS || {}; RANGE = bank.RANGE || {}; SUMBITS = bank.SUMBITS || {};
+      SECS1 = bank.SECS1 || []; SECS2 = bank.SECS2 || [];
+    } else {
+      BANKJ = bank.BANKJ || {};
+      SECS_J = bank.SECS_J || [];
+    }
+  } else if (+partial === 1) {
+    BANK1 = bank.BANK1 || {}; SECS1 = bank.SECS1 || [];
+  } else {
+    BANK2 = bank.BANK2 || {}; SECS2 = bank.SECS2 || [];
+  }
+}
+function persistQuestionBank(partial, bank, revision) {
+  if (!/^[a-f0-9]{64}$/i.test(String(revision || ''))) throw new Error('El servidor no devolvió una versión válida del banco.');
+  applyQuestionBank(partial, bank);
+  try { localStorage.setItem(questionBankCacheKey(partial, revision), JSON.stringify(bank)); }
+  catch (error) { throw new Error('No se pudo guardar el banco de preguntas en este navegador. Libera espacio y vuelve a entrar.'); }
+  ACTIVE_BANK_PARTIAL = +partial; ACTIVE_BANK_REVISION = String(revision);
+  return ACTIVE_BANK_REVISION;
+}
+function restoreQuestionBank(partial, revision) {
+  if (!revision) return false;
+  const raw = LS.get(questionBankCacheKey(partial, revision));
+  if (!raw) return false;
+  try {
+    const bank = JSON.parse(raw);
+    applyQuestionBank(partial, bank);
+    ACTIVE_BANK_PARTIAL = +partial; ACTIVE_BANK_REVISION = String(revision);
+    return true;
+  } catch (error) {
+    console.error('No se pudo restaurar la copia local del banco de preguntas:', error);
+    return false;
+  }
+}
+async function loadQuestionBank(partial) {
+  const response = await api('question_bank', { parcial: partial, token: ADMIN });
+  if (!response || !response.ok) throw new Error(response && response.msg ? response.msg : 'No se pudieron cargar las preguntas desde Sheets.');
+  return persistQuestionBank(partial, response.bank, response.bankRevision);
+}
+async function ensureQuestionBankForState(state) {
+  if (!state) throw new Error('No hay un intento para restaurar.');
+  if (state.bankRevision) {
+    if (restoreQuestionBank(state.parcial, state.bankRevision)) return;
+    throw new Error('Falta la copia local de las preguntas de este intento. No se reemplazará por una versión distinta.');
+  }
+  if (+ACTIVE_BANK_PARTIAL !== +state.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a iniciar sesión para cargar las preguntas de este examen.');
+  state.bankRevision = ACTIVE_BANK_REVISION;
+  save();
+}
+async function ensureQuestionBankForLogin(session) {
+  if (session.bankRevision) {
+    if (restoreQuestionBank(session.parcial, session.bankRevision)) return;
+    throw new Error('Falta la copia local de las preguntas cargadas al iniciar sesión. Vuelve a ingresar para descargarlas otra vez.');
+  }
+  if (+ACTIVE_BANK_PARTIAL !== +session.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a ingresar la contraseña del examen para cargar las preguntas.');
+  session.bankRevision = ACTIVE_BANK_REVISION;
+  SS.set('eq_est_sess', JSON.stringify(session));
+}
 const MSG = {
   incorrecta: 'Contraseña incorrecta.',
   cambio: 'La contraseña ha cambiado. Solicita la nueva a tu profesor(a).',
@@ -1022,7 +1091,13 @@ const ResultQueue = {
         const r = await api('submit', Object.assign({}, job.result, { requestId: job.key }));
         if (r.ok) {
           await this.remove(job); this.jobs.shift();
-          if (S && S.result && this.key(S.result) === job.key) { S.sent = true; S.status = 'ok'; SEND.n = 0; save(); renderFin(); }
+          if (S && S.result && this.key(S.result) === job.key) {
+            const grade = r.grade && typeof r.grade === 'object' ? r.grade : r;
+            ['aciertos', 'total', 'calificacion', 'detalle', 'respuestas'].forEach(key => {
+              if (grade[key] !== undefined) S.result[key] = grade[key];
+            });
+            S.sent = true; S.status = 'ok'; SEND.n = 0; save(); renderFin();
+          }
         } else if (r.code === 'duplicado' || r.code === 'sesion') {
           await this.remove(job); this.jobs.shift();
           if (S && S.result && this.key(S.result) === job.key) { S.status = 'dup'; save(); renderFin(); }
@@ -1050,13 +1125,19 @@ $('#form-clave').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('#btn-entrar'), err = $('#clave-err'), clave = $('#clave').value.trim();
   if (!clave) return;
-  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando…'; err.hidden = true;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando y cargando preguntas…'; err.hidden = true;
   const r = await api('login', { clave, dev: DEV });
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Entrar';
   if (r.code === 'bloqueado') { lockLogin(r.espera || 300); return; }
   if (r.ok && r.role === 'admin') { $('#clave').value = ''; showAlert('El panel está en el Dashboard', 'Los resultados, métricas, contraseñas y la configuración de este examen se manejan en el <b>Dashboard de Asistencias</b>: entra como administrador y elige <b>Examen</b> en la barra superior.', 'bi-speedometer2', '#4338ca'); return; }
   if (r.ok && r.role === 'alumno' && bloqueaMovil()) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Entrar'; return; }
-  if (r.ok && r.role === 'alumno') { CLK = !!r.reloj; PREGN = r.preguntas; PREGC = r.cierre || ''; SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '' })); afterLogin(r.parcial, true); return; }
+  if (r.ok && r.role === 'alumno') {
+    try { persistQuestionBank(r.parcial, r.questionBank, r.bankRevision); }
+    catch (error) { err.textContent = error.message; err.hidden = false; return; }
+    CLK = !!r.reloj; PREGN = r.preguntas; PREGC = r.cierre || '';
+    SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '', bankRevision: r.bankRevision }));
+    await afterLogin(r.parcial, true); return;
+  }
   err.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${MSG[r.code] || r.msg || 'No se pudo entrar.'}${r.code === 'incorrecta' && r.restan !== undefined ? ` <b>Te ${r.restan === 1 ? 'queda 1 intento' : 'quedan ' + r.restan + ' intentos'}.</b>` : ''}`; err.hidden = false;
   const c = $('#clave-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); $('#clave').select();
 });
@@ -1068,19 +1149,26 @@ function lockLogin(sec) {                         // bloqueo por demasiados inte
     err.innerHTML = `<i class="bi bi-shield-lock-fill me-1"></i>Demasiados intentos con contraseña incorrecta. Podrás intentar de nuevo en <b>${Math.floor(left / 60)}:${pad2(left % 60)}</b>.`; err.hidden = false; };
   paint(); lockT = setInterval(paint, 500);
 }
-function afterLogin(parcial, fresh) {
+async function afterLogin(parcial, fresh) {
   if (S && S.fin) {
     if (fresh) { if (!S.sent && S.status !== 'dup' && S.result) queueResult(S.result); clearState(); flushQueue(); }   // alumno nuevo en este equipo: se limpia el intento anterior
     else { renderFin(); show('fin'); return; }
   }
   if (S && !S.fin) {
-    if (!fresh) { startExam(true); return; }          // recarga en la misma pestaña: continúa
+    if (!fresh) {
+      try { await ensureQuestionBankForState(S); }
+      catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); return; }
+      startExam(true); return;
+    }
     $('#rs-info').innerHTML = `<b>${esc(S.nombre)}</b> · ${esc(S.cuenta)} · Gpo. ${esc(S.grupo)}<br><small class="text-muted">${EXAMS[S.parcial].titulo} · Tipo ${S.tipo}</small>`;
     show('resume'); return;
   }
   openDatos(parcial);
 }
-$('#rs-continuar').onclick = () => startExam(true);
+$('#rs-continuar').onclick = async () => {
+  try { await ensureQuestionBankForState(S); startExam(true); }
+  catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); }
+};
 $('#rs-otro').onclick = () => { if (confirm('Dejarás de ver el intento anterior en este equipo (el avance sigue guardado y se retoma con su número de cuenta y nombre). ¿Continuar?')) { const s = JSON.parse(SS.get('eq_est_sess') || '{}'), p = s.parcial || (S && S.parcial) || 1; detachState(); openDatos(p); } };
 
 /* ===== 2. Datos ===== */
@@ -1123,10 +1211,15 @@ $('#form-datos').addEventListener('submit', async e => {
   }
   if (res.resumed) {          // el servidor ya tenía este examen en curso: se continúa con el mismo tipo, reloj y respuestas
     const pr = res.progreso || {}, loc = loadLocal(PARCIAL, cuenta), mismo = loc && !loc.fin && (loc.seed >>> 0) === (res.seed >>> 0);
-    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
+    if (mismo && loc.bankRevision && !restoreQuestionBank(PARCIAL, loc.bankRevision)) {
+      showAlert('Falta la copia local de las preguntas', 'No se reemplazará la versión de este intento por otra distinta. Contacta a tu profesor(a) antes de continuar.', 'bi-cloud-download', '#d97706'); return;
+    }
+    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: mismo && loc.bankRevision ? loc.bankRevision : ACTIVE_BANK_REVISION };
+    try { await ensureQuestionBankForState(S); }
+    catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); return; }
     save(); startExam(true); if (res.cerrar) { toast('Tu profesor(a) cerró tu examen: tus respuestas se enviaron.', 'bi-lock-fill', 5000); finish('admin'); } return;
   }
-  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
+  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: ACTIVE_BANK_REVISION };
   save(); startExam(false);
 });
 
@@ -1423,24 +1516,54 @@ function grade() {
   const resp = EXAM.map(q => { const v = S.answers[q.id]; return q.id + ':' + (v === undefined || v === '' ? '-' : (q.kind === 'mc' ? 'ABCD'[+v] : v)); }).join(';');
   return { ok, det, resp, nota: Math.round(ok / TOTAL() * 100) / 10 };
 }
+const GRADE_WAIT_STEPS = ['Preparando tus respuestas…', 'Empaquetando el examen…', 'Enviando al servidor…', 'Evaluando cada respuesta…', 'Esperando la calificación final…'];
+let gradeWaitTimer = null, gradeWaitIndex = 0;
+function startGradeWait() {
+  if (gradeWaitTimer) return;
+  gradeWaitIndex = 0;
+  gradeWaitTimer = setInterval(() => {
+    gradeWaitIndex = Math.min(gradeWaitIndex + 1, GRADE_WAIT_STEPS.length - 1);
+    const step = $('#grade-wait-step');
+    if (step) step.textContent = GRADE_WAIT_STEPS[gradeWaitIndex];
+    maybeRevealGrade();
+  }, 1400);
+}
+function stopGradeWait() {
+  clearInterval(gradeWaitTimer);
+  gradeWaitTimer = null;
+}
+function maybeRevealGrade() {
+  if (!S || !S.sent || gradeWaitIndex < GRADE_WAIT_STEPS.length - 1 || S.gradeRevealed) return;
+  S.gradeRevealed = true;
+  stopGradeWait();
+  save();
+  renderFin();
+}
+function gradeWaitHTML() {
+  startGradeWait();
+  return `<div class="grade-wait" role="status" aria-live="polite"><div class="spinner-border text-primary mb-3" aria-hidden="true"></div><h2 class="h5 fw-bold mb-2">Calificando tu examen</h2><p id="grade-wait-step" class="grade-wait-step mb-3">${GRADE_WAIT_STEPS[gradeWaitIndex]}</p><div class="grade-wait-track" aria-hidden="true"><i></i></div><div class="small text-muted mt-3">Espera la respuesta del servidor. No cierres esta página.</div></div>`;
+}
 function finish(motivo) {
   if (!S || S.fin) return;
   const g = grade(), fin = Math.min(nowMs(), limiteMs()), usado = fin - S.start;
   S.fin = true; examActive = false; clearInterval(timerId); clearInterval(syncId); clearInterval(pollId);
   S.result = { parcial: S.parcial, inicio: S.inicioISO, fecha: new Date(fin).toISOString(), nombre: S.nombre, cuenta: S.cuenta, grupo: S.grupo, tipo: S.tipo, aciertos: g.ok, total: TOTAL(), calificacion: g.nota, tiempo: fmtT(usado), tiempoSeg: Math.round(usado / 1000), salidas: S.salidas, motivo, detalle: g.det, respuestas: g.resp, procedimiento: JSON.stringify(S.proc || {}), seed: S.seed, sid: S.sid };
-  S.status = 'pend'; save(); renderFin(); show('fin'); sendResult(S);
+  S.status = 'pend'; S.gradeRevealed = false; save(); renderFin(); show('fin'); sendResult(S);
 }
 
 /* ===== 4. Pantalla final: calificación y envío ===== */
 function renderFin() {
   const r = S.result, pct = r.aciertos / r.total * 100, col = pct >= 60 ? '#16a34a' : '#dc2626';
   $('#fin-sub').textContent = `${EXAMS[r.parcial].titulo}`;
-  $('#fin-score').innerHTML = S.status === 'dup'
+  if (S.status === 'dup' || S.gradeRevealed) stopGradeWait();
+  const waiting = S.status !== 'dup' && !S.gradeRevealed;
+  $('#fin-score').innerHTML = waiting ? gradeWaitHTML() : S.status === 'dup'
     ? `<div class="alert alert-danger d-inline-block"><i class="bi bi-x-octagon-fill me-1"></i>Este examen ya había sido respondido: no se guardó tu resultado.</div>`
     : `<div class="grade-ring" style="--p:${pct};--gc:${col}"><b style="color:${col}">${r.calificacion.toFixed(1)}</b><small class="text-muted fw-bold">de 10</small></div><div class="mt-2 fw-bold">${r.aciertos} aciertos de ${r.total}</div><div class="small text-muted">${pct >= 60 ? '¡Aprobado!' : 'Sigue practicando, ¡tú puedes!'}</div>`;
   $('#fin-aviso') && ($('#fin-aviso').innerHTML = r.motivo === 'admin' ? '<div class="alert alert-warning small fw-bold"><i class="bi bi-lock-fill me-1"></i>Tu profesor(a) cerró este examen por exceder el límite de salidas de la ventana. Se calificó con lo que alcanzaste a responder.</div>' : '');
   $('#fin-datos').innerHTML = `<div class="fin-banner"><div><small>Número de cuenta</small><b>${esc(r.cuenta)}</b></div><div><small>Grupo</small><b>${esc(r.grupo)}</b></div></div>`;
-  renderMalas(r);
+  if (waiting) $('#fin-malas').replaceChildren();
+  else renderMalas(r);
   setStatus();
 }
 /* Preguntas que estuvieron mal (sin mostrar la respuesta correcta) */
@@ -1499,7 +1622,7 @@ function leave() { if (!examActive || away) return; away = true; S.salidas++; sa
 function back() { if (!away) return; away = false; if (examActive) toast(`Saliste de la ventana del examen (${S.salidas} ${S.salidas === 1 ? 'vez' : 'veces'}). Queda registrado.`, 'bi-eye-fill', 4000); }
 document.addEventListener('visibilitychange', () => document.hidden ? leave() : back());
 window.addEventListener('blur', leave); window.addEventListener('focus', back);
-window.addEventListener('beforeunload', e => { if (examActive || (S && S.result && !S.sent && S.status !== 'dup')) { e.preventDefault(); e.returnValue = ''; } });   // también mientras el envío final no se guarde
+window.addEventListener('beforeunload', e => { if (examActive || (S && S.result && (!S.sent || !S.gradeRevealed) && S.status !== 'dup')) { e.preventDefault(); e.returnValue = ''; } });   // también mientras se espera la respuesta final
 
 /* ===== Arranque ===== */
 /* Modo panel: el Dashboard de Asistencias abre esta página en un marco (?panel=1) solo para usar el motor del examen
@@ -1513,9 +1636,21 @@ $('#btn-prof-movil').onclick = () => show('clave');
   if (PANEL_MODE) { document.body.classList.add('modo-panel'); $$('.screen').forEach(s => s.classList.add('d-none')); return; }   // el Dashboard inyecta aquí su panel
   if (sess && sess.role === 'admin') SS.del('eq_est_sess');
   if (MOVIL && !(S && S.fin)) { show('movil'); }                                        // celular o tableta: solo el profesor puede entrar
-  else if (sess && sess.role === 'alumno') { PREGN = sess.n; PREGC = sess.cierre || ''; afterLogin(sess.parcial, false); }
-  else if (S && !S.fin) { SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); startExam(true); }          // se cerró la ventana y se volvió a abrir: sigue la sesión de ese número de cuenta
-  else if (S && S.fin && S.result && !S.sent && S.status !== 'dup') { SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); renderFin(); show('fin'); sendResult(S); }
+  else if (sess && sess.role === 'alumno') {
+    if (!(S && S.fin)) {
+      try { await ensureQuestionBankForLogin(sess); }
+      catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); show('clave'); return; }
+    }
+    PREGN = sess.n; PREGC = sess.cierre || ''; await afterLogin(sess.parcial, false);
+  }
+  else if (S && !S.fin) {
+    try {
+      await ensureQuestionBankForState(S);
+      SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial, bankRevision: S.bankRevision }));
+      startExam(true);
+    } catch (error) { showAlert('No se pudieron restaurar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); show('clave'); }
+  }          // se cerró la ventana y se volvió a abrir: sigue la sesión de ese número de cuenta
+  else if (S && S.fin && S.result && (!S.sent || !S.gradeRevealed) && S.status !== 'dup') { SS.set('eq_est_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); renderFin(); show('fin'); if (!S.sent) sendResult(S); }
   else show('clave');
   flushQueue();
 })();

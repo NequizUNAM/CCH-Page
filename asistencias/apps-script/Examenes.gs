@@ -59,6 +59,7 @@ const Examenes = (function () {
       if (lock && !lock.tryLock(LOCK_WAIT_MS)) return out({ ok: false, code: 'ocupado', msg: 'Servidor ocupado' });
       switch (d.action) {
         case 'login': return out(login_(d, m));
+        case 'question_bank': return out(adminOnly_(d, m, questionBank_));
         case 'start': return out(start_(d, m));
         case 'progress': return out(progress_(d, m));
         case 'submit': return out(submit_(d, m));
@@ -200,8 +201,10 @@ const Examenes = (function () {
     for (const p of [1, 2]) {
       if (cfg['clave' + p] === clave) {
         if (cfg['abierto' + p] !== 'SI') return { ok: false, code: 'cerrado' };
+        const bank = questionBank_( { parcial: p }, m );
+        if (!bank.ok) return bank;
         CacheService.getScriptCache().remove('fl_' + dev);
-        return { ok: true, role: 'alumno', parcial: p, materia: m, reloj: cfg.reloj === 'SI', preguntas: nPreg_(cfg, p), cierre: cierre_(cfg, p), t: Date.now() };
+        return { ok: true, role: 'alumno', parcial: p, materia: m, reloj: cfg.reloj === 'SI', preguntas: nPreg_(cfg, p), cierre: cierre_(cfg, p), questionBank: bank.bank, bankRevision: bank.bankRevision, t: Date.now() };
       }
     }
     for (const p of [1, 2]) {
@@ -215,6 +218,13 @@ const Examenes = (function () {
     if (w) return { ok: false, code: 'bloqueado', espera: w };
     const f = cacheGet_('fl_' + dev);
     return { ok: false, code: 'incorrecta', restan: f ? MAX_FALLOS - f.n : MAX_FALLOS };
+  }
+  function questionBank_(d, m) {
+    const parcial = Number(d.parcial);
+    if (!(parcial === 1 || parcial === 2)) return { ok: false, code: 'datos', msg: 'Parcial inválido.' };
+    if (typeof BancosPreguntas === 'undefined') return { ok: false, code: 'preguntas', msg: 'Falta agregar BancosPreguntas.gs al proyecto.' };
+    const snapshot = BancosPreguntas.readPartialFromSheets(m, parcial);
+    return { ok: true, bank: snapshot.bank, bankRevision: snapshot.revision };
   }
 
   /* ---------------------------------- Alumno ---------------------------------- */
@@ -393,7 +403,7 @@ const Examenes = (function () {
     sh.deleteRow(r); return { ok: true };
   }
 
-  const ACTIONS = ['login', 'start', 'progress', 'submit', 'admin_data', 'admin_qedits', 'admin_cfg', 'admin_setclave', 'admin_abierto', 'admin_liberar', 'admin_reloj', 'admin_cerrar', 'admin_cfgexamen', 'admin_savequestion'];
+  const ACTIONS = ['login', 'question_bank', 'start', 'progress', 'submit', 'admin_data', 'admin_qedits', 'admin_cfg', 'admin_setclave', 'admin_abierto', 'admin_liberar', 'admin_reloj', 'admin_cerrar', 'admin_cfgexamen', 'admin_savequestion'];
   /* ---- Para el panel de Asistencias (no cambian el examen) ---- */
   // Estado de cada materia sin crear hojas: ¿existe su Config y qué parciales admiten alumnos?
   function estado() {

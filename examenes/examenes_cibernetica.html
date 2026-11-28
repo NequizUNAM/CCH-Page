@@ -130,6 +130,7 @@
     .mal-n { width:30px; height:30px; border-radius:50%; background:var(--c); color:#fff; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
     @media (max-width:575.98px) { .fin-banner b { font-size:2rem; } }
 
+  .grade-wait{max-width:520px;margin:0 auto;padding:1.4rem 1.2rem;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(145deg,#eff6ff,#fff);color:#1e3a8a}.grade-wait .spinner-border{width:2.4rem;height:2.4rem}.grade-wait-step{min-height:1.5em;font-weight:700;color:#1d4ed8}.grade-wait-track{height:8px;overflow:hidden;border-radius:999px;background:#dbeafe}.grade-wait-track i{display:block;width:35%;height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#06b6d4);animation:gradeWaitMove 1.4s ease-in-out infinite alternate}@keyframes gradeWaitMove{to{transform:translateX(185%)}}@media(prefers-reduced-motion:reduce){.grade-wait-track i{animation:none;width:100%}}
   .send-alert{display:flex;gap:.7rem;align-items:flex-start;text-align:left;background:#fee2e2;border:2px solid #dc2626;color:#991b1b;border-radius:14px;padding:.8rem 1rem;margin-bottom:.7rem;font-size:.95rem;animation:sendPulse 1.6s ease-in-out infinite}.send-alert i{font-size:1.6rem;color:#dc2626}
 @keyframes sendPulse{50%{box-shadow:0 0 0 6px rgba(220,38,38,.18)}}@media (prefers-reduced-motion:reduce){.send-alert{animation:none}}
 .mbar{height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden}.mbar i{display:block;height:100%;border-radius:999px;transition:width .6s}.mdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
@@ -386,6 +387,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const EXAM_DATA_READY = Promise.resolve();
 /* ==========================================================================
    CONFIGURACIÓN (lo único que debes editar aquí)
    Las contraseñas del examen y la del administrador YA NO están en esta página:
@@ -399,6 +401,7 @@ const ENDPOINT_CCH = (() => {
   } catch (e) { return ''; }
 })();
 const CFG = {
+  MATERIA: 'cib',
   ENDPOINT: ENDPOINT_CCH,
   SYNC_MIN: [2, 4],                // rango (minutos) del envío del avance: cada equipo elige al azar su propio intervalo dentro del rango
   PROC_OBLIGATORIO: true,          // true: no se puede entregar (con el botón) si una pregunta contestada no tiene su procedimiento completo. No cambia la calificación.
@@ -440,71 +443,7 @@ const openQ = (sec, html, expect, rule, cmp = 'norm', bl) => ({ sec, kind: 'open
 /* ==========================================================================
    PARCIAL 1 · Precursores, circuitos básicos, conversiones y suma binaria
    ========================================================================== */
-const BANK = {
-  prec: {
-    A: [
-      { q: '¿Quién es considerada la autora del primer algoritmo pensado para ser ejecutado por una máquina (la Máquina Analítica de Babbage)?', ok: 'Ada Lovelace', bad: ['Jean Jennings Bartik', 'Kathleen Booth', 'Arturo Rosenblueth'] },
-      { q: 'Norbert Wiener es recordado principalmente por haber…', ok: 'fundado la cibernética, el estudio del control y la comunicación en animales y máquinas', bad: ['construido la computadora ENIAC', 'creado el primer lenguaje ensamblador', 'descifrado la máquina Enigma'] },
-      { q: '¿Qué científico mexicano fue coautor del artículo «Behavior, Purpose and Teleology», clave para la cibernética, y primer director del Cinvestav?', ok: 'Arturo Rosenblueth', bad: ['Norbert Wiener', 'Alan Turing', 'Claude Shannon'] },
-      { q: '¿Cuál es el aporte más destacado de la «máquina de Turing»?', ok: 'Introdujo la idea de una computadora universal capaz de ejecutar cualquier algoritmo', bad: ['Fue la primera computadora electrónica comercial', 'Creó la teoría de la información', 'Inventó el primer lenguaje ensamblador'] },
-      { q: 'El artículo «A Mathematical Theory of Communication» dio origen a…', ok: 'la teoría de la información (Claude Shannon)', bad: ['la máquina de Turing (Alan Turing)', 'la cibernética (Norbert Wiener)', 'el algoritmo de la Máquina Analítica (Ada Lovelace)'] },
-      { q: '¿Quién creó el primer lenguaje ensamblador y su ensamblador para la computadora ARC?', ok: 'Kathleen Booth', bad: ['Ada Lovelace', 'Jean Jennings Bartik', 'Claude Shannon'] },
-      { q: 'Jean Jennings Bartik destaca por haber sido una de las seis primeras programadoras de la computadora…', ok: 'ENIAC', bad: ['ARC', 'Máquina Analítica', 'Enigma'] }
-    ],
-    B: [
-      { q: '¿Qué aportación destaca más en el trabajo de Ada Lovelace?', ok: 'Describir cómo programar una máquina para calcular los números de Bernoulli, el primer algoritmo para una máquina', bad: ['Construir la primera computadora electrónica', 'Descifrar los mensajes de la máquina Enigma', 'Acuñar el término «cibernética»'] },
-      { q: '¿Qué máquina logró descifrar Alan Turing en Bletchley Park durante la Segunda Guerra Mundial?', ok: 'La máquina Enigma', bad: ['La ENIAC', 'La Máquina Analítica', 'La computadora ARC'] },
-      { q: 'La tesis de maestría de Claude Shannon unió…', ok: 'los circuitos eléctricos con el álgebra de Boole', bad: ['la fisiología con la cibernética', 'el ensamblador con la ENIAC', 'la Máquina Analítica con los números de Bernoulli'] },
-      { q: 'El libro <i>Cybernetics</i> de Norbert Wiener lleva el subtítulo «control y comunicación en…»', ok: 'el animal y la máquina', bad: ['la computadora y el programa', 'el circuito y la batería', 'el número y la ecuación'] },
-      { q: 'Un lenguaje de programación recibió el nombre «Ada» en honor a…', ok: 'Ada Lovelace', bad: ['Kathleen Booth', 'Jean Jennings Bartik', 'Alan Turing'] },
-      { q: 'El «juego de la imitación» planteado por Alan Turing es…', ok: 'una prueba para decidir si una máquina puede comportarse como un ser humano', bad: ['un método para descifrar la máquina Enigma', 'un lenguaje ensamblador para el ARC', 'una forma de medir la información en bits'] },
-      { q: 'Kathleen Booth, además del ensamblador, diseñó las computadoras…', ok: 'ARC, SEC y APE(X)C', bad: ['ENIAC, BINAC y UNIVAC', 'ACE, Colossus y Enigma', 'Cybernetics, Teseo y Dartmouth'] }
-    ]
-  },
-  gen: {
-    A: [
-      { q: '¿Qué componente electrónico caracteriza a la <b>primera generación</b> de computadoras?', ok: 'Los tubos de vacío (bulbos)', bad: ['Los transistores', 'Los circuitos integrados', 'Los microprocesadores'] },
-      { q: '¿Qué invento distingue a la <b>segunda generación</b> de computadoras y las hizo más pequeñas, rápidas y con menos consumo de energía?', ok: 'El transistor', bad: ['El bulbo', 'El microprocesador', 'La tarjeta perforada'] },
-      { q: '¿Qué lenguaje de programación de alto nivel, pensado para cálculos científicos, destacó en la segunda generación?', ok: 'FORTRAN', bad: ['Python', 'El lenguaje máquina', 'Java'] }
-    ],
-    B: [
-      { q: '¿Qué avance caracteriza a la <b>tercera generación</b> de computadoras?', ok: 'Los circuitos integrados (chips)', bad: ['Los tubos de vacío', 'Los transistores sueltos', 'Las tarjetas perforadas'] },
-      { q: '¿Qué distingue a la <b>cuarta generación</b> de computadoras?', ok: 'El microprocesador: la unidad central de proceso en un solo chip', bad: ['Los tubos de vacío', 'Los relevadores electromecánicos', 'El transistor individual'] },
-      { q: '¿Con qué se programaba principalmente la <b>primera generación</b> de computadoras?', ok: 'Con lenguaje máquina (ceros y unos)', bad: ['Con Python', 'Con Java', 'Con HTML'] }
-    ]
-  },
-  cdca: {
-    A: [
-      { q: '¿Qué es la <b>corriente directa</b> (CD o DC)?', ok: 'La que fluye siempre en el mismo sentido, con voltaje constante', bad: ['La que cambia de sentido muchas veces por segundo', 'La que solo existe en los cables de la calle', 'La que aumenta su voltaje con el tiempo sin cambiar de sentido'] },
-      { q: '¿Qué es la <b>corriente alterna</b> (CA o AC)?', ok: 'La que cambia de sentido muchas veces por segundo, con voltaje en forma de onda senoidal', bad: ['La que fluye siempre en el mismo sentido', 'La que solo producen las pilas y baterías', 'La que no tiene voltaje'] },
-      { q: '¿Cuál de estos es un ejemplo de <b>corriente directa</b>?', ok: 'Una pila o una batería', bad: ['El contacto de la pared de una casa', 'La red eléctrica de la ciudad', 'Un motor industrial conectado a la red'] },
-      { q: 'En México, ¿con qué frecuencia oscila la corriente alterna de la red doméstica?', ok: '60 Hz', bad: ['50 Hz', '120 Hz', '127 Hz'] }
-    ],
-    B: [
-      { q: 'En una gráfica de voltaje contra tiempo, la <b>corriente directa</b> se ve como…', ok: 'una línea recta horizontal (voltaje constante)', bad: ['una onda senoidal que sube y baja', 'una línea que baja poco a poco hasta cero', 'una serie de picos que cambian de signo cada medio segundo'] },
-      { q: 'En una gráfica de voltaje contra tiempo, la <b>corriente alterna</b> se ve como…', ok: 'una onda senoidal que sube, baja y se hace negativa', bad: ['una línea recta horizontal', 'una línea que solo crece', 'un punto fijo'] },
-      { q: '¿Cuál de estos es un ejemplo de <b>corriente alterna</b>?', ok: 'El contacto de la pared de una casa', bad: ['Una pila AA', 'La batería de un celular', 'El puerto USB de una computadora'] },
-      { q: '¿Cuál afirmación es correcta?', ok: 'En CD el sentido de la corriente no cambia; en CA cambia periódicamente', bad: ['En CD el sentido cambia 60 veces por segundo; en CA nunca cambia', 'Ambas cambian de sentido, pero la CD lo hace más rápido', 'Ninguna de las dos tiene un sentido definido'] }
-    ]
-  }
-};
-
-
-const SECS1 = [
-  { id: 'prec', t: 'Precursores de la computación y la cibernética', d: 'Elige la respuesta correcta.', ic: 'bi-clock-history', c: '#7c3aed' },
-  { id: 'gen',  t: 'Generaciones de computadoras', d: 'Elige la respuesta correcta.', ic: 'bi-pc-display', c: '#db2777' },
-  { id: 'conv', t: 'Conversiones entre sistemas de numeración', d: 'Respuesta abierta: escribe solo la respuesta, sin espacios y con los símbolos que se indican en cada pregunta.', ic: 'bi-arrow-left-right', c: '#2563eb' },
-  { id: 'sum',  t: 'Suma de números binarios', d: 'Respuesta abierta: escribe solo el resultado, sin espacios y usando únicamente 0 y 1.', ic: 'bi-plus-slash-minus', c: '#16a34a' }
-];
-const NAMES = { 2: 'binario', 8: 'octal', 10: 'decimal', 16: 'hexadecimal' };
-const PAIRS = {
-  A: [[10, 2], [2, 10], [10, 8], [8, 10], [10, 16], [16, 10], [2, 8], [8, 2], [2, 16], [16, 2], [16, 8]],
-  B: [[2, 10], [10, 2], [8, 10], [10, 8], [16, 10], [10, 16], [8, 2], [2, 8], [16, 2], [2, 16], [8, 16]],
-  C: [[10, 2], [2, 10], [10, 16], [16, 10], [8, 10], [10, 8], [2, 16], [16, 2], [2, 8], [8, 2], [16, 8]]
-};
-const RANGE = { A: [19, 230], B: [27, 254], C: [33, 241] };
-const SUMBITS = { A: [4, 5], B: [5, 6], C: [4, 6] };
-/* Tipo C: combina, en un orden fijo, las preguntas de los bancos A y B (mismo tamaño que A) */
+let BANK = {};let SECS1 = [];let NAMES = {};let PAIRS = {};let RANGE = {};let SUMBITS = {};/* Tipo C: combina, en un orden fijo, las preguntas de los bancos A y B (mismo tamaño que A) */
 const mixAB = (a, b) => { const o = []; for (let i = 0; i < Math.max(a.length, b.length); i++) { if (i % 2 === 0 ? a[i] : b[i]) o.push(i % 2 === 0 ? a[i] : b[i]); else if (a[i] || b[i]) o.push(a[i] || b[i]); } return o.slice(0, a.length); };
 
 function buildU1(tipo, seed) {          // parte 1 del primer parcial: precursores, generaciones, conversiones y sumas binarias
@@ -540,49 +479,7 @@ function buildP1(tipo, seed) {
 /* ==========================================================================
    PARCIAL 2 · Compuertas lógicas, diagramas, tablas de verdad y mapas de Karnaugh
    ========================================================================== */
-const SECS2 = [
-  { id: 'gat', t: 'Compuertas lógicas', d: 'Elige la respuesta correcta.', ic: 'bi-toggles', c: '#7c3aed' },
-  { id: 'log', t: 'Lógica con enunciados', d: 'Lee cada situación. Usa 1 = verdadero (sí) y 0 = falso (no). En las tablas de verdad escribe solo 0 y 1, sin espacios.', ic: 'bi-chat-left-text-fill', c: '#0ea5e9' },
-  { id: 'dia', t: 'Diagramas de circuitos lógicos', d: 'Observa cada diagrama. En las preguntas abiertas escribe solo la respuesta, sin espacios.', ic: 'bi-diagram-3-fill', c: '#0891b2' },
-  { id: 'tv',  t: 'Tablas de verdad', d: 'Las respuestas abiertas llevan solo 0 y 1 (o un número), sin espacios.', ic: 'bi-table', c: '#d97706' },
-  { id: 'kar', t: 'Mapas de Karnaugh y mintérminos (m)', d: 'En los mapas, las columnas y filas siguen el código Gray (00, 01, 11, 10).', ic: 'bi-grid-3x3-gap-fill', c: '#16a34a' },
-  { id: 'dis', t: 'Diseño y evaluación de circuitos', d: 'Problemas como el sumador: de una tabla de verdad o un enunciado al circuito de AND, OR y NOT (suma de minitérminos).', ic: 'bi-cpu-fill', c: '#e11d48' }
-];
-const BANK2 = {
-  gat: {
-    A: [
-      { q: '¿Qué compuerta produce salida 1 únicamente cuando <b>todas</b> sus entradas valen 1?', ok: 'AND', bad: ['OR', 'NOT', 'Ninguna: su salida siempre vale 0'] },
-      { q: 'La salida de una compuerta OR vale 0 solamente cuando…', ok: 'todas sus entradas valen 0', bad: ['alguna entrada vale 1', 'todas sus entradas valen 1', 'sus entradas son distintas'] },
-      { q: 'La compuerta NOT también se conoce como…', ok: 'inversor (invierte el valor de la entrada)', bad: ['sumador', 'comparador', 'amplificador'] },
-      { q: '¿Qué símbolo algebraico representa la operación AND?', ok: 'Un punto o producto (A·B)', bad: ['Un signo más (A+B)', 'Una barra superior (Ā)', 'Un signo igual (A=B)'] },
-      { q: 'Las entradas de una compuerta AND son A = 1 y B = 0. ¿Cuánto vale su salida?', ok: '0', bad: ['1', '2', 'No se puede saber'] }
-    ],
-    B: [
-      { q: '¿Qué compuerta produce salida 1 cuando <b>al menos una</b> de sus entradas vale 1?', ok: 'OR', bad: ['AND', 'NOT', 'Ninguna: su salida siempre vale 1'] },
-      { q: 'La salida de una compuerta AND vale 0 cuando…', ok: 'al menos una entrada vale 0', bad: ['todas las entradas valen 1', 'solo la primera entrada vale 1', 'nunca vale 0'] },
-      { q: '¿Qué significa la barra sobre una variable (Ā)?', ok: 'Negación: invierte su valor', bad: ['Que se suma con otra variable', 'Que se multiplica por 2', 'Que vale siempre 1'] },
-      { q: 'A una compuerta NOT le llega un 0. ¿Qué valor entrega a la salida?', ok: '1', bad: ['0', '2', 'Ninguno'] },
-      { q: '¿Cuántas entradas tiene una compuerta NOT?', ok: 'Una', bad: ['Dos', 'Tres', 'Ninguna'] }
-    ]
-  },
-  tv: {
-    A: [{ q: '¿Para qué sirve una tabla de verdad?', ok: 'Para mostrar la salida de un circuito con todas las combinaciones posibles de sus entradas', bad: ['Para medir el voltaje de un circuito', 'Para dibujar el diagrama de un circuito', 'Para convertir números a binario'] }],
-    B: [{ q: 'En lógica digital, ¿cuántos valores distintos puede tomar cada variable?', ok: 'Dos: 0 y 1', bad: ['Uno solo', 'Diez: del 0 al 9', 'Los que se quiera'] }]
-  },
-  kar: {
-    A: [
-      { q: 'En un mapa de Karnaugh, las celdas vecinas (adyacentes) difieren en…', ok: 'un solo bit (código Gray)', bad: ['dos bits', 'todos sus bits', 'ningún bit'] },
-      { q: 'Los grupos que se forman en un mapa de Karnaugh deben tener un número de celdas igual a…', ok: 'una potencia de 2 (1, 2, 4, 8, 16…)', bad: ['cualquier número entero', 'solo números pares mayores que 2', 'solo números primos'] },
-      { q: '¿Cuántas celdas tiene el mapa de Karnaugh de 4 variables?', ok: '16', bad: ['8', '12', '32'] }
-    ],
-    B: [
-      { q: 'Las columnas BC de un mapa de Karnaugh de 3 variables se ordenan así:', ok: '00, 01, 11, 10', bad: ['00, 01, 10, 11', '00, 10, 01, 11', '01, 00, 10, 11'] },
-      { q: 'En un mapa de Karnaugh, ¿qué celdas se consideran adyacentes además de las vecinas?', ok: 'Las de los bordes opuestos (el mapa se «enrolla»)', bad: ['Las que están en diagonal', 'Ninguna otra', 'Solo las de la esquina superior izquierda'] },
-      { q: '¿Qué forma deben tener los grupos de 1s en un mapa de Karnaugh?', ok: 'Rectangular (no en diagonal)', bad: ['En diagonal', 'En forma de L', 'Cualquier forma'] }
-    ]
-  }
-};
-const GT = {
+let SECS2 = [];let BANK2 = {};const GT = {
   and: { n: 'AND', f: (a, b) => a & b }, or: { n: 'OR', f: (a, b) => a | b }, nand: { n: 'NAND', f: (a, b) => 1 - (a & b) },
   nor: { n: 'NOR', f: (a, b) => 1 - (a | b) }, xor: { n: 'XOR', f: (a, b) => a ^ b }, xnor: { n: 'XNOR', f: (a, b) => 1 - (a ^ b) }, not: { n: 'NOT' }
 };
@@ -1568,133 +1465,12 @@ function procCheck(q, P, ans) {
    Oracle compró Sun en 2010). Símbolos de diagramas de flujo según la norma ANSI/ISO 5807.
    Los ejercicios numéricos se generan con la semilla y se calculan con la misma aritmética entera de Java.
    ========================================================================== */
-const SECS_J = [
-  { id: 'pro', t: 'El problema y la metodología de solución', d: 'Elige la respuesta correcta.', ic: 'bi-lightbulb-fill', c: '#7c3aed' },
-  { id: 'alg', t: 'Algoritmos, diagramas de flujo y pseudocódigo', d: 'Observa diagramas, bloques Scratch y pseudocódigo; responde según se indique.', ic: 'bi-diagram-2-fill', c: '#0891b2' },
-  { id: 'exp', t: 'Expresiones aritméticas y lógica', d: 'Evalúa expresiones y operadores siguiendo la jerarquía lógica.', ic: 'bi-calculator-fill', c: '#d97706' },
-  { id: 'cic', t: 'Scratch, vectores y estructuras repetitivas', d: 'Ciclos, contadores, acumuladores, banderas y acceso a listas.', ic: 'bi-arrow-repeat', c: '#16a34a' }
-];
-const intRule = { re: /[^0-9-]/g, ic: 'bi-123', im: 'text', up: true, max: 8, txt: 'Responde <b>solo con el número entero</b>, sin espacios (puede llevar signo −).', warn: 'Solo se permiten números y el signo menos.' };
+let SECS_J = [];const intRule = { re: /[^0-9-]/g, ic: 'bi-123', im: 'text', up: true, max: 8, txt: 'Responde <b>solo con el número entero</b>, sin espacios (puede llevar signo −).', warn: 'Solo se permiten números y el signo menos.' };
 const textRule = { re: /[^A-ZÁÉÍÓÚÑ0-9 .¿?¡!_-]/gi, ic: 'bi-text-left', im: 'text', up: true, max: 120, txt: 'Escribe el texto solicitado, sin respuestas adicionales.', warn: 'Usa letras, números y espacios.' };
 const decRule = { re: /[^0-9.\-]/g, ic: 'bi-123', im: 'decimal', up: true, max: 10, txt: 'Responde <b>solo con el número</b>. Si el resultado es de tipo <b>double</b>, escribe el punto decimal (por ejemplo <span class="mono">4.0</span> o <span class="mono">2.5</span>).', warn: 'Solo se permiten números, punto decimal y signo menos.' };
 const boolRule = { re: /[^A-Z]/g, ic: 'bi-toggle-on', im: 'text', up: true, max: 5, txt: 'Responde <b>true</b> o <b>false</b>.', warn: 'Escribe true o false.' };
 const jcode = s => `<pre class="jcode">${esc(s)}</pre>`;
-const BANKJ = {
-  pro: {
-    A: [
-      { q: 'En la solución de problemas con computadora, ¿qué es un <b>problema</b>?', ok: 'Una situación en la que se quiere pasar de un estado inicial a un estado deseado (la solución)', bad: ['Un error del programa que impide compilarlo', 'Una instrucción del lenguaje Java', 'Un diagrama que representa un algoritmo'], bl: 'Recordar' },
-      { q: 'En un diagrama <b>EPS</b>, la letra <b>E</b> representa…', ok: 'las entradas: los datos que se necesitan para resolver el problema', bad: ['las estructuras de control', 'los errores del programa', 'la ejecución del algoritmo'], bl: 'Recordar' },
-      { q: 'Un problema que, con los mismos datos de entrada, <b>siempre</b> produce la misma salida es…', ok: 'determinístico', bad: ['probabilístico', 'aleatorio', 'imposible de programar'], bl: 'Comprender' },
-      { q: 'Calcular el área de un rectángulo a partir de su base y su altura es un problema…', ok: 'secuencial: los pasos se ejecutan uno tras otro, sin decisiones ni repeticiones', bad: ['cíclico', 'condicional', 'probabilístico'], bl: 'Aplicar' },
-      { q: '¿Cuál es la <b>primera</b> etapa de la metodología de solución de problemas?', ok: 'Planteamiento del problema', bad: ['Prueba de escritorio', 'Codificación en Java', 'Elaboración del diagrama de flujo'], bl: 'Recordar' },
-      { q: 'En la etapa de <b>análisis</b> del problema se…', ok: 'identifican los datos de entrada, el proceso y los datos de salida', bad: ['ejecuta el programa en la computadora', 'instala el JDK', 'escribe el código en Java'], bl: 'Comprender' }
-    ],
-    B: [
-      { q: 'Según el diagrama EPS, ¿cuáles son los elementos de un problema?', ok: 'Entrada, proceso y salida', bad: ['Inicio, desarrollo y cierre', 'Variables, constantes y operadores', 'Hardware, software y usuario'], bl: 'Recordar' },
-      { q: 'En un diagrama <b>EPS</b>, la letra <b>S</b> representa…', ok: 'las salidas: los resultados que se obtienen', bad: ['la sintaxis del lenguaje', 'la secuencia de pasos', 'el sistema operativo'], bl: 'Recordar' },
-      { q: 'Predecir qué número saldrá al lanzar un dado es un problema…', ok: 'probabilístico: el resultado depende del azar', bad: ['determinístico', 'secuencial', 'cíclico'], bl: 'Comprender' },
-      { q: 'Decidir si una persona puede votar según su edad es un problema…', ok: 'condicional: hay que evaluar una condición para elegir qué hacer', bad: ['cíclico', 'secuencial', 'probabilístico'], bl: 'Aplicar' },
-      { q: '¿Qué es la <b>prueba de escritorio</b>?', ok: 'Seguir el algoritmo a mano con datos de ejemplo para verificar que da los resultados correctos', bad: ['Instalar el programa en una computadora de escritorio', 'Compilar el código en Java', 'Dibujar el diagrama de flujo en papel'], bl: 'Comprender' },
-      { q: '¿Cuál es el orden correcto de las etapas de la metodología?', ok: 'Planteamiento → análisis → diseño de la solución → prueba de escritorio', bad: ['Análisis → planteamiento → prueba de escritorio → diseño', 'Diseño → planteamiento → análisis → prueba de escritorio', 'Prueba de escritorio → diseño → análisis → planteamiento'], bl: 'Comprender' }
-    ],
-    C: [
-      { q: 'En un diagrama <b>EPS</b>, la letra <b>P</b> representa…', ok: 'el proceso: las operaciones que transforman las entradas en salidas', bad: ['el programa ya compilado', 'la prueba de escritorio', 'el pseudocódigo'], bl: 'Recordar' },
-      { q: 'Sumar, una por una, las calificaciones de los 40 alumnos de un grupo es un problema…', ok: 'cíclico: se repiten las mismas instrucciones varias veces', bad: ['condicional', 'probabilístico', 'secuencial sin repeticiones'], bl: 'Aplicar' },
-      { q: '«La probabilidad de que llueva mañana es de 70 %». Este tipo de problema es…', ok: 'probabilístico', bad: ['determinístico', 'secuencial', 'cíclico'], bl: 'Comprender' },
-      { q: 'En la etapa de <b>diseño de la solución</b> se…', ok: 'elaboran el algoritmo, el pseudocódigo y el diagrama de flujo', bad: ['redacta el planteamiento del problema', 'compra el equipo de cómputo', 'eligen los resultados al azar'], bl: 'Comprender' },
-      { q: 'Para calcular el promedio de 3 calificaciones, ¿cuáles son las <b>entradas</b>?', ok: 'Las 3 calificaciones', bad: ['El promedio', 'La división entre 3', 'El mensaje «Aprobado»'], bl: 'Aplicar' },
-      { q: '¿Para qué sirve la prueba de escritorio?', ok: 'Para detectar errores en el algoritmo antes de programarlo', bad: ['Para convertir el algoritmo en código máquina', 'Para que el programa corra más rápido', 'Para instalar el entorno de desarrollo'], bl: 'Comprender' }
-    ]
-  },
-  alg: {
-    A: [
-      { q: '¿Qué es un <b>algoritmo</b>?', ok: 'Una serie finita y ordenada de pasos para resolver un problema', bad: ['Un lenguaje de programación', 'Un error lógico', 'Un dispositivo de entrada'], bl: 'Recordar' },
-      { q: '¿Qué es el <b>pseudocódigo</b>?', ok: 'Una descripción del algoritmo con palabras del idioma y una estructura parecida a la de un programa', bad: ['El código máquina del procesador', 'Un diagrama con símbolos geométricos', 'Un programa ya compilado en Java'], bl: 'Recordar' }
-    ],
-    B: [
-      { q: '¿Cuál de estas es una característica de todo algoritmo?', ok: 'Es finito: termina después de un número determinado de pasos', bad: ['Puede tener pasos ambiguos', 'Nunca termina', 'Solo puede escribirse en Java'], bl: 'Comprender' },
-      { q: '¿Qué es un <b>diagrama de flujo</b>?', ok: 'La representación gráfica de un algoritmo con símbolos unidos por flechas', bad: ['Un listado de código en Java', 'Una tabla de verdad', 'Un circuito eléctrico'], bl: 'Recordar' }
-    ],
-    C: [
-      { q: 'En pseudocódigo, ¿qué estructura se usa para <b>tomar una decisión</b>?', ok: 'Si … Entonces … SiNo … FinSi', bad: ['Mientras … FinMientras', 'Inicio … Fin', 'Leer …'], bl: 'Comprender' },
-      { q: 'En un diagrama de flujo, ¿qué indican las <b>flechas</b> (líneas de flujo)?', ok: 'El orden en que se ejecutan los pasos', bad: ['Una operación aritmética', 'Una condición', 'El fin del algoritmo'], bl: 'Comprender' }
-    ]
-  },
-  cic: {
-    A: [
-      { q: 'Un <b>contador</b> es una variable que…', ok: 'aumenta (o disminuye) en una cantidad fija cada vez que ocurre algo, por ejemplo <span class="mono">c = c + 1</span>', bad: ['va sumando valores distintos', 'solo puede valer true o false', 'nunca cambia su valor'], bl: 'Recordar' },
-      { q: '¿Cuál es la diferencia entre <span class="mono">while</span> y <span class="mono">do-while</span>?', ok: 'do-while ejecuta el cuerpo al menos una vez porque evalúa la condición al final', bad: ['while siempre se ejecuta al menos una vez', 'do-while no lleva condición', 'No hay ninguna diferencia'], bl: 'Comprender' },
-      { q: '¿Cuáles son los componentes básicos de una estructura repetitiva?', ok: 'Valor inicial, condición que se evalúa, modificación del estado y sentencias que se repiten', bad: ['Entrada, impresión y fin', 'Clase, objeto y método', 'Solo la condición'], bl: 'Recordar' }
-    ],
-    B: [
-      { q: 'Un <b>acumulador</b> es una variable que…', ok: 'va sumando valores que pueden ser distintos, por ejemplo <span class="mono">suma = suma + x</span>', bad: ['aumenta siempre de 1 en 1', 'solo vale true o false', 'guarda el texto que se imprime'], bl: 'Recordar' },
-      { q: 'Si la condición de un <span class="mono">while</span> es falsa desde el principio, el cuerpo del ciclo…', ok: 'no se ejecuta ninguna vez', bad: ['se ejecuta una vez', 'se ejecuta para siempre', 'marca un error de sintaxis'], bl: 'Comprender' },
-      { q: '¿Qué puede pasar si dentro de un ciclo nunca se modifica la variable de la condición?', ok: 'Que el ciclo se vuelva infinito', bad: ['Que el ciclo no se ejecute', 'Java la modifica automáticamente', 'El programa no compila'], bl: 'Comprender' }
-    ],
-    C: [
-      { q: 'Una <b>bandera</b> (flag) es una variable que…', ok: 'indica si ocurrió o no un evento; normalmente toma dos valores (true/false o 1/0)', bad: ['va sumando valores', 'cuenta de 1 en 1', 'guarda el texto que se imprime'], bl: 'Recordar' },
-      { q: '¿Qué ciclo conviene usar cuando se conoce de antemano cuántas veces se va a repetir?', ok: '<span class="mono">for</span>', bad: ['<span class="mono">switch</span>', '<span class="mono">if-else</span>', 'Ninguno: no se puede saber'], bl: 'Comprender' },
-      { q: 'En <span class="mono">for (int i = 0; i &lt; 5; i++)</span>, la parte <span class="mono">i++</span> es…', ok: 'la modificación del estado de la variable de control', bad: ['la condición', 'el valor inicial', 'el cuerpo del ciclo'], bl: 'Comprender' }
-    ]
-  },
-  exp: {
-    A: [{ q: '¿Qué operador de Java obtiene el <b>residuo</b> de una división entera?', ok: '<span class="mono">%</span>', bad: ['<span class="mono">/</span>', '<span class="mono">\\</span>', '<span class="mono">mod</span>'], bl: 'Recordar' }],
-    B: [{ q: 'En Java, ¿qué operador lógico representa «<b>y</b>» (las dos condiciones deben cumplirse)?', ok: '<span class="mono">&amp;&amp;</span>', bad: ['<span class="mono">||</span>', '<span class="mono">!</span>', '<span class="mono">==</span>'], bl: 'Recordar' }],
-    C: [{ q: '¿Cuál es la diferencia entre <span class="mono">=</span> y <span class="mono">==</span> en Java?', ok: '<span class="mono">=</span> asigna un valor; <span class="mono">==</span> compara si dos valores son iguales', bad: ['Son lo mismo', '<span class="mono">==</span> asigna y <span class="mono">=</span> compara', '<span class="mono">=</span> solo se usa con texto'], bl: 'Comprender' }]
-  },
-  jav: {
-    A: [
-      { q: '¿Quién es considerado el creador del lenguaje Java?', ok: 'James Gosling, en Sun Microsystems', bad: ['Dennis Ritchie, en los Laboratorios Bell', 'Bill Gates, en Microsoft', 'Guido van Rossum, en el CWI de Países Bajos'], bl: 'Recordar' },
-      { q: '¿En qué año se presentó públicamente el lenguaje Java?', ok: '1995', bad: ['1975', '1985', '2005'], bl: 'Recordar' },
-      { q: '¿Qué es el <b>bytecode</b> de Java?', ok: 'El código intermedio que genera el compilador de Java y que ejecuta la JVM', bad: ['El código fuente que se escribe en archivos .java', 'Un error de compilación', 'El sistema operativo de la computadora'], bl: 'Comprender' },
-      { q: 'Un <b>compilador</b>…', ok: 'traduce todo el código fuente a otro lenguaje (código máquina o bytecode) antes de ejecutarlo', bad: ['ejecuta el programa sin traducirlo', 'dibuja diagramas de flujo', 'solo detecta errores lógicos'], bl: 'Comprender' },
-      { q: '¿Qué significa <b>JVM</b>?', ok: 'Java Virtual Machine (máquina virtual de Java)', bad: ['Java Visual Method', 'Java Variable Manager', 'Java Version Module'], bl: 'Recordar' },
-      { q: '¿Qué instrucción imprime un texto y <b>después hace un salto de línea</b>?', ok: '<span class="mono">System.out.println()</span>', bad: ['<span class="mono">System.out.print()</span>', '<span class="mono">System.in.read()</span>', '<span class="mono">sc.nextLine()</span>'], bl: 'Recordar' },
-      { q: 'En Java, ¿cuántos bits ocupa un dato de tipo <span class="mono">int</span>?', ok: '32 bits', bad: ['8 bits', '16 bits', '64 bits'], bl: 'Recordar' },
-      { q: 'Olvidar el punto y coma al final de una instrucción produce un…', ok: 'error sintáctico: el compilador lo detecta', bad: ['error lógico', 'resultado correcto', 'ciclo infinito'], bl: 'Comprender' }
-    ],
-    B: [
-      { q: '¿En qué empresa nació el lenguaje Java?', ok: 'Sun Microsystems', bad: ['Microsoft', 'IBM', 'Apple'], bl: 'Recordar' },
-      { q: '¿Cuál fue el <b>primer nombre</b> del lenguaje que hoy conocemos como Java?', ok: 'Oak', bad: ['Pascal', 'Cobol', 'Python'], bl: 'Recordar' },
-      { q: 'Que Java tenga una <b>arquitectura neutral</b> significa que…', ok: 'el mismo bytecode se ejecuta en cualquier sistema que tenga una JVM', bad: ['solo funciona en Windows', 'no usa la memoria de la computadora', 'nunca necesita compilarse'], bl: 'Comprender' },
-      { q: 'Un <b>intérprete</b>…', ok: 'traduce y ejecuta el programa instrucción por instrucción', bad: ['traduce todo el programa y no lo ejecuta', 'solo dibuja el diagrama de flujo', 'es un tipo de dato de Java'], bl: 'Comprender' },
-      { q: '¿Qué contiene el <b>JDK</b> (Java Development Kit)?', ok: 'Las herramientas para desarrollar en Java, como el compilador javac y el entorno para ejecutar los programas', bad: ['Solo un editor de texto', 'Solo el sistema operativo', 'Únicamente juegos de ejemplo'], bl: 'Comprender' },
-      { q: 'Un programa de Java empieza a ejecutarse en el método…', ok: '<span class="mono">main</span>', bad: ['<span class="mono">start</span>', '<span class="mono">print</span>', '<span class="mono">init</span>'], bl: 'Recordar' },
-      { q: '¿Qué tipo primitivo guarda únicamente los valores <span class="mono">true</span> o <span class="mono">false</span>?', ok: '<span class="mono">boolean</span>', bad: ['<span class="mono">char</span>', '<span class="mono">int</span>', '<span class="mono">String</span>'], bl: 'Recordar' },
-      { q: 'Un programa compila y corre, pero calcula mal el promedio de 3 calificaciones porque divide entre 2. Es un…', ok: 'error lógico', bad: ['error sintáctico', 'error del teclado', 'error de la JVM'], bl: 'Comprender' }
-    ],
-    C: [
-      { q: '¿Qué empresa es responsable de Java desde que compró Sun Microsystems en 2010?', ok: 'Oracle', bad: ['Google', 'Microsoft', 'IBM'], bl: 'Recordar' },
-      { q: 'El lema de Java «<i>Write once, run anywhere</i>» significa…', ok: 'escribe el programa una vez y ejecútalo en cualquier plataforma que tenga JVM', bad: ['el programa solo puede ejecutarse una vez', 'hay que reescribir el programa para cada sistema operativo', 'el programa no necesita computadora'], bl: 'Comprender' },
-      { q: 'Java es un lenguaje <b>orientado a objetos</b> porque…', ok: 'organiza los programas en clases y objetos', bad: ['solo se programa con diagramas', 'no usa variables', 'se ejecuta sin compilar'], bl: 'Comprender' },
-      { q: '¿Qué extensión tiene un archivo de <b>código fuente</b> de Java?', ok: '<span class="mono">.java</span>', bad: ['<span class="mono">.class</span>', '<span class="mono">.exe</span>', '<span class="mono">.jvm</span>'], bl: 'Recordar' },
-      { q: '¿Qué es un <b>IDE</b>?', ok: 'Un entorno de desarrollo integrado: editor, compilador y depurador en un solo programa (por ejemplo, NetBeans o Eclipse)', bad: ['Un tipo de dato', 'Un error de sintaxis', 'El código máquina del procesador'], bl: 'Recordar' },
-      { q: '¿Para qué sirve la clase <span class="mono">Scanner</span>?', ok: 'Para leer los datos que el usuario escribe con el teclado', bad: ['Para imprimir en la pantalla', 'Para dibujar diagramas de flujo', 'Para compilar el programa'], bl: 'Recordar' },
-      { q: '¿Cuál es el rango de valores del tipo <span class="mono">byte</span>?', ok: 'De −128 a 127', bad: ['De 0 a 255', 'De −32,768 a 32,767', 'De 0 a 1'], bl: 'Recordar' },
-      { q: 'Un <b>paradigma de programación</b> es…', ok: 'un estilo o enfoque para escribir programas, por ejemplo el imperativo o el orientado a objetos', bad: ['un error que detecta el compilador', 'un tipo de dato numérico', 'el nombre de la máquina virtual'], bl: 'Comprender' }
-    ]
-  },
-  tipo: {        // ¿qué tipo de dato conviene? (cod)
-    A: [
-      { q: 'Se quiere guardar la <b>edad</b> de una persona (de 0 a 120 años) usando la <b>menor memoria</b> posible. ¿Qué tipo primitivo conviene?', ok: '<span class="mono">byte</span>', bad: ['<span class="mono">long</span>', '<span class="mono">double</span>', '<span class="mono">boolean</span>'], bl: 'Aplicar' },
-      { q: '¿Qué tipo de dato conviene para guardar el <b>precio</b> de un producto con centavos, por ejemplo 249.90?', ok: '<span class="mono">double</span>', bad: ['<span class="mono">int</span>', '<span class="mono">char</span>', '<span class="mono">boolean</span>'], bl: 'Aplicar' }
-    ],
-    B: [
-      { q: '¿Qué tipo de dato conviene para guardar la <b>inicial</b> del nombre de una persona (una sola letra)?', ok: '<span class="mono">char</span>', bad: ['<span class="mono">double</span>', '<span class="mono">int</span>', '<span class="mono">boolean</span>'], bl: 'Aplicar' },
-      { q: '¿Qué tipo de dato conviene para guardar si un alumno <b>está inscrito o no</b>?', ok: '<span class="mono">boolean</span>', bad: ['<span class="mono">char</span>', '<span class="mono">float</span>', '<span class="mono">long</span>'], bl: 'Aplicar' }
-    ],
-    C: [
-      { q: 'Se quiere guardar la <b>población mundial</b> (unos 8,000 millones de personas). El tipo <span class="mono">int</span> llega hasta 2,147,483,647. ¿Qué tipo conviene?', ok: '<span class="mono">long</span>', bad: ['<span class="mono">byte</span>', '<span class="mono">short</span>', '<span class="mono">char</span>'], bl: 'Analizar' },
-      { q: '¿Qué tipo de dato conviene para guardar una <b>temperatura</b> como 36.7 °C?', ok: '<span class="mono">double</span>', bad: ['<span class="mono">int</span>', '<span class="mono">boolean</span>', '<span class="mono">char</span>'], bl: 'Aplicar' }
-    ]
-  },
-  scan: {
-    A: [{ q: 'Con un objeto <span class="mono">Scanner</span> llamado <span class="mono">sc</span>, ¿qué método lee un <b>número entero</b>?', ok: '<span class="mono">sc.nextInt()</span>', bad: ['<span class="mono">sc.nextDouble()</span>', '<span class="mono">sc.nextLine()</span>', '<span class="mono">System.out.println()</span>'], bl: 'Recordar' }],
-    B: [{ q: 'Con un objeto <span class="mono">Scanner</span> llamado <span class="mono">sc</span>, ¿qué método lee un <b>número con decimales</b>?', ok: '<span class="mono">sc.nextDouble()</span>', bad: ['<span class="mono">sc.nextInt()</span>', '<span class="mono">sc.next()</span>', '<span class="mono">System.in</span>'], bl: 'Recordar' }],
-    C: [{ q: '¿Qué instrucción crea un objeto <span class="mono">Scanner</span> para leer desde el teclado?', ok: '<span class="mono">Scanner sc = new Scanner(System.in);</span>', bad: ['<span class="mono">Scanner sc = System.out;</span>', '<span class="mono">import Scanner = teclado;</span>', '<span class="mono">int sc = new Scanner();</span>'], bl: 'Recordar' }]
-  }
-};
-/* Símbolos de diagrama de flujo (ANSI/ISO 5807) */
+let BANKJ = {};/* Símbolos de diagrama de flujo (ANSI/ISO 5807) */
 const FSYM = {
   term: { svg: '<rect x="20" y="15" width="160" height="50" rx="25" />', ok: 'Inicio o fin del algoritmo (terminal)' },
   proc: { svg: '<rect x="20" y="15" width="160" height="50" />', ok: 'Proceso: una operación o asignación' },
@@ -2061,10 +1837,77 @@ api = async function (action, data = {}) {
   if (isBusy(r)) r.code = 'ocupado';
   return r;
 };
+const BANK_CACHE_PREFIX = `eq_${CFG.MATERIA}_bank`;
+let ACTIVE_BANK_REVISION = '', ACTIVE_BANK_PARTIAL = 0;
+const questionBankCacheKey = (partial, revision) => `${BANK_CACHE_PREFIX}_${partial}_${revision}`;
+function applyQuestionBank(partial, bank) {
+  if (!bank || typeof bank !== 'object' || Array.isArray(bank)) throw new Error('El servidor devolvió un banco de preguntas inválido.');
+  if (CFG.MATERIA === 'cib') {
+    if (+partial === 1) {
+      BANK = bank.BANK || {}; BANK2 = bank.BANK2 || {};
+      NAMES = bank.NAMES || {}; PAIRS = bank.PAIRS || {}; RANGE = bank.RANGE || {}; SUMBITS = bank.SUMBITS || {};
+      SECS1 = bank.SECS1 || []; SECS2 = bank.SECS2 || [];
+    } else {
+      BANKJ = bank.BANKJ || {};
+      SECS_J = bank.SECS_J || [];
+    }
+  } else if (+partial === 1) {
+    BANK1 = bank.BANK1 || {}; SECS1 = bank.SECS1 || [];
+  } else {
+    BANK2 = bank.BANK2 || {}; SECS2 = bank.SECS2 || [];
+  }
+}
+function persistQuestionBank(partial, bank, revision) {
+  if (!/^[a-f0-9]{64}$/i.test(String(revision || ''))) throw new Error('El servidor no devolvió una versión válida del banco.');
+  applyQuestionBank(partial, bank);
+  try { localStorage.setItem(questionBankCacheKey(partial, revision), JSON.stringify(bank)); }
+  catch (error) { throw new Error('No se pudo guardar el banco de preguntas en este navegador. Libera espacio y vuelve a entrar.'); }
+  ACTIVE_BANK_PARTIAL = +partial; ACTIVE_BANK_REVISION = String(revision);
+  return ACTIVE_BANK_REVISION;
+}
+function restoreQuestionBank(partial, revision) {
+  if (!revision) return false;
+  const raw = LS.get(questionBankCacheKey(partial, revision));
+  if (!raw) return false;
+  try {
+    const bank = JSON.parse(raw);
+    applyQuestionBank(partial, bank);
+    ACTIVE_BANK_PARTIAL = +partial; ACTIVE_BANK_REVISION = String(revision);
+    return true;
+  } catch (error) {
+    console.error('No se pudo restaurar la copia local del banco de preguntas:', error);
+    return false;
+  }
+}
+async function loadQuestionBank(partial) {
+  const response = await api('question_bank', { parcial: partial, token: ADMIN });
+  if (!response || !response.ok) throw new Error(response && response.msg ? response.msg : 'No se pudieron cargar las preguntas desde Sheets.');
+  return persistQuestionBank(partial, response.bank, response.bankRevision);
+}
+async function ensureQuestionBankForState(state) {
+  if (!state) throw new Error('No hay un intento para restaurar.');
+  if (state.bankRevision) {
+    if (restoreQuestionBank(state.parcial, state.bankRevision)) return;
+    throw new Error('Falta la copia local de las preguntas de este intento. No se reemplazará por una versión distinta.');
+  }
+  if (+ACTIVE_BANK_PARTIAL !== +state.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a iniciar sesión para cargar las preguntas de este examen.');
+  state.bankRevision = ACTIVE_BANK_REVISION;
+  save();
+}
+async function ensureQuestionBankForLogin(session) {
+  if (session.bankRevision) {
+    if (restoreQuestionBank(session.parcial, session.bankRevision)) return;
+    throw new Error('Falta la copia local de las preguntas cargadas al iniciar sesión. Vuelve a ingresar para descargarlas otra vez.');
+  }
+  if (+ACTIVE_BANK_PARTIAL !== +session.parcial || !ACTIVE_BANK_REVISION) throw new Error('Vuelve a ingresar la contraseña del examen para cargar las preguntas.');
+  session.bankRevision = ACTIVE_BANK_REVISION;
+  SS.set('eq_sess', JSON.stringify(session));
+}
 const MSG = {
   incorrecta: 'Contraseña incorrecta.',
   cambio: 'La contraseña ha cambiado. Solicita la nueva a tu profesor(a).',
   cerrado: 'El examen está cerrado por ahora. Consulta a tu profesor(a).',
+  preguntas: 'No se pudo cargar el banco de preguntas desde Google Sheets.',
   red: 'No hay conexión con el servidor. Revisa tu internet e inténtalo otra vez.',
   config: 'El examen aún no está conectado a la hoja de Google (falta configurar el ENDPOINT).',
   auth: 'Tu sesión de administrador expiró. Vuelve a entrar.',
@@ -2202,7 +2045,13 @@ const ResultQueue = {
         const r = await api('submit', Object.assign({}, job.result, { requestId: job.key }));
         if (r.ok) {
           await this.remove(job); this.jobs.shift();
-          if (S && S.result && this.key(S.result) === job.key) { S.sent = true; S.status = 'ok'; SEND.n = 0; save(); renderFin(); }
+          if (S && S.result && this.key(S.result) === job.key) {
+            const grade = r.grade && typeof r.grade === 'object' ? r.grade : r;
+            ['aciertos', 'total', 'calificacion', 'detalle', 'respuestas', 'base', 'bonus'].forEach(key => {
+              if (grade[key] !== undefined) S.result[key] = grade[key];
+            });
+            S.sent = true; S.status = 'ok'; SEND.n = 0; save(); renderFin();
+          }
         } else if (r.code === 'duplicado' || r.code === 'sesion') {
           await this.remove(job); this.jobs.shift();
           if (S && S.result && this.key(S.result) === job.key) { S.status = 'dup'; save(); renderFin(); }
@@ -2232,13 +2081,19 @@ $('#form-clave').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('#btn-entrar'), err = $('#clave-err'), clave = $('#clave').value.trim();
   if (!clave) return;
-  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando…'; err.hidden = true;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando y cargando preguntas…'; err.hidden = true;
   const r = await api('login', { clave, dev: DEV });
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Entrar';
   if (r.code === 'bloqueado') { lockLogin(r.espera || 300); return; }
   if (r.ok && r.role === 'admin') { $('#clave').value = ''; showAlert('El panel está en el Dashboard', 'Los resultados, métricas, contraseñas y la configuración de este examen se manejan en el <b>Dashboard de Asistencias</b>: entra como administrador y elige <b>Examen</b> en la barra superior.', 'bi-speedometer2', '#4338ca'); return; }
   if (r.ok && r.role === 'alumno' && bloqueaMovil()) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Entrar'; return; }
-  if (r.ok && r.role === 'alumno') { CLK = !!r.reloj; PREGN = r.preguntas; PREGC = r.cierre || ''; SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '' })); afterLogin(r.parcial, true); return; }
+  if (r.ok && r.role === 'alumno') {
+    try { persistQuestionBank(r.parcial, r.questionBank, r.bankRevision); }
+    catch (error) { err.textContent = error.message; err.hidden = false; return; }
+    CLK = !!r.reloj; PREGN = r.preguntas; PREGC = r.cierre || '';
+    SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: r.parcial, n: r.preguntas, cierre: r.cierre || '', bankRevision: r.bankRevision }));
+    await afterLogin(r.parcial, true); return;
+  }
   err.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${MSG[r.code] || r.msg || 'No se pudo entrar.'}${r.code === 'incorrecta' && r.restan !== undefined ? ` <b>Te ${r.restan === 1 ? 'queda 1 intento' : 'quedan ' + r.restan + ' intentos'}.</b>` : ''}`; err.hidden = false;
   const c = $('#clave-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); $('#clave').select();
 });
@@ -2250,19 +2105,26 @@ function lockLogin(sec) {                         // bloqueo por demasiados inte
     err.innerHTML = `<i class="bi bi-shield-lock-fill me-1"></i>Demasiados intentos con contraseña incorrecta. Podrás intentar de nuevo en <b>${Math.floor(left / 60)}:${pad2(left % 60)}</b>.`; err.hidden = false; };
   paint(); lockT = setInterval(paint, 500);
 }
-function afterLogin(parcial, fresh) {
+async function afterLogin(parcial, fresh) {
   if (S && S.fin) {
     if (fresh) { if (!S.sent && S.status !== 'dup' && S.result) queueResult(S.result); clearState(); flushQueue(); }   // alumno nuevo en este equipo: se limpia el intento anterior
     else { renderFin(); show('fin'); return; }
   }
   if (S && !S.fin) {
-    if (!fresh) { startExam(true); return; }          // recarga en la misma pestaña: continúa
+    if (!fresh) {
+      try { await ensureQuestionBankForState(S); }
+      catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); return; }
+      startExam(true); return;
+    }
     $('#rs-info').innerHTML = `<b>${esc(S.nombre)}</b> · ${esc(S.cuenta)} · Gpo. ${esc(S.grupo)}<br><small class="text-muted">${EXAMS[S.parcial].titulo} · Tipo ${S.tipo}</small>`;
     show('resume'); return;
   }
   openDatos(parcial);
 }
-$('#rs-continuar').onclick = () => startExam(true);
+$('#rs-continuar').onclick = async () => {
+  try { await ensureQuestionBankForState(S); startExam(true); }
+  catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); }
+};
 $('#rs-otro').onclick = () => { if (confirm('Dejarás de ver el intento anterior en este equipo (el avance sigue guardado y se retoma con su número de cuenta y nombre). ¿Continuar?')) { const s = JSON.parse(SS.get('eq_sess') || '{}'), p = s.parcial || (S && S.parcial) || 1; detachState(); openDatos(p); } };
 
 /* ===== 2. Datos ===== */
@@ -2305,10 +2167,15 @@ $('#form-datos').addEventListener('submit', async e => {
   }
   if (res.resumed) {          // el servidor ya tenía este examen en curso: se continúa con el mismo tipo, reloj y respuestas
     const pr = res.progreso || {}, loc = loadLocal(PARCIAL, cuenta), mismo = loc && !loc.fin && (loc.seed >>> 0) === (res.seed >>> 0);
-    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
+    if (mismo && loc.bankRevision && !restoreQuestionBank(PARCIAL, loc.bankRevision)) {
+      showAlert('Falta la copia local de las preguntas', 'No se reemplazará la versión de este intento por otra distinta. Contacta a tu profesor(a) antes de continuar.', 'bi-cloud-download', '#d97706'); return;
+    }
+    S = { parcial: PARCIAL, nombre: res.nombre || nombre, cuenta, grupo: res.grupo || grupo, tipo: res.tipo, seed: res.seed >>> 0, start: Date.parse(res.inicio) || Date.now(), inicioISO: res.inicio, answers: Object.assign({}, pr.a || {}, mismo ? loc.answers : {}), flags: Object.assign({}, pr.f || {}, mismo ? loc.flags : {}), proc: Object.assign({}, pr.p || {}, mismo ? loc.proc || {} : {}), salidas: Math.max(res.salidas || 0, mismo ? loc.salidas || 0 : 0), n: effN(res.total || (mismo ? loc.n : 0), availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: mismo && loc.bankRevision ? loc.bankRevision : ACTIVE_BANK_REVISION };
+    try { await ensureQuestionBankForState(S); }
+    catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); return; }
     save(); startExam(true); if (res.cerrar) { toast('Tu profesor(a) cerró tu examen: tus respuestas se enviaron.', 'bi-lock-fill', 5000); finish('admin'); } return;
   }
-  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {} };
+  S = { parcial: PARCIAL, nombre, cuenta, grupo, tipo, seed, start: Date.parse(res.inicio) || nowMs(), inicioISO: res.inicio || inicio, n: effN(res.preguntas, availOf(PARCIAL)), cierre: res.cierre ? Date.parse(res.cierre) : 0, answers: {}, flags: {}, proc: {}, salidas: 0, fin: false, sent: false, result: null, sid: res.sid, questionEdits: res.questionEdits || {}, bankRevision: ACTIVE_BANK_REVISION };
   save(); startExam(false);
 });
 
@@ -2497,24 +2364,54 @@ function grade() {
   const resp = EXAM.map(q => { const v = S.answers[q.id]; return q.id + ':' + (v === undefined || v === '' ? '-' : (q.kind === 'mc' ? 'ABCD'[+v] : v)); }).join(';');
   return { ok, det, resp, bon, base: okBase, nota: Math.round(ok / TOTAL() * 100) / 10 };
 }
+const GRADE_WAIT_STEPS = ['Preparando tus respuestas…', 'Empaquetando el examen…', 'Enviando al servidor…', 'Evaluando cada respuesta…', 'Esperando la calificación final…'];
+let gradeWaitTimer = null, gradeWaitIndex = 0;
+function startGradeWait() {
+  if (gradeWaitTimer) return;
+  gradeWaitIndex = 0;
+  gradeWaitTimer = setInterval(() => {
+    gradeWaitIndex = Math.min(gradeWaitIndex + 1, GRADE_WAIT_STEPS.length - 1);
+    const step = $('#grade-wait-step');
+    if (step) step.textContent = GRADE_WAIT_STEPS[gradeWaitIndex];
+    maybeRevealGrade();
+  }, 1400);
+}
+function stopGradeWait() {
+  clearInterval(gradeWaitTimer);
+  gradeWaitTimer = null;
+}
+function maybeRevealGrade() {
+  if (!S || !S.sent || gradeWaitIndex < GRADE_WAIT_STEPS.length - 1 || S.gradeRevealed) return;
+  S.gradeRevealed = true;
+  stopGradeWait();
+  save();
+  renderFin();
+}
+function gradeWaitHTML() {
+  startGradeWait();
+  return `<div class="grade-wait" role="status" aria-live="polite"><div class="spinner-border text-primary mb-3" aria-hidden="true"></div><h2 class="h5 fw-bold mb-2">Calificando tu examen</h2><p id="grade-wait-step" class="grade-wait-step mb-3">${GRADE_WAIT_STEPS[gradeWaitIndex]}</p><div class="grade-wait-track" aria-hidden="true"><i></i></div><div class="small text-muted mt-3">Espera la respuesta del servidor. No cierres esta página.</div></div>`;
+}
 function finish(motivo) {
   if (!S || S.fin) return;
   const g = grade(), fin = Math.min(nowMs(), limiteMs()), usado = fin - S.start;
   S.fin = true; examActive = false; clearInterval(timerId); clearInterval(syncId); clearInterval(pollId);
   S.result = { parcial: S.parcial, inicio: S.inicioISO, fecha: new Date(fin).toISOString(), nombre: S.nombre, cuenta: S.cuenta, grupo: S.grupo, tipo: S.tipo, aciertos: g.ok, base: g.base, bonus: g.bon, total: TOTAL(), calificacion: g.nota, tiempo: fmtT(usado), tiempoSeg: Math.round(usado / 1000), salidas: S.salidas, motivo, detalle: g.det, respuestas: g.resp, procedimiento: JSON.stringify(S.proc || {}), seed: S.seed, sid: S.sid };
-  S.status = 'pend'; save(); renderFin(); show('fin'); sendResult(S);
+  S.status = 'pend'; S.gradeRevealed = false; save(); renderFin(); show('fin'); sendResult(S);
 }
 
 /* ===== 4. Pantalla final: calificación y envío ===== */
 function renderFin() {
   const r = S.result, pct = r.aciertos / r.total * 100, col = pct >= 60 ? '#16a34a' : '#dc2626';
   $('#fin-sub').textContent = `${EXAMS[r.parcial].titulo}`;
-  $('#fin-score').innerHTML = S.status === 'dup'
+  if (S.status === 'dup' || S.gradeRevealed) stopGradeWait();
+  const waiting = S.status !== 'dup' && !S.gradeRevealed;
+  $('#fin-score').innerHTML = waiting ? gradeWaitHTML() : S.status === 'dup'
     ? `<div class="alert alert-danger d-inline-block"><i class="bi bi-x-octagon-fill me-1"></i>Este examen ya había sido respondido: no se guardó tu resultado.</div>`
     : `<div class="grade-ring" style="--p:${pct};--gc:${col}"><b style="color:${col}">${r.calificacion.toFixed(1)}</b><small class="text-muted fw-bold">de 10</small></div><div class="mt-2 fw-bold">${r.aciertos} aciertos de ${r.total}</div>${r.bonus ? '<div class="small fw-bold" style="color:#b45309"><i class="bi bi-star-fill me-1"></i>Incluye la pregunta bonus (+2, máximo 10)</div>' : ''}<div class="small text-muted">${pct >= 60 ? '¡Aprobado!' : 'Sigue practicando, ¡tú puedes!'}</div>`;
   $('#fin-aviso') && ($('#fin-aviso').innerHTML = r.motivo === 'admin' ? '<div class="alert alert-warning small fw-bold"><i class="bi bi-lock-fill me-1"></i>Tu profesor(a) cerró este examen por exceder el límite de salidas de la ventana. Se calificó con lo que alcanzaste a responder.</div>' : '');
   $('#fin-datos').innerHTML = `<div class="fin-banner"><div><small>Número de cuenta</small><b>${esc(r.cuenta)}</b></div><div><small>Grupo</small><b>${esc(r.grupo)}</b></div></div>`;
-  renderMalas(r);
+  if (waiting) $('#fin-malas').replaceChildren();
+  else renderMalas(r);
   setStatus();
 }
 /* Preguntas que estuvieron mal (sin mostrar la respuesta correcta) */
@@ -2573,22 +2470,35 @@ function leave() { if (!examActive || away) return; away = true; S.salidas++; sa
 function back() { if (!away) return; away = false; if (examActive) toast(`Saliste de la ventana del examen (${S.salidas} ${S.salidas === 1 ? 'vez' : 'veces'}). Queda registrado.`, 'bi-eye-fill', 6000); }
 document.addEventListener('visibilitychange', () => document.hidden ? leave() : back());
 window.addEventListener('blur', leave); window.addEventListener('focus', back);
-window.addEventListener('beforeunload', e => { if (examActive || (S && S.result && !S.sent && S.status !== 'dup')) { e.preventDefault(); e.returnValue = ''; } });   // también mientras el envío final no se guarde
+window.addEventListener('beforeunload', e => { if (examActive || (S && S.result && (!S.sent || !S.gradeRevealed) && S.status !== 'dup')) { e.preventDefault(); e.returnValue = ''; } });   // también mientras se espera la respuesta final
 
 /* ===== Arranque ===== */
 /* Modo panel: el Dashboard de Asistencias abre esta página en un marco (?panel=1) solo para usar el motor del examen
    (reconstruir cada examen, revisar procedimientos y calcular métricas). Aquí no se muestra nada al alumnado. */
 const PANEL_MODE = new URLSearchParams(location.search).get('panel') === '1' && window.parent !== window;
 $('#btn-prof-movil').onclick = () => show('clave');
-(function init() {
+(async function init() {
+  await EXAM_DATA_READY;
   { const dd = $('#d-dur'); if (dd) dd.textContent = CFG.DURACION_MIN; }
   let sess = null; try { sess = JSON.parse(SS.get('eq_sess') || 'null'); } catch (e) { }
   if (PANEL_MODE) { document.body.classList.add('modo-panel'); $$('.screen').forEach(s => s.classList.add('d-none')); return; }   // el Dashboard inyecta aquí su panel
   if (sess && sess.role === 'admin') SS.del('eq_sess');
   if (MOVIL && !(S && S.fin)) { show('movil'); }                                        // celular o tableta: solo el profesor puede entrar
-  else if (sess && sess.role === 'alumno') { PREGN = sess.n; PREGC = sess.cierre || ''; afterLogin(sess.parcial, false); }
-  else if (S && !S.fin) { SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); startExam(true); }          // se cerró la ventana y se volvió a abrir: sigue la sesión de ese número de cuenta
-  else if (S && S.fin && S.result && !S.sent && S.status !== 'dup') { SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); renderFin(); show('fin'); sendResult(S); }
+  else if (sess && sess.role === 'alumno') {
+    if (!(S && S.fin)) {
+      try { await ensureQuestionBankForLogin(sess); }
+      catch (error) { showAlert('No se pudieron cargar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); show('clave'); return; }
+    }
+    PREGN = sess.n; PREGC = sess.cierre || ''; await afterLogin(sess.parcial, false);
+  }
+  else if (S && !S.fin) {
+    try {
+      await ensureQuestionBankForState(S);
+      SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial, bankRevision: S.bankRevision }));
+      startExam(true);
+    } catch (error) { showAlert('No se pudieron restaurar las preguntas', esc(error.message), 'bi-cloud-download', '#d97706'); show('clave'); }
+  }          // se cerró la ventana y se volvió a abrir: sigue la sesión de ese número de cuenta
+  else if (S && S.fin && S.result && (!S.sent || !S.gradeRevealed) && S.status !== 'dup') { SS.set('eq_sess', JSON.stringify({ role: 'alumno', parcial: S.parcial })); renderFin(); show('fin'); if (!S.sent) sendResult(S); }
   else show('clave');
   flushQueue();
 })();
